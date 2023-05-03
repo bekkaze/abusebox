@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "abusebox"
+version = "0.0.0-beta"
+description = ""
+authors = ["bekkage <bilguunsec@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+django = "^4.2"
+djangorestframework = "^3.14.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
