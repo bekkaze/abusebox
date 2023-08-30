@@ -28,6 +28,7 @@ function DashboardStatsGrid() {
           </div>
         </div>
       </BoxWrapper>
+      
       <BoxWrapper>
         <div className='rounded-full h-12 w-12 flex items-center justify-center bg-red-500'>
           <TbNetworkOff className='text-2xl text-white'/>
