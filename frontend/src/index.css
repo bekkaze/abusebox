@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', sans-serif;
+    line-height: 1.3;
+  }
+  table {}
+  th, 
+  td {
+    @apply py-3 px-2.5 text-sm text-left border-y border-gray-200;
+  }
+  thead {
+    @apply bg-slate-100;
+  }
+  th {
+    @apply font-semibold;
+  }
+  a {
+    @apply text-sky-500 hover:underline;
+  }
+}
