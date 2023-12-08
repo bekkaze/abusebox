@@ -1,14 +1,9 @@
-import React from "react";
-import DashboardStatsGrid from "./DashboardStatsGrid";
-import DashboardChart from "./charts/DashboardChart";
+import React, { useState } from 'react';
 
-export default function Dashboard() {
-  
-
+export default function Login() {
   return (
-    <div className="flex gap-4">
-      <DashboardStatsGrid/>
-      <DashboardChart/>
+    <div>
+      Dashboard
     </div>
-  )
+  ) 
 }
