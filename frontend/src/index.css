@@ -1,3 +1,7 @@
-@tailwind base; 
-@tailwind components; 
+@tailwind base;
+@tailwind components;
 @tailwind utilities;
+
+.home  {
+  background-color: #000300;
+}
