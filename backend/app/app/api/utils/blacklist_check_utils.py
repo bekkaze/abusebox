@@ -46,7 +46,7 @@ BASE_PROVIDERS = [
   {'provider': 'virus.rbl.jp', 'categories': ['unknown']},
   {'provider': 'wormrbl.imp.ch', 'categories': ['unknown']},
   {'provider': 'z.mailspike.net', 'categories': ['unknown']},
-  {'provider': 'netscan.rbl.blockedservers.com', 'categories': ['unknown']}
+  {'provider': 'netscan.rbl.blockedservers.com', 'categories': ['unknown']},
 ]
 
 # Blacklist check from source 
