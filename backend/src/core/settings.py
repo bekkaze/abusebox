@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-qg%5cq$_djbjqn1yn2$4nq%^_d@l=@ybq-h@4oa$#-c1my*^!6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -43,10 +43,12 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.authentication',
     'apps.blacklist',
+    'apps.hostname',
 
     # NATIVE
     'rest_framework',
     'drf_yasg',
+    'corsheaders',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -82,7 +84,13 @@ SWAGGER_SETTINGS = {
     }
 }
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000", 
+]
+CORS_ALLOW_CREDENTIALS = True
+
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

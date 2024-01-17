@@ -42,5 +42,7 @@ urlpatterns = [
     path('user/', include('apps.authentication.urls')),
     path('user/', include('apps.users.urls')),
 
-    path('blacklist/', include('apps.blacklist.apis.routes.urls')),
+    path('blacklist/', include('apps.blacklist.apis.urls')),
+
+    path('hostname/', include('apps.hostname.apis.urls')),
 ]
