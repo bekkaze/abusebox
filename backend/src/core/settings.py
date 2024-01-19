@@ -85,7 +85,7 @@ SWAGGER_SETTINGS = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000", 
+    "http://172.20.10.2:3000", 
 ]
 CORS_ALLOW_CREDENTIALS = True
 

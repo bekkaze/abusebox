@@ -1,29 +1,45 @@
-import React, { useState } from 'react';
+import { useState } from "react";
+import { useAuth } from "../services/auth/authProvider";
+import { loginUser } from "../services/auth/authService";
+import { useNavigate } from "react-router-dom";
 import loginImg from '../assets/login.jpg';
-import { login } from '../services/auth';
 
-export default function Login() {
+const Login = () => {
+  const { setToken } = useAuth();
+  const navigate = useNavigate();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [detail, setDetail] = useState('');
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-
+  const handleLogin = async (event) => {
+    event.preventDefault();
     try {
-      const response = await login(username, password);
-
-      const { access, refresh } = response;
-
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('refreshToken', refresh);
-
+      const response = await fetch('/api/user/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Error during login: ${response.statusText}`);
+      }
+  
+      const responseData = await response.json();
+      setToken(responseData.access);
+      navigate('/', { replace: true });
     } catch (error) {
-      console.error('Login failed:', error.message);
-      setDetail('Invalid credentials. Please try again.');
+      setDetail(`Error during login: ${error.message}`);
+      throw error;
     }
   };
-
+  
+  
   return (
     <div className='grid grid-cols-1 sm:grid-cols-2 h-screen w-full'>
       <div className='hidden sm:block'>
@@ -51,4 +67,6 @@ export default function Login() {
       </div>
     </div>
   ) 
-}
+};
+
+export default Login;
