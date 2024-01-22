@@ -7,8 +7,8 @@ export const loginUser = async (username, password) => {
       password,
     });
 
-    if (response.data.accessToken) {
-      return response.data.access;
+    if (response.data.access) {
+      return response;
     }
 
     return response.data;

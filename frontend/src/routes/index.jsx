@@ -3,28 +3,39 @@ import { useAuth } from "../services/auth/authProvider";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 import Login from '../pages/Login';
+import LandingPage from "../pages/Landing";
+import QuickCheck from "../pages/blacklist/QuickCheck";
+import DashboardLayout from "../layouts/dashboard/layout";
 
 const Routes = () => {
   const { token } = useAuth();
   
   const routesForPublic = [
     {
-      path: '/home',
-      element: <div>Landing Page</div>,
+      path: '/',
+      element: <LandingPage />,
     },
+    {
+      path: 'quick-check',
+      element: <QuickCheck />
+    }
   ];
 
   const routesForAuthenticatedOnly = [
     {
-      path: '/',
-      element: <ProtectedRoute />,
+      path: '/dashboard',
+      element: (
+        <DashboardLayout>
+          <ProtectedRoute />
+        </DashboardLayout>
+      ),
       children: [
         {
-          path: '/dashboard',
+          path: '/dashboard/home',
           element: <div>User Dashboard</div>
         },
         {
-          path: '/blacklist-check',
+          path: '/dashboard/blacklist-check',
           element: <div>Blacklist Check</div>
         },
       ],
@@ -32,10 +43,6 @@ const Routes = () => {
   ];
 
   const routesForNotAuthenticatedOnly = [
-    {
-      path: '/quick-check',
-      element: <div>Quick check</div>,
-    },
     {
       path: '/login',
       element: <Login />

@@ -15,29 +15,20 @@ const Login = () => {
   const handleLogin = async (event) => {
     event.preventDefault();
     try {
-      const response = await fetch('/api/user/login/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
-      });
+      const response = await loginUser(username, password);
   
-      if (!response.ok) {
-        throw new Error(`Error during login: ${response.statusText}`);
+      if (response.data.access) {
+        const token = response.data.access;
+        setToken(token);
+        navigate('/dashboard/home', { replace: true });
+      } else {
+        setDetail('Login failed: Access token not found in response');
       }
-  
-      const responseData = await response.json();
-      setToken(responseData.access);
-      navigate('/', { replace: true });
     } catch (error) {
       setDetail(`Error during login: ${error.message}`);
-      throw error;
     }
   };
+  
   
   
   return (
