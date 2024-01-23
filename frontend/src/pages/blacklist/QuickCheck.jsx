@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { checkBlacklist } from '../../services/blacklist/checkService';
-import ResultTable from '../../components/landing/blacklist/ResultTable';
+import ResultTable from '../../components/blacklist/ResultTable';
 
 const QuickCheck = () => {
   const location = useLocation();

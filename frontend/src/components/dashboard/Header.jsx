@@ -10,8 +10,8 @@ export default function Header() {
   const { setToken } = useAuth();
 
   const handleLogout = () => {
-    setToken();
-    navigate("/", { replace: true });
+    setToken();    navigate("/", { replace: true });
+
   };
 
   return (

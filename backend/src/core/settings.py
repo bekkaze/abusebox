@@ -62,7 +62,7 @@ REST_FRAMEWORK = {
     ),  
 }
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False,
@@ -85,7 +85,7 @@ SWAGGER_SETTINGS = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://172.20.10.2:3000", 
+    "http://10.136.32.236:3000", 
 ]
 CORS_ALLOW_CREDENTIALS = True
 

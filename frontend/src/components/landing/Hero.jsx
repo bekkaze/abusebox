@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 /* import { checkBlacklist } from '../../services/blacklist'; */
 
 const Hero = () => {
-
   const navigate = useNavigate();
   const [hostname, setHostname] = useState('');
  

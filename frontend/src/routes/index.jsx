@@ -6,6 +6,8 @@ import Login from '../pages/Login';
 import LandingPage from "../pages/Landing";
 import QuickCheck from "../pages/blacklist/QuickCheck";
 import DashboardLayout from "../layouts/dashboard/layout";
+import BlacklistCheck from "../pages/dashboard/BlacklistCheck";
+import BlacklistMonitor from "../pages/dashboard/BlacklistMonitor";
 
 const Routes = () => {
   const { token } = useAuth();
@@ -36,8 +38,12 @@ const Routes = () => {
         },
         {
           path: '/dashboard/blacklist-check',
-          element: <div>Blacklist Check</div>
+          element: <BlacklistCheck />
         },
+        {
+          path: '/dashboard/blacklist-monitor',
+          element: <BlacklistMonitor />
+        }
       ],
     },
   ];

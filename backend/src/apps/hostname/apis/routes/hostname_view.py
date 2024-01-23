@@ -28,19 +28,30 @@ class HostnameDetailView(APIView):
     return Response(serializer.data)
 
   @swagger_auto_schema(
-    operation_description="Create a new hostname",
-    request_body=HostnameSerializer,
-    responses={
-      201: openapi.Response("New hostname created", HostnameSerializer()),
-      400: "Bad Request - Invalid input data",
-    },
+      operation_description="Create a new hostname",
+      request_body=HostnameSerializer,
+      responses={
+          201: openapi.Response("New hostname created", HostnameSerializer()),
+          400: "Bad Request - Invalid input data",
+      },
+      exclude=['user', 'status']  # Exclude 'user' and 'status' from the documentation
   )
   def post(self, request):
-    serializer = HostnameSerializer(data=request.data)
-    if serializer.is_valid():
+      post_data = {
+          'hostname': request.data.get('hostname'),
+          'hostname_type': request.data.get('hostname_type'),
+          'description': request.data.get('description'),
+          'is_alert_enabled': request.data.get('is_alert_enabled'),
+          'is_monitor_enabled': request.data.get('is_monitor_enabled'),
+          'status': 'active',
+          'user': request.user.id
+      }
+
+      serializer = HostnameSerializer(data=post_data)
+      serializer.is_valid(raise_exception=True)  # Raises ValidationError if not valid
+
       serializer.save()
       return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
   @swagger_auto_schema(
     operation_description="Update an existing hostname",
