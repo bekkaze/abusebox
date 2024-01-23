@@ -7,7 +7,7 @@ const HostnameService = () => {
   const createHostname = async (hostnameData) => {
     try {
       const response = await axios.post(
-        '/api/hostname/detail/',
+        '/api/hostname/',
         hostnameData,
         {
           headers: {
@@ -45,9 +45,30 @@ const HostnameService = () => {
     }
   };
 
+  const deleteHostname = async (id) => {
+    try {
+      const response = await axios.delete(
+        `/api/hostname/${id}`,
+        {
+          headers: {
+            'accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      return response;
+    } catch (error) {
+      console.error('Error delete hostname');
+      throw error;
+    }
+  }
+
   return {
     createHostname,
     listHostname,
+    deleteHostname,
   }
 }
 

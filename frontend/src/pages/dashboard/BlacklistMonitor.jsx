@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { HiOutlinePlusCircle } from "react-icons/hi";
-import { Dialog, Transition } from "@headlessui/react";
+import { HiOutlinePlusCircle, HiEye, HiTrash, HiPencilAlt } from "react-icons/hi";
+import { Dialog, Transition, Menu } from "@headlessui/react";
 import HostnameService from "../../services/hostname";
+import { MdCheckBox, MdCheckBoxOutlineBlank, } from "react-icons/md";
+import { RiListSettingsLine } from "react-icons/ri";
+
 
 export default function BlacklistMonitor() {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,7 +28,9 @@ export default function BlacklistMonitor() {
 
   const handleSubmit = async () => {
     try {
+      console.log(formData);
       const result = await hostnameService.createHostname(formData);
+      fetchHostnameList();
     } catch (error) {
       console.error("Failed to create hostname. Please try again:", error);
     }
@@ -37,7 +42,6 @@ export default function BlacklistMonitor() {
     try {
       const listData = await hostnameService.listHostname();
       setHostnameListData(listData);
-      console.log(listData);
     } catch (error) {
       console.error("Failed to retrieve hostname list:", error);
     }
@@ -46,6 +50,21 @@ export default function BlacklistMonitor() {
   useEffect(() => {
     fetchHostnameList();
   }, []);
+
+  const handleView = (id) => {
+    console.log(`View clicked for ID: ${id}`);
+  }
+
+  const handleDelete = async (id) => {
+    try {
+      const result = await hostnameService.deleteHostname(id);
+      fetchHostnameList();
+    } catch (error) {
+      console.error("Failed to delete hostname. Please try again:", error);
+    }
+
+    setIsOpen(false);
+  }
 
   return (
     <div className="bg-white px-4 pt-3 pb-4 rounded-sm border border-gray-200 flex-1">
@@ -70,9 +89,9 @@ export default function BlacklistMonitor() {
             <th className="p-2">Report</th>
             <th className="p-2">Checked</th>
             <th className="p-2">Created</th>
-            <th className="p-2">Status</th>
             <th className="p-2">Monitor</th>
             <th className="p-2">Alert</th>
+            <th className="p-2">Status</th>
             <th className="p-2">Action</th>
           </tr>
         </thead>
@@ -84,12 +103,85 @@ export default function BlacklistMonitor() {
               <td className="p-2"></td>
               <td className="p-2"></td>
               <td className="p-2">{hostnameData.created}</td>
+              <td className="p-2">
+                {hostnameData.is_alert_enabled ? <MdCheckBox /> : <MdCheckBoxOutlineBlank />}
+              </td>
+              <td className="p-2">
+                {hostnameData.is_monitor_enabled ? <MdCheckBox /> : <MdCheckBoxOutlineBlank />}
+              </td>
               <td className={`p-2 ${hostnameData.status === 'active' ? 'text-green-500' : 'text-red-500'}`}>
                 {hostnameData.status}
               </td>
               <td className="p-2">
-                {/* Add action buttons or links here */}
-              </td>
+                  <Menu>
+                    {({ open }) => (
+                      <>
+                        <Menu.Button className="text-gray-700 cursor-pointer">
+                          <RiListSettingsLine />
+                        </Menu.Button>
+                        <Transition
+                          show={open}
+                          enter="transition-opacity duration-75"
+                          enterFrom="opacity-0"
+                          enterTo="opacity-100"
+                          leave="transition-opacity duration-150"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <Menu.Items
+                            static
+                            className="origin-top-right absolute right-0 mt-2 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
+                          >
+                            <div className="py-1">
+                              <Menu.Item>
+                                {({ active }) => (
+                                  <button
+                                    onClick={() => {
+                                      handleView(hostnameData.id);
+                                    }}
+                                    className={`${
+                                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                    } w-full text-left py-2 px-4 text-sm`}
+                                  >
+                                    <div className="flex items-center"><HiEye className="mr-2" />Report</div>
+                                  </button>
+                                )}
+                              </Menu.Item>
+                              <Menu.Item>
+                              {({ active }) => (
+                                  <button
+                                    onClick={() => {
+                                      /* handleEdit(hostnameData.id); */
+                                    }}
+                                    className={`${
+                                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                    } w-full text-left py-2 px-4 text-sm`}
+                                  >
+                                    <div className="flex items-center"><HiPencilAlt className="mr-2" />Edit</div>
+                                  </button>
+                                )}
+                              </Menu.Item>
+                              <Menu.Item>
+                                {({ active }) => (
+                                  <button
+                                    onClick={() => {
+                                      handleDelete(hostnameData.id);
+                                    }}
+                                    className={`${
+                                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                    } w-full text-left py-2 px-4 text-sm`}
+                                  >
+                                    <div className="flex items-center"><HiTrash className="mr-2" />Delete</div>
+                                  </button>
+                                )}
+                              </Menu.Item>
+                            </div>
+                          </Menu.Items>
+                        </Transition>
+                      </>
+                    )}
+                  </Menu>
+                </td>
             </tr>
           ))}
         </tbody>

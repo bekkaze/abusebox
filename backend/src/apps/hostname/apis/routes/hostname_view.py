@@ -17,7 +17,7 @@ class HostnameListCreateView(APIView):
     serializer = HostnameSerializer(hostnames, many=True)
     return Response(serializer.data)
 
-class HostnameDetailView(APIView):
+class HostnameAPIView(APIView):
   @swagger_auto_schema(
     operation_description="Get details of a specific hostname",
     responses={200: openapi.Response("Details of the hostname", HostnameSerializer())},

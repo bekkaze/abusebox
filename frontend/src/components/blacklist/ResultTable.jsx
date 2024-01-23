@@ -26,7 +26,7 @@ const ResultTable = ({ data }) => {
       <tr>
         <th className="px-4 py-2">Provider</th>
         <th className="px-4 py-2">Status</th>
-        <th className="px-4 py-2">Action</th>
+        {/* <th className="px-4 py-2">Action</th> */}
       </tr>
     </thead>
     <tbody>
@@ -36,11 +36,11 @@ const ResultTable = ({ data }) => {
           <td className={`px-4 py-2 ${isBlacklisted(provider) ? 'text-red-600 font-bold' : 'text-green-600'}`}>
             {isBlacklisted(provider) ? 'Blacklisted' : 'Clear'}
           </td>
-          <td className="px-4 py-2">
+          {/* <td className="px-4 py-2">
           {isBlacklisted(provider) ? <button className="bg-[#EF4444] hover:bg-[#ff7676] text-white font-bold py-0.5 px-4 rounded">
               Delist
             </button> : ''}
-          </td>
+          </td> */}
         </tr>
       ))}
     </tbody>
