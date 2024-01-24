@@ -18,6 +18,7 @@
     "autoprefixer": "^10.4.17",
     "axios": "^1.6.5",
     "classnames": "^2.5.1",
+    "jwt-decode": "^4.0.0",
     "postcss": "^8.4.33",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

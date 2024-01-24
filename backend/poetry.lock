@@ -53,6 +53,19 @@ asgiref = ">=3.6"
 Django = ">=3.2"
 
 [[package]]
+name = "django-crontab"
+version = "0.7.1"
+description = "dead simple crontab powered job scheduling for django"
+optional = false
+python-versions = "*"
+files = [
+    {file = "django-crontab-0.7.1.tar.gz", hash = "sha256:1201810a212460aaaa48eb6a766738740daf42c1a4f6aafecfb1525036929236"},
+]
+
+[package.dependencies]
+Django = ">=1.8"
+
+[[package]]
 name = "djangorestframework"
 version = "3.14.0"
 description = "Web APIs for Django, made easy."
@@ -276,4 +289,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "5e343dd54714c716ee9cca9f05609d183df814822ed26e0db0fda3245dcd6b61"
+content-hash = "08d1b1bcd5f98abce9e23a2a4722ee1a4344860c8232ec4722345de9257bcc1d"

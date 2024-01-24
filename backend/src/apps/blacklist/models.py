@@ -1,6 +1,7 @@
 from django.db import models
 
 # Create your models here.
+# USE THIS FOR PREVENT DELIST MALICIOUS HACKER's IP
 class BlacklistedHostname(models.Model):
   hostname = models.CharField(max_length=30, null=False)
   reason = models.CharField(max_length=100, null=True)

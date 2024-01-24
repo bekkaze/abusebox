@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
     'corsheaders',
+    'django_crontab',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -172,3 +173,7 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CRONJOBS = [
+    ('1 1 * * *', 'apps.blacklist.jobs.check_hostname_blacklist.run')
+]

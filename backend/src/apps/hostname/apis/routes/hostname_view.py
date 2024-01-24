@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.core.serializers import serialize
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -6,16 +7,33 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from apps.hostname.models import Hostname
 from apps.hostname.apis.serializers import HostnameSerializer
+from apps.blacklist.models import BlacklistedHostname
+from apps.hostname.models import CheckHistory
+import json 
 
 class HostnameListCreateView(APIView):
   @swagger_auto_schema(
-    operation_description="Get a list of all hostnames",
-    responses={200: openapi.Response("List of hostnames", HostnameSerializer(many=True))},
+    operation_description="Get a list of all hostnames"
   )
   def get(self, request):
-    hostnames = Hostname.objects.all()
-    serializer = HostnameSerializer(hostnames, many=True)
-    return Response(serializer.data)
+    hostnames = Hostname.objects.filter(user=request.user.id).all()
+    response_data: list = []
+
+    for hostname in hostnames:
+      try:
+        check_history_model = CheckHistory.objects.filter(hostname=hostname.id).get()
+        hostname_data = json.loads(serialize('json', [hostname]))[0]['fields']
+        hostname_data['result'] = check_history_model.result
+        hostname_data['checked'] = check_history_model.created 
+        response_data.append(hostname_data)
+      except: 
+        hostname_data = json.loads(serialize('json', [hostname]))[0]['fields']
+        hostname_data['result'] = None
+        hostname_data['checked'] = 'Not checked'
+        response_data.append(hostname_data)
+
+    return Response(response_data, status=status.HTTP_200_OK)
+
 
 class HostnameAPIView(APIView):
   @swagger_auto_schema(
