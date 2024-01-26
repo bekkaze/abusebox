@@ -42,7 +42,7 @@ const Login = () => {
           <h2 className='text-4xl dark:text-white font-bold text-center'>Sign in</h2>
           <div className='flex flex-col text-gray-400 py-2'>
             <label>User Name</label>
-            <input className='rounded-lg bg-gray-700 mt-2 p-2 focus:border-blue-500 focus:bg-gray-800 focus:outline-none' placeholder='user@mail.com' type='text' value={username} onChange={(e) => setUsername(e.target.value)}/>
+            <input className='rounded-lg bg-gray-700 mt-2 p-2 focus:border-blue-500 focus:bg-gray-800 focus:outline-none' placeholder='username' type='text' value={username} onChange={(e) => setUsername(e.target.value)}/>
           </div>
           <div className='flex flex-col text-gray-400 py-2'>
             <label>Password</label>

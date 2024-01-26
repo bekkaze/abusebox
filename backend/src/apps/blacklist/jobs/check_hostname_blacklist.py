@@ -8,6 +8,10 @@ def run():
 
   for hostname in hostnames:
     result = check_dnsbl_providers(hostname.hostname)
+    if result['detected_on'] != []:
+      for detected_provider in result['detected_on']:
+        detected_provider['status'] = 'open'
+        detected_provider['respone'] = None
 
     check_history_model: dict = {
       'hostname': hostname.id,

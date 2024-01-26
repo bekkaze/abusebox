@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { checkBlacklist } from '../../services/blacklist/checkService';
-import ResultTable from '../../components/blacklist/ResultTable';
+import ResultTableQuick from '../../components/blacklist/ResultTable';
 
 const QuickCheck = () => {
   const location = useLocation();
@@ -42,8 +42,8 @@ const QuickCheck = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center bg-gray-200">
-      <div className="overflow-x-auto sm:-mx-6 lg:-mx-8 bg-white w-1/2 mx-auto">
+    <div className="bg-white px-4 pt-3 pb-4 rounded-sm border border-gray-200 flex-1">
+      <div className="border-x border-gray-200 rounded-sm mt-3">
         <h1 className="text-2xl font-bold mb-4 text-center">Report of {hostname}</h1>
         <div className="inline-block min-w-full py-2 sm:px-6 lg:px-8">
           <div className="overflow-hidden">

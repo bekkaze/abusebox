@@ -21,17 +21,20 @@ class HostnameListCreateView(APIView):
 
     for hostname in hostnames:
       try:
-        check_history_model = CheckHistory.objects.filter(hostname=hostname.id).get()
+        check_history_model = CheckHistory.objects.filter(hostname=hostname.id, status='current').get()
         hostname_data = json.loads(serialize('json', [hostname]))[0]['fields']
         hostname_data['result'] = check_history_model.result
         hostname_data['checked'] = check_history_model.created 
+        hostname_data['result']['id'] = check_history_model.id
+        hostname_data['id'] = hostname.id
         response_data.append(hostname_data)
       except: 
         hostname_data = json.loads(serialize('json', [hostname]))[0]['fields']
         hostname_data['result'] = None
         hostname_data['checked'] = 'Not checked'
+        hostname_data['id'] = hostname.id
         response_data.append(hostname_data)
-
+      
     return Response(response_data, status=status.HTTP_200_OK)
 
 

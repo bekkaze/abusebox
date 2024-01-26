@@ -24,7 +24,7 @@ const Navbar = () => {
               <li className='p-4 hover:bg-[#00df9a] cursor-pointer rounded-md' onClick={() => navigate('/signup')}>Signup</li>
             </>
         ) : (
-            <li className='p-4 hover:bg-[#00df9a] cursor-pointer rounded-md' onClick={() => navigate('/dashboard')}>Account</li>
+            <li className='p-4 hover:bg-[#00df9a] cursor-pointer rounded-md' onClick={() => navigate('/dashboard')}>Dashboard</li>
         )}
         </ul>
       <div onClick={handleNav} className='block md:hidden'>

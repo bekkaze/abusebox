@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from 'react-router-dom';
 import { HiOutlinePlusCircle } from 'react-icons/hi'
 import HostnameService from "../../services/hostname";
 import HostnameTable from "../../components/dashboard/blacklistMonitor/HostnameTable";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
-import ViewReport from "../../components/dashboard/blacklistMonitor/ViewReport";
 
 export default function BlacklistMonitor() {
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     hostname_type: "",
     hostname: "",
@@ -53,10 +54,8 @@ export default function BlacklistMonitor() {
   }, []);
 
   const handleView = (hostnameData) => {
-    console.log(hostnameData);
-    setSelectedHostnameData(hostnameData);
-    setViewModalOpen(true);
-  }
+    navigate('/dashboard/blacklist-monitor/report', { state: { hostnameData } });
+   }
 
   const handleDelete = async (id) => {
     try {
@@ -71,33 +70,32 @@ export default function BlacklistMonitor() {
 
   return (
     <div className="bg-white px-4 pt-3 pb-4 rounded-sm border border-gray-200 flex-1">
-    <div className='bg-white h-16 px-4 flex items-center border-b border-color-gray-200'>
-      <strong className="text-gray-700 font-medium">Blacklist Monitors</strong>
-      <div className="ml-auto">
-      <button
-        className="bg-blue-500 text-white py-2 px-4 flex items-center rounded"
-        onClick={() => setAddModalOpen(true)}
-      >
-        <HiOutlinePlusCircle className="mr-2" /> Add New
-      </button>
+      <div className='bg-white h-16 px-4 flex items-center border-b border-color-gray-200'>
+        <strong className="text-gray-700 font-medium">Blacklist Monitors</strong>
+        <div className="ml-auto">
+        <button
+          className="bg-blue-500 text-white py-2 px-4 flex items-center rounded"
+          onClick={() => setAddModalOpen(true)}
+        >
+          <HiOutlinePlusCircle className="mr-2" /> Add New
+        </button>
+        </div>
       </div>
-    </div>
 
-    <div className="border-x border-gray-200 rounded-sm mt-3">
-      <HostnameTable 
-      hostnameListData={hostnameListData} 
-      handleView={handleView} 
-      handleDelete={handleDelete} 
-      />
-      <AddNewMonitorDialog 
-      formData={formData} 
-      handleInputChange={handleInputChange} 
-      handleSubmit={handleSubmit} 
-      isOpen={addModalOpen} 
-      setIsOpen={setAddModalOpen} 
-      />
-      {selectedHostnameData && <ViewReport hostnameData={selectedHostnameData} isOpen={viewModalOpen} setIsOpen={setViewModalOpen} />}
-    </div>
+      <div className="border-x border-gray-200 rounded-sm mt-3">
+        <HostnameTable 
+        hostnameListData={hostnameListData} 
+        handleView={handleView} 
+        handleDelete={handleDelete} 
+        />
+        <AddNewMonitorDialog 
+        formData={formData} 
+        handleInputChange={handleInputChange} 
+        handleSubmit={handleSubmit} 
+        isOpen={addModalOpen} 
+        setIsOpen={setAddModalOpen} 
+        />
+      </div>
     </div>
   );
 }

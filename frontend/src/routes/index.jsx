@@ -8,6 +8,7 @@ import QuickCheck from "../pages/blacklist/QuickCheck";
 import DashboardLayout from "../layouts/dashboard/layout";
 import BlacklistCheck from "../pages/dashboard/BlacklistCheck";
 import BlacklistMonitor from "../pages/dashboard/BlacklistMonitor";
+import ViewReport from "../pages/dashboard/ViewReport";
 
 const Routes = () => {
   const { token } = useAuth();
@@ -43,6 +44,10 @@ const Routes = () => {
         {
           path: '/dashboard/blacklist-monitor',
           element: <BlacklistMonitor />
+        },
+        {
+          path: '/dashboard/blacklist-monitor/report',
+          element: <ViewReport />
         }
       ],
     },
