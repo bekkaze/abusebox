@@ -25,6 +25,7 @@
     "react-hot-toast": "^2.4.1",
     "react-icons": "^5.0.1",
     "react-router-dom": "^6.21.3",
+    "react-toastify": "^10.0.4",
     "react-typed": "^1.2.0",
     "tailwindcss": "^3.4.1"
   },

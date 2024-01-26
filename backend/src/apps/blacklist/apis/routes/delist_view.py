@@ -67,5 +67,8 @@ class DelistAPIView(APIView):
         
         check_history_model.result = check_history_model_result
         check_history_model.save()
+      
+      case _:
+        return Response({'msg': 'Not implemented'}, status=status.HTTP_200_OK)
 
     return Response(check_history_model_result, status=status.HTTP_200_OK)
