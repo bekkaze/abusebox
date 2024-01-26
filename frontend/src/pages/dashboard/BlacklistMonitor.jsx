@@ -4,6 +4,8 @@ import { HiOutlinePlusCircle } from 'react-icons/hi'
 import HostnameService from "../../services/hostname";
 import HostnameTable from "../../components/dashboard/blacklistMonitor/HostnameTable";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function BlacklistMonitor() {
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -30,10 +32,14 @@ export default function BlacklistMonitor() {
 
   const handleSubmit = async () => {
     try {
-    const result = await hostnameService.createHostname(formData);
-    fetchHostnameList();
+      const result = await hostnameService.createHostname(formData);
+      console.log(result);
+      if (result.status === 'active') {
+        toast.success("Successfully added hostname");
+        fetchHostnameList();
+      }
     } catch (error) {
-    console.error("Failed to create hostname. Please try again:", error);
+      toast.error("Failed to create hostname. Please try again:", error);
     }
 
     setAddModalOpen(false);
@@ -59,10 +65,15 @@ export default function BlacklistMonitor() {
 
   const handleDelete = async (id) => {
     try {
-    const result = await hostnameService.deleteHostname(id);
-    fetchHostnameList();
+      const result = await hostnameService.deleteHostname(id);
+
+      if (result.status === 204) {
+        toast.success('Successfully delete hostname');
+        fetchHostnameList();
+      }
+      
     } catch (error) {
-    console.error("Failed to delete hostname. Please try again:", error);
+      toast.error('Failed to delete hostname. Please try again:', error);
     }
 
     setViewModalOpen(false);
@@ -96,6 +107,8 @@ export default function BlacklistMonitor() {
         setIsOpen={setAddModalOpen} 
         />
       </div>
+
+      <ToastContainer position="top-center" autoClose={5000} />
     </div>
   );
 }

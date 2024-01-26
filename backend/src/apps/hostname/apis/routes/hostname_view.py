@@ -100,5 +100,7 @@ class HostnameAPIView(APIView):
   )
   def delete(self, request, pk):
     hostname = get_object_or_404(Hostname, pk=pk)
+    check_history = get_object_or_404(CheckHistory, hostname=hostname)
+    check_history.delete()
     hostname.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)

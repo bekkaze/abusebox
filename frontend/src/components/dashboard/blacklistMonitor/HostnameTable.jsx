@@ -9,6 +9,7 @@ export default function HostnameTable({ hostnameListData, handleView, handleDele
       <thead>
         <tr className="text-left border-b border-gray-300">
           <th className="p-2">Hostname</th>
+          <th className="p-2">Description</th>
           <th className="p-2">Type</th>
           <th className="p-2">Report</th>
           <th className="p-2">Checked</th>
@@ -23,6 +24,7 @@ export default function HostnameTable({ hostnameListData, handleView, handleDele
         {hostnameListData.map((hostnameData) => (
           <tr key={hostnameData.id} className="border-b border-gray-300">
             <td className="p-2">{hostnameData.hostname}</td>
+            <td className="p-2">{hostnameData.description}</td>
             <td className="p-2">{hostnameData.hostname_type}</td>
             <td className={`p-2 ${hostnameData.result ? (hostnameData.result.is_blacklisted === false ? 'text-green-500' : 'text-red-500') : 'text-black'}`}>
             <div>
