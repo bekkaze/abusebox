@@ -1,6 +1,6 @@
 # AbuseBox open source blacklist monitoring tool
 
-In order to prevent ISP organizations and organizations that operate using foreign addresses from the following risks, the web application has been developed as an open source, so that it is possible to check the blacklist with open source, control all the addresses in the organization, and send a request for automatic removal if it is blacklisted. Development was done using django-rest-framework on the backend and React/VITE on the frontend.
+In order to prevent ISP organizations and organizations that operate using public addresses from the following risks, the web application has been developed as an open source, so that it is possible to check the blacklist, monitor all the addresses in the organization, and send a deslist request for automatic removal if it is blacklisted. Development was done using django-rest-framework on the backend and React/VITE on the frontend.
 
 The following risks arise when a domain or network address is blacklisted:
 - Due to blacklisting of the external address that is being NATed, users will be restricted from accessing the Internet
