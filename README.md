@@ -8,6 +8,34 @@ The following risks arise when a domain or network address is blacklisted:
 - Damage to your organization's reputation
 - Inability to access certain services: If an IP address is blacklisted, it may be blocked from accessing certain websites or services.
 
+### Getting Started
+##### Backend
+```
+# pip3 install poetry
+# cd backend/
+# poetry install
+# poetry shell
+(VIRTUAL SHELL)# cd src; python manage.py runserver 0.0.0.0:8000
+```
+and need change CORS_ALLOWED_ORIGINS in /backend/src/core/settings.py:
+```
+CORS_ALLOWED_ORIGINS = [
+    "http://<FrontendIP>:3000", 
+]
+
+```
+##### Frontend 
+```
+# cd frontend/
+# yarn install
+# yarn run dev
+```
+
+.env file for vite/react:
+```
+VITE_BASE_URL=http://<backendIP>:8000/
+```
+
 ToDo:
 - Docker container deployment
 - Add nginx
