@@ -9,6 +9,7 @@ import DashboardLayout from "../layouts/dashboard/layout";
 import BlacklistCheck from "../pages/dashboard/BlacklistCheck";
 import BlacklistMonitor from "../pages/dashboard/BlacklistMonitor";
 import ViewReport from "../pages/dashboard/ViewReport";
+import Home from "../pages/dashboard/Home";
 
 const Routes = () => {
   const { token } = useAuth();
@@ -34,8 +35,8 @@ const Routes = () => {
       ),
       children: [
         {
-          path: '/dashboard/home',
-          element: <div>User Dashboard</div>
+          path: '/dashboard/',
+          element: <Home />
         },
         {
           path: '/dashboard/blacklist-check',
