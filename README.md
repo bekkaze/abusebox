@@ -37,7 +37,7 @@ CORS_ALLOWED_ORIGINS = [
 ```
 cd backend
 docker build -t abuse-backend .
-docker run -p 8000:8000 -e FRONT_IP="http://fill_caller_IP" abuse-backend
+docker run -p 8000:8000 -e FRONT_IP="http://fill_caller_domain" abuse-backend
 ```
 
 ##### Frontend
