@@ -47,7 +47,7 @@ const QuickCheck = () => {
         <h1 className="text-2xl font-bold mb-4 text-center">Report of {hostname}</h1>
         <div className="inline-block min-w-full py-2 sm:px-6 lg:px-8">
           <div className="overflow-hidden">
-            <ResultTable data={data} />
+            <ResultTableQuick data={data} />
           </div>
         </div>
       </div>
