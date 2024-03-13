@@ -8,40 +8,23 @@ from apps.hostname.models import CheckHistory, Hostname
 from apps.blacklist.utils.delist_util import barracudacentral
 from apps.users.models import User
 
-lang = input("What's the programming language you want to learn? ")
-
-match lang:
-    case "JavaScript":
-        print("You can become a web developer.")
-    case "Python":
-        print("You can become a Data Scientist")
-    case "PHP":
-        print("You can become a backend developer")
-    case "Solidity":
-        print("You can become a Blockchain developer")
-    case "Java":
-        print("You can become a mobile app developer")
-    case _:
-        print("The language doesn't matter, what matters is solving problems.")
-
-
 class DelistAPIView(APIView):
   @swagger_auto_schema(
-      operation_description="Post delisting data",
-      request_body=openapi.Schema(
-          type=openapi.TYPE_OBJECT,
-          properties={
-              'provider': openapi.Schema(type=openapi.TYPE_STRING, description="Provider"),
-              'delist_required_data': openapi.Schema(type=openapi.TYPE_OBJECT, description="Delist required data")
-          },
-          required=["provider", "delist_required_data"]
-      ),
-      responses={
-          200: openapi.Response('Successful operation'),
-          400: openapi.Response('Bad Request'),
-          500: openapi.Response('Internal Server Error')
+    operation_description="Post delisting data",
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        'provider': openapi.Schema(type=openapi.TYPE_STRING, description="Provider"),
+        'delist_required_data': openapi.Schema(type=openapi.TYPE_OBJECT, description="Delist required data")
       },
-      tags=['Delist API View']
+      required=["provider", "delist_required_data"]
+    ),
+    responses={
+      200: openapi.Response('Successful operation'),
+      400: openapi.Response('Bad Request'),
+      500: openapi.Response('Internal Server Error')
+    },
+    tags=['Delist API View']
   )
   def post(self, request):
     provider: str = request.data['provider']
@@ -51,7 +34,7 @@ class DelistAPIView(APIView):
     user_model = User.objects.filter(id=hostname_model.user.id).get()
 
     match provider:
-      case 'b.barracudacentral.org': #'spam.dnsbl.sorbs.net':#
+      case 'b.barracudacentral.org': # FOR TESTING
         chck, result = barracudacentral(
           check_history_model.hostname,
           user_model.phone_number,
@@ -61,7 +44,7 @@ class DelistAPIView(APIView):
 
         check_history_model_result: dict = check_history_model.result
         for history_detected_provider in check_history_model_result['detected_on']:
-          if history_detected_provider['provider'] == provider: # 'spam.dnsbl.sorbs.net':
+          if history_detected_provider['provider'] == provider: # FOR TESTING
             history_detected_provider['status'] = 'closed'
             history_detected_provider['response'] = result
         
@@ -71,4 +54,10 @@ class DelistAPIView(APIView):
       case _:
         return Response({'msg': 'Not implemented'}, status=status.HTTP_200_OK)
 
-    return Response(check_history_model_result, status=status.HTTP_200_OK)
+    return Response(
+    {
+      'msg': 'success',
+      'result': check_history_model_result
+    },
+      status=status.HTTP_200_OK
+  )
