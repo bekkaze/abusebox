@@ -20,7 +20,7 @@ const Login = () => {
       if (response.data.access) {
         const token = response.data.access;
         setToken(token);
-        navigate('/dashboard/home', { replace: true });
+        navigate('/dashboard/', { replace: true });
       } else {
         setDetail('Login failed: Access token not found in response');
       }

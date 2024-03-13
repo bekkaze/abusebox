@@ -1,14 +1,16 @@
-// DelistModal.jsx
 import React, { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import FormFieldRender from './FormFieldRender';
 import DelistSerivce from '../../../services/blacklist/delist';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from "react-router-dom";
 
 const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
   const [formData, setFormData] = useState({});
   const delistService = DelistSerivce(); 
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleInputChange = (event) => {
     setFormData({
@@ -19,6 +21,8 @@ const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
    
 
   const handleSubmit = async () => {
+    console.log(data);
+    setIsLoading(true);
     const body = {
       'provider': provider,
       'delist_required_data': {
@@ -29,15 +33,18 @@ const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
     
     try {
       const response = await delistService.delistRequest(body);
-      if (response.success) {
+
+      if (response.msg === 'success') {
         toast.success('Delist request sent successfully');
-        window.location.reload();
+        navigate('/dashboard/blacklist-monitor/', { replace: true });
       } else if (response.msg === 'Not implemented') {
         toast.error(`Not implemented auto list feature on ${provider}`);
       }
     } catch (error) {
       console.error('Error during delist request:', error);
       toast.error('An error occurred while processing your request.');
+    } finally {
+      setIsLoading(false);
     }
     onClose(); 
   };
@@ -71,9 +78,10 @@ const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
               <div className="mt-4 flex justify-between">
                 <button
                   onClick={handleSubmit}
-                  className="bg-blue-500 text-white py-2 px-4 rounded"
-                >
-                  Send delist request
+                  className={`py-2 px-4 rounded ${isLoading ? 'opacity-50 cursor-not-allowed' : 'inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500'}`}
+                  disabled={isLoading}
+                  >
+                  {isLoading ? 'Loading...' : 'Send delist request'}
                 </button>
                 <button
                   onClick={onClose}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { checkBlacklist } from '../../services/blacklist/checkService';
-import ResultTableQuick from '../../components/blacklist/ResultTable';
+import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
 
 const QuickCheck = () => {
   const location = useLocation();
@@ -47,7 +47,7 @@ const QuickCheck = () => {
         <h1 className="text-2xl font-bold mb-4 text-center">Report of {hostname}</h1>
         <div className="inline-block min-w-full py-2 sm:px-6 lg:px-8">
           <div className="overflow-hidden">
-            <ResultTable data={data} />
+            <ResultTableQuick data={data} />
           </div>
         </div>
       </div>
