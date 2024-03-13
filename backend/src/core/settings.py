@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -88,6 +89,11 @@ SWAGGER_SETTINGS = {
 CORS_ALLOWED_ORIGINS = [
     "http://10.136.32.236:3000", 
 ]
+
+FRONT_IP = os.getenv("FRONT_IP")
+if FRONT_IP:
+    CORS_ALLOWED_ORIGINS.append(FRONT_IP)
+
 CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
