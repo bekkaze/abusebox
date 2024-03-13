@@ -1,0 +1,11 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      - FRONT_IP=http://frontend
+  frontend:
+    build: ./frontend
+    environment:
+      - VITE_BASE_URL=http://backend:8000
+    ports:
+      - 3000:3000
