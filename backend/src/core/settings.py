@@ -181,5 +181,5 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CRONJOBS = [
-    ('1 1 * * *', 'apps.blacklist.jobs.check_hostname_blacklist.run')
+    ('0 0 * * *', 'apps.blacklist.jobs.check_hostname_blacklist.run')
 ]
