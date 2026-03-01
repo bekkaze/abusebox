@@ -201,12 +201,6 @@ cd backend
 python -m py_compile $(find app -name '*.py')
 ```
 
-## Open source guidelines
-
-- Contribution process: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Community standards: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- Vulnerability reporting: [SECURITY.md](SECURITY.md)
-
 ## License
 
 This project is licensed under the terms in [LICENSE](LICENSE).
