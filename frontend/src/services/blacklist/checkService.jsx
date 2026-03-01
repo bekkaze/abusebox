@@ -2,10 +2,12 @@ import axios from 'axios';
 
 export const checkBlacklist = async (hostname) => {
   try {
-    const response = await axios.get(`/api/blacklist/quick-check/?hostname=${hostname}`, {
+    const query = new URLSearchParams({ hostname }).toString();
+    const response = await axios.get(`/api/blacklist/quick-check/?${query}`, {
       headers: {
         'Accept': 'application/json'
-      }
+      },
+      timeout: 15000,
     });
 
     return response.data;

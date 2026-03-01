@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-.landing  {
-  background-color: #000300;
+:root {
+  --surface-bg: #f3f4f6;
+  --card-border: #e5e7eb;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--surface-bg);
+  color: #111827;
+}
+
+.landing {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.24), transparent 28%),
+    radial-gradient(circle at 80% 70%, rgba(59, 130, 246, 0.2), transparent 30%),
+    #020617;
 }

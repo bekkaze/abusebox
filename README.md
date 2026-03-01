@@ -1,80 +1,128 @@
-# AbuseBox open source blacklist monitoring tool
+# AbuseBox
 
-In order to prevent ISP organizations and organizations that operate using public addresses from the following risks, the web application has been developed as an open source, so that it is possible to check the blacklist, monitor all the addresses in the organization, and send a deslist request for automatic removal if it is blacklisted. Development was done using django-rest-framework on the backend and React/VITE on the frontend.
+AbuseBox is an open-source blacklist monitoring platform built with Django REST Framework and React (Vite).
+It helps teams check hostnames/IPs against DNSBL providers, monitor tracked hostnames, and manage blacklist operations.
 
-The following risks arise when a domain or network address is blacklisted:
+## Features
 
-- Due to blacklisting of the external address that is being NATed, users will be restricted from accessing the Internet
-- Unable to receive and send emails
-- Damage to your organization's reputation
-- Inability to access certain services: If an IP address is blacklisted, it may be blocked from accessing certain websites or services.
+- Quick blacklist check (public endpoint)
+- Authenticated dashboard for monitored hostnames
+- Hostname health/report history
+- Delist request workflow (provider-specific)
+- Swagger/OpenAPI docs for backend endpoints
 
-### Getting Started
+## Tech stack
 
-##### Backend
+- Backend: Django 5, Django REST Framework, Simple JWT
+- Frontend: React 18, Vite, Tailwind CSS
+- Default DB: SQLite (configurable via environment variables)
+- Containerization: Docker + Docker Compose
 
-1. On local environment
+## Repository structure
 
-```
-# pip3 install poetry
-# cd backend/
-# poetry install
-# poetry shell
-(VIRTUAL SHELL)# cd src; python manage.py runserver 0.0.0.0:8000
-```
+- `backend/`: Django API service
+- `frontend/`: React app
+- `docker-compose.yml`: local multi-service setup
+- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`: open-source project standards
 
-and need change CORS_ALLOWED_ORIGINS in /backend/src/core/settings.py:
+## Prerequisites
 
-```
-CORS_ALLOWED_ORIGINS = [
-    "http://<FrontendIP>:3000",
-]
+- Python 3.10+
+- Poetry
+- Node.js 18+
+- Yarn
+- Docker (optional)
 
-```
+## Local development
 
-2. With docker
+### 1. Backend setup
 
-```
+```bash
 cd backend
-docker build -t abuse-backend .
-
-docker run -p 8000:8000 -e FRONT_IP="<http://fill_caller_domain>" abuse-backend
-
+cp .env.example .env
+poetry install
+poetry run python src/manage.py migrate
+poetry run python src/manage.py createsuperuser  # optional
+poetry run python src/manage.py runserver 0.0.0.0:8000
 ```
 
-##### Frontend
+Backend is available at `http://localhost:8000`.
 
-1. On local environment
-```
-# cd frontend/
-# yarn install
-# yarn run dev
-```
+### 2. Frontend setup
 
-.env file for vite/react:
-
-```
-VITE_BASE_URL=http://<backendIP>:8000/
-```
-
-2. With docker
-
-```
+```bash
 cd frontend
-docker build -t abuse-frontend .
-docker run -p 3000:3000 -e VITE_BASE_URL=<http://backend_ip:8000>  abuse-frontend
+cp .env.example .env
+yarn install
+yarn dev
 ```
 
-##### Launch with docker-compose
+Frontend is available at `http://localhost:3000`.
 
+## Environment configuration
+
+### Backend (`backend/.env`)
+
+Key variables:
+
+- `DJANGO_SECRET_KEY`
+- `DJANGO_DEBUG` (`true`/`false`)
+- `DJANGO_ALLOWED_HOSTS` (comma-separated)
+- `DJANGO_CORS_ALLOWED_ORIGINS` (comma-separated)
+- `DJANGO_DB_ENGINE`
+- `DJANGO_DB_NAME`
+- `DJANGO_DB_USER`
+- `DJANGO_DB_PASSWORD`
+- `DJANGO_DB_HOST`
+- `DJANGO_DB_PORT`
+
+### Frontend (`frontend/.env`)
+
+- `VITE_BASE_URL=http://localhost:8000`
+
+Vite proxies `/api/*` requests to `VITE_BASE_URL` during development.
+
+## Run with Docker Compose
+
+```bash
+docker compose up --build
 ```
-docker compose up
+
+Services:
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000`
+
+## API docs
+
+After backend startup:
+
+- Swagger UI: `http://localhost:8000/swagger/`
+- ReDoc: `http://localhost:8000/redoc/`
+
+## Quality checks
+
+### Frontend
+
+```bash
+cd frontend
+yarn build
+yarn lint
 ```
 
-ToDo:
+### Backend
 
-- Docker container deployment
-- Add nginx
-- Improve design
-- Improve security
-- PostgreSQL
+```bash
+cd backend
+poetry run python src/manage.py check
+```
+
+## Open source guidelines
+
+- Contribution process: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Community standards: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Vulnerability reporting: [SECURITY.md](SECURITY.md)
+
+## License
+
+This project is licensed under the terms in [LICENSE](LICENSE).

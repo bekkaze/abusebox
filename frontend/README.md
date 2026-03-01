@@ -1,8 +1,26 @@
-# React + Vite
+# AbuseBox Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for the AbuseBox project.
 
-Currently, two official plugins are available:
+## Scripts
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+yarn dev      # start development server on port 3000
+yarn build    # production build
+yarn preview  # preview production build
+yarn lint     # eslint checks
+```
+
+## Environment
+
+Create `.env` from `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Required variable:
+
+- `VITE_BASE_URL=http://localhost:8000`
+
+The Vite dev server proxies `/api/*` requests to this backend URL.

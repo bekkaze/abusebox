@@ -4,17 +4,20 @@ import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
 
 export default function BlacklistCheck() {
   const [hostname, setHostname] = useState('');
-  const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
+  const [error, setError] = useState('');
 
   const fetchData = async () => {
     try {
+      setError('');
       if (hostname) {
         const result = await checkBlacklist(hostname);
         setData(result);
       }
     } catch (error) {
+      setData(null);
+      setError('Failed to run blacklist check.');
       console.log('Failed to check blacklist: ', error);
     } finally {
       setLoading(false);
@@ -22,6 +25,10 @@ export default function BlacklistCheck() {
   };
 
   const handleBlacklistCheck = async () => {
+    if (!hostname.trim()) {
+      setError('Enter a hostname or IPv4 address.');
+      return;
+    }
     setLoading(true);
     fetchData();
   };
@@ -53,6 +60,7 @@ export default function BlacklistCheck() {
       </div>
       <div className="bg-white px-4 pt-3 pb-4 rounded-sm border border-gray-200 flex-1">
         <div className="border-x border-gray-200 rounded-sm mt-3">
+          {error ? <p className="px-6 py-4 text-sm text-red-600">{error}</p> : null}
           {data ? (        
             <div className="inline-block min-w-full py-2 sm:px-6 lg:px-8">
               <h1 className="text-2xl font-bold mb-4 text-center">Report of {hostname}</h1>

@@ -9,6 +9,8 @@ import 'react-toastify/dist/ReactToastify.css';
 
 export default function BlacklistMonitor() {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -20,7 +22,6 @@ export default function BlacklistMonitor() {
   });
   const hostnameService = HostnameService();
   const [hostnameListData, setHostnameListData] = useState([]);
-  const [selectedHostnameData, setSelectedHostnameData] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -33,25 +34,35 @@ export default function BlacklistMonitor() {
   const handleSubmit = async () => {
     try {
       const result = await hostnameService.createHostname(formData);
-      console.log(result);
       if (result.status === 'active') {
         toast.success("Successfully added hostname");
+        setFormData({
+          hostname_type: "",
+          hostname: "",
+          description: "",
+          is_alert_enabled: false,
+          is_monitor_enabled: false,
+        });
         fetchHostnameList();
       }
     } catch (error) {
-      toast.error("Failed to create hostname. Please try again:", error);
+      toast.error("Failed to create hostname. Please try again.");
     }
 
     setAddModalOpen(false);
   };
 
   const fetchHostnameList = async () => {
+    setIsLoading(true);
+    setErrorMessage("");
     try {
-    const listData = await hostnameService.listHostname();
-    setHostnameListData(listData);
-    console.log(listData);
+      const listData = await hostnameService.listHostname();
+      setHostnameListData(listData);
     } catch (error) {
-    console.error("Failed to retrieve hostname list:", error);
+      setErrorMessage("Failed to retrieve hostname list.");
+      console.error("Failed to retrieve hostname list:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -73,10 +84,8 @@ export default function BlacklistMonitor() {
       }
       
     } catch (error) {
-      toast.error('Failed to delete hostname. Please try again:', error);
+      toast.error('Failed to delete hostname. Please try again.');
     }
-
-    setViewModalOpen(false);
   }
 
   return (
@@ -94,11 +103,19 @@ export default function BlacklistMonitor() {
       </div>
 
       <div className="border-x border-gray-200 rounded-sm mt-3">
-        <HostnameTable 
-        hostnameListData={hostnameListData} 
-        handleView={handleView} 
-        handleDelete={handleDelete} 
-        />
+        {isLoading ? (
+          <div className="p-6 text-sm text-gray-500">Loading monitors...</div>
+        ) : errorMessage ? (
+          <div className="p-6 text-sm text-red-600">{errorMessage}</div>
+        ) : hostnameListData.length === 0 ? (
+          <div className="p-6 text-sm text-gray-500">No monitors yet. Add one to start tracking blacklist status.</div>
+        ) : (
+          <HostnameTable
+            hostnameListData={hostnameListData}
+            handleView={handleView}
+            handleDelete={handleDelete}
+          />
+        )}
         <AddNewMonitorDialog 
         formData={formData} 
         handleInputChange={handleInputChange} 

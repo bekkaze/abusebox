@@ -2,9 +2,15 @@ services:
   backend:
     build: ./backend
     environment:
-      - FRONT_IP=http://frontend
+      - DJANGO_DEBUG=true
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend
+      - DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:3000
+    ports:
+      - 8000:8000
   frontend:
     build: ./frontend
+    depends_on:
+      - backend
     environment:
       - VITE_BASE_URL=http://backend:8000
     ports:

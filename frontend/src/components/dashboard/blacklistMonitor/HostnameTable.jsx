@@ -1,9 +1,21 @@
+import React, { memo } from "react";
 import { MdCheckBox, MdCheckBoxOutlineBlank, } from "react-icons/md";
 import { RiListSettingsLine } from "react-icons/ri";
 import { HiEye, HiTrash, HiPencilAlt } from "react-icons/hi";
 import { Transition, Menu } from "@headlessui/react";
 
-export default function HostnameTable({ hostnameListData, handleView, handleDelete }) {
+const formatDateTime = (value) => {
+  if (!value || value === "Not checked") {
+    return "Not checked";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
+};
+
+function HostnameTable({ hostnameListData, handleView, handleDelete }) {
   return (
     <table className="w-full text-gray-700 border-collapse">
       <thead>
@@ -31,18 +43,18 @@ export default function HostnameTable({ hostnameListData, handleView, handleDele
               {!hostnameData.result ? <p>Not checked</p> : <p>Detected by: {hostnameData.result.detected_on.length} of {hostnameData.result.providers.length}</p>}
             </div>
             </td>
-            <td className="p-2">{hostnameData.checked}</td>
-            <td className="p-2">{hostnameData.created}</td>
-            <td className="p-2">
-              {hostnameData.is_alert_enabled ? <MdCheckBox /> : <MdCheckBoxOutlineBlank />}
-            </td>
+            <td className="p-2">{formatDateTime(hostnameData.checked)}</td>
+            <td className="p-2">{formatDateTime(hostnameData.created)}</td>
             <td className="p-2">
               {hostnameData.is_monitor_enabled ? <MdCheckBox /> : <MdCheckBoxOutlineBlank />}
+            </td>
+            <td className="p-2">
+              {hostnameData.is_alert_enabled ? <MdCheckBox /> : <MdCheckBoxOutlineBlank />}
             </td>
             <td className={`p-2 ${hostnameData.status === 'active' ? 'text-green-500' : 'text-red-500'}`}>
               {hostnameData.status}
             </td>
-            <td className="p-2">
+            <td className="p-2 relative">
                 <Menu>
                   {({ open }) => (
                     <>
@@ -80,12 +92,10 @@ export default function HostnameTable({ hostnameListData, handleView, handleDele
                             <Menu.Item>
                             {({ active }) => (
                                 <button
-                                  onClick={() => {
-                                    /* handleEdit(hostnameData.id); */
-                                  }}
+                                  disabled
                                   className={`${
                                     active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
-                                  } w-full text-left py-2 px-4 text-sm`}
+                                  } w-full text-left py-2 px-4 text-sm cursor-not-allowed opacity-60`}
                                 >
                                   <div className="flex items-center"><HiPencilAlt className="mr-2" />Edit</div>
                                 </button>
@@ -118,3 +128,5 @@ export default function HostnameTable({ hostnameListData, handleView, handleDele
     </table>
   )
 }
+
+export default memo(HostnameTable);

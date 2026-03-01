@@ -1,8 +1,11 @@
 __pycache__
-migrations 
-.env 
+.env
 db.sqlite3
-
+*.sqlite3
+*.pyc
+.venv/
+venv/
+backend/.venv/
 
 # dependencies
 /node_modules
@@ -25,3 +28,4 @@ db.sqlite3
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.SECURITY.md

@@ -58,6 +58,7 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                       name="hostname"
                       value={formData.hostname}
                       onChange={handleInputChange}
+                      required
                       className="mt-1 p-2 w-full border rounded-md"
                     />
                   </div>
@@ -70,6 +71,7 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                       name="hostname_type"
                       value={formData.hostname_type}
                       onChange={handleInputChange}
+                      required
                       className="mt-1 p-2 w-full border rounded-md"
                     >
                       <option value="">Select Hostname Type</option>
@@ -124,6 +126,13 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
 
                   {/* Submit button */}
                   <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      className="bg-gray-100 text-gray-700 py-2 px-4 rounded mr-2"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Cancel
+                    </button>
                     <button
                       type="button"
                       className="bg-blue-500 text-white py-2 px-4 rounded"

@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -8,12 +9,14 @@ from apps.hostname.models import CheckHistory
 from apps.hostname.apis.serializers import CheckHistorySerializer
 
 class CheckHistoryListCreateView(APIView):
+  permission_classes = (IsAuthenticated,)
+
   @swagger_auto_schema(
     operation_description="Get a list of all check histories",
     responses={200: openapi.Response("List of check histories", CheckHistorySerializer(many=True))},
   )
   def get(self, request):
-    check_histories = CheckHistory.objects.all()
+    check_histories = CheckHistory.objects.filter(hostname__user=request.user).all()
     serializer = CheckHistorySerializer(check_histories, many=True)
     return Response(serializer.data)
 
@@ -33,12 +36,14 @@ class CheckHistoryListCreateView(APIView):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class CheckHistoryDetailView(APIView):
+  permission_classes = (IsAuthenticated,)
+
   @swagger_auto_schema(
     operation_description="Get details of a specific check history",
     responses={200: openapi.Response("Details of the check history", CheckHistorySerializer())},
   )
   def get(self, request, pk):
-    check_history = get_object_or_404(CheckHistory, pk=pk)
+    check_history = get_object_or_404(CheckHistory, pk=pk, hostname__user=request.user)
     serializer = CheckHistorySerializer(check_history)
     return Response(serializer.data)
 
@@ -52,7 +57,7 @@ class CheckHistoryDetailView(APIView):
     },
   )
   def put(self, request, pk):
-    check_history = get_object_or_404(CheckHistory, pk=pk)
+    check_history = get_object_or_404(CheckHistory, pk=pk, hostname__user=request.user)
     serializer = CheckHistorySerializer(check_history, data=request.data)
     if serializer.is_valid():
       serializer.save()
@@ -67,6 +72,6 @@ class CheckHistoryDetailView(APIView):
     },
   )
   def delete(self, request, pk):
-    check_history = get_object_or_404(CheckHistory, pk=pk)
+    check_history = get_object_or_404(CheckHistory, pk=pk, hostname__user=request.user)
     check_history.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)

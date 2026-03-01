@@ -12,11 +12,6 @@ const ResultTableQuick = ({ data }) => {
     return data.detected_on.some((item) => item.provider === provider);
   };
 
-  const handleDelist = (provider, hostname) => {
-    setSelectedProvider(provider);
-    setSelectedHostname(hostname);;
-  }
-
   return (
     <div className="scrollable-table overflow-auto h-screen">
       <table className="w-full text-gray-700 border-collapse">

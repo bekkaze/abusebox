@@ -19,7 +19,7 @@ class BlacklistedHostnameAPIView(APIView):
   )
   def get(self, request): 
     blacklisted_hostnames = BlacklistedHostname.objects.all()
-    serializer = BlacklistedHostnameSerializer(BlacklistedHostname, many=True)
+    serializer = BlacklistedHostnameSerializer(blacklisted_hostnames, many=True)
     return Response(serializer.data)
 
   @swagger_auto_schema(
@@ -33,6 +33,7 @@ class BlacklistedHostnameAPIView(APIView):
   def post(self, request):
     serializer = BlacklistedHostnameSerializer(data=request.data)
     if serializer.is_valid(): 
+      serializer.save()
       return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

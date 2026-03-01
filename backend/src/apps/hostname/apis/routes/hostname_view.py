@@ -1,50 +1,53 @@
-from django.shortcuts import get_object_or_404
-from django.core.serializers import serialize
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from apps.hostname.models import Hostname
 from apps.hostname.apis.serializers import HostnameSerializer
-from apps.blacklist.models import BlacklistedHostname
-from apps.hostname.models import CheckHistory
-import json 
+from apps.hostname.models import CheckHistory, Hostname
 
 class HostnameListCreateView(APIView):
+  permission_classes = (IsAuthenticated,)
+
   @swagger_auto_schema(
     operation_description="Get a list of all hostnames"
   )
   def get(self, request):
-    hostnames = Hostname.objects.filter(user=request.user.id).all()
+    hostnames = Hostname.objects.filter(user=request.user).all()
+    current_checks = {
+      check.hostname_id: check
+      for check in CheckHistory.objects.filter(hostname__in=hostnames, status='current')
+    }
     response_data: list = []
 
     for hostname in hostnames:
-      try:
-        check_history_model = CheckHistory.objects.filter(hostname=hostname.id, status='current').get()
-        hostname_data = json.loads(serialize('json', [hostname]))[0]['fields']
+      check_history_model = current_checks.get(hostname.id)
+      hostname_data = HostnameSerializer(hostname).data
+      if check_history_model:
         hostname_data['result'] = check_history_model.result
         hostname_data['checked'] = check_history_model.created 
-        hostname_data['result']['id'] = check_history_model.id
-        hostname_data['id'] = hostname.id
-        response_data.append(hostname_data)
-      except: 
-        hostname_data = json.loads(serialize('json', [hostname]))[0]['fields']
+        if hostname_data['result']:
+          hostname_data['result']['id'] = check_history_model.id
+      else:
         hostname_data['result'] = None
         hostname_data['checked'] = 'Not checked'
-        hostname_data['id'] = hostname.id
-        response_data.append(hostname_data)
+      response_data.append(hostname_data)
       
     return Response(response_data, status=status.HTTP_200_OK)
 
 
 class HostnameAPIView(APIView):
+  permission_classes = (IsAuthenticated,)
+
   @swagger_auto_schema(
     operation_description="Get details of a specific hostname",
     responses={200: openapi.Response("Details of the hostname", HostnameSerializer())},
   )
   def get(self, request, pk):
-    hostname = get_object_or_404(Hostname, pk=pk)
+    hostname = Hostname.objects.filter(user=request.user, pk=pk).first()
+    if not hostname:
+      return Response({"detail": "Hostname not found."}, status=status.HTTP_404_NOT_FOUND)
     serializer = HostnameSerializer(hostname)
     return Response(serializer.data)
 
@@ -84,7 +87,9 @@ class HostnameAPIView(APIView):
     },
   )
   def put(self, request, pk):
-    hostname = get_object_or_404(Hostname, pk=pk)
+    hostname = Hostname.objects.filter(user=request.user, pk=pk).first()
+    if not hostname:
+      return Response({"detail": "Hostname not found."}, status=status.HTTP_404_NOT_FOUND)
     serializer = HostnameSerializer(hostname, data=request.data)
     if serializer.is_valid():
       serializer.save()
@@ -99,8 +104,10 @@ class HostnameAPIView(APIView):
     },
   )
   def delete(self, request, pk):
-    hostname = get_object_or_404(Hostname, pk=pk)
-    check_history = get_object_or_404(CheckHistory, hostname=hostname)
-    check_history.delete()
+    hostname = Hostname.objects.filter(user=request.user, pk=pk).first()
+    if not hostname:
+      return Response({"detail": "Hostname not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    CheckHistory.objects.filter(hostname=hostname).delete()
     hostname.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)

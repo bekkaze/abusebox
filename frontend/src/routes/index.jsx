@@ -28,28 +28,29 @@ const Routes = () => {
   const routesForAuthenticatedOnly = [
     {
       path: '/dashboard',
-      element: (
-        <DashboardLayout>
-          <ProtectedRoute />
-        </DashboardLayout>
-      ),
+      element: <ProtectedRoute />,
       children: [
         {
-          path: '/dashboard/',
-          element: <Home />
+          element: <DashboardLayout />,
+          children: [
+            {
+              index: true,
+              element: <Home />
+            },
+            {
+              path: 'blacklist-check',
+              element: <BlacklistCheck />
+            },
+            {
+              path: 'blacklist-monitor',
+              element: <BlacklistMonitor />
+            },
+            {
+              path: 'blacklist-monitor/report',
+              element: <ViewReport />
+            }
+          ]
         },
-        {
-          path: '/dashboard/blacklist-check',
-          element: <BlacklistCheck />
-        },
-        {
-          path: '/dashboard/blacklist-monitor',
-          element: <BlacklistMonitor />
-        },
-        {
-          path: '/dashboard/blacklist-monitor/report',
-          element: <ViewReport />
-        }
       ],
     },
   ];

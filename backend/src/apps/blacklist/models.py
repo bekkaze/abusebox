@@ -8,3 +8,12 @@ class BlacklistedHostname(models.Model):
   is_active = models.BooleanField(default=True)
   created = models.DateTimeField(auto_now_add=True)
   updated = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    ordering = ["-created"]
+    indexes = [
+      models.Index(fields=["hostname", "is_active"]),
+    ]
+
+  def __str__(self):
+    return self.hostname

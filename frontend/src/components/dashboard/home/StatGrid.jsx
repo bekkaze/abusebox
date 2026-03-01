@@ -1,10 +1,10 @@
 import React from "react";
 import { IoBagHandle } from "react-icons/io5";
 
-const StatGrid = ({ title, bodyText, BoxWrapperIcon }) => {
+const StatGrid = ({ title, bodyText }) => {
   return (
     <div className="bg-white rounded-sm p-4 flex-1 border border-gray-200 flex items-center">
-      <div className="box-wrapper">
+      <div className="flex items-center">
         <div className="rounded-full h-12 w-12 flex items-center justify-center bg-sky-500">
           <IoBagHandle className="text-2xl text-white" />
         </div>

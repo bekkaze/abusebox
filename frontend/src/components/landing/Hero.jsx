@@ -8,9 +8,11 @@ const Hero = () => {
   const [hostname, setHostname] = useState('');
  
   const handleCheck = async () => {
+    if (!hostname.trim()) {
+      return;
+    }
     try {
-      console.log('call');
-      navigate('/quick-check', { state: { hostname: hostname } });
+      navigate('/quick-check', { state: { hostname: hostname.trim() } });
     } catch (error) {
       console.error('Failed to navigate to guestCheck:', error);
     }
@@ -50,6 +52,7 @@ const Hero = () => {
           <button 
             className='bg-[#EF4444] text-white rounded-md font-medium w-[200px] ml-4 my-6 px-6 py-3'
             onClick={handleCheck}
+            disabled={!hostname.trim()}
             >
             Blacklist check
           </button>

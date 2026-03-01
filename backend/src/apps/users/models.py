@@ -40,7 +40,7 @@ class User(AbstractBaseUser):
   objects = UserManager()
   
   def __str__(self):
-    return f'{self.first_name} {self.last_name}'
+    return self.username
 
   def has_module_perms(self, app_label):
     return True
