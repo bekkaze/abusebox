@@ -1,13 +1,13 @@
-FROM python:alpine3.19
+FROM python:3.11-alpine
 
 WORKDIR /app
-RUN apk update 
-RUN pip install poetry
-RUN poetry config virtualenvs.create false 
 
-COPY poetry.lock pyproject.toml ./
-RUN poetry install --no-interaction --no-ansi --without dev
+RUN apk add --no-cache build-base libffi-dev
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . ./
+
 EXPOSE 8000
 
-CMD ["sh", "-c", "python /app/src/manage.py migrate && python /app/src/manage.py runserver 0.0.0.0:8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

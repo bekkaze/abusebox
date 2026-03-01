@@ -1,0 +1,57 @@
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routers import auth_router, blacklist_router, hostname_router
+from app.core.config import settings
+from app.db.init_data import seed_default_admin
+from app.db.session import Base, SessionLocal, engine
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+    try:
+        seed_default_admin(db)
+    finally:
+        db.close()
+
+    yield
+
+
+def create_app() -> FastAPI:
+    if not settings.app_debug and settings.app_secret_key == "insecure-dev-secret-key-change-me":
+        raise RuntimeError("APP_SECRET_KEY must be set in non-debug environments")
+
+    app = FastAPI(
+        title=settings.app_name,
+        debug=settings.app_debug,
+        docs_url="/swagger/",
+        redoc_url="/redoc/",
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(auth_router)
+    app.include_router(blacklist_router)
+    app.include_router(hostname_router)
+
+    @app.get("/health", tags=["system"])
+    def health() -> dict[str, str]:
+        return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
+
+    return app
+
+
+app = create_app()

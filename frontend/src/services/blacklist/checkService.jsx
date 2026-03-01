@@ -7,7 +7,7 @@ export const checkBlacklist = async (hostname) => {
       headers: {
         'Accept': 'application/json'
       },
-      timeout: 15000,
+      timeout: 30000,
     });
 
     return response.data;
@@ -18,13 +18,17 @@ export const checkBlacklist = async (hostname) => {
 
 const handleRequestError = (error, customErrorMessage) => {
   if (error.response) {
-    console.error(`HTTP error! status: ${error.response.status}`);
-    throw new Error(`HTTP error! status: ${error.response.status}`);
+    const detail =
+      error.response?.data?.detail ||
+      error.response?.data?.error ||
+      `HTTP error! status: ${error.response.status}`;
+    console.error(detail);
+    throw new Error(detail);
   } else if (error.request) {
     console.error('No response received');
-    throw new Error('No response received');
+    throw new Error('No response received from backend.');
   } else {
     console.error(customErrorMessage || 'Error setting up the request', error.message);
-    throw new Error(customErrorMessage || 'Error setting up the request');
+    throw new Error(error.message || customErrorMessage || 'Error setting up the request');
   }
 };

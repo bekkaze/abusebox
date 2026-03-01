@@ -89,12 +89,15 @@ export default function BlacklistMonitor() {
   }
 
   return (
-    <div className="bg-white px-4 pt-3 pb-4 rounded-sm border border-gray-200 flex-1">
-      <div className='bg-white h-16 px-4 flex items-center border-b border-color-gray-200'>
-        <strong className="text-gray-700 font-medium">Blacklist Monitors</strong>
+    <section className="bg-white px-5 pt-5 pb-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className='flex items-center'>
+        <div>
+          <p className="text-sm text-slate-500">Assets</p>
+          <strong className="text-2xl text-slate-900 font-semibold">Blacklist Monitors</strong>
+        </div>
         <div className="ml-auto">
         <button
-          className="bg-blue-500 text-white py-2 px-4 flex items-center rounded"
+          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-4 flex items-center rounded-xl transition-colors"
           onClick={() => setAddModalOpen(true)}
         >
           <HiOutlinePlusCircle className="mr-2" /> Add New
@@ -102,7 +105,7 @@ export default function BlacklistMonitor() {
         </div>
       </div>
 
-      <div className="border-x border-gray-200 rounded-sm mt-3">
+      <div className="rounded-xl border border-slate-200 mt-5 overflow-hidden">
         {isLoading ? (
           <div className="p-6 text-sm text-gray-500">Loading monitors...</div>
         ) : errorMessage ? (
@@ -126,6 +129,6 @@ export default function BlacklistMonitor() {
       </div>
 
       <ToastContainer position="top-center" autoClose={5000} />
-    </div>
+    </section>
   );
 }

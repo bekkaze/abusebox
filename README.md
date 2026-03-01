@@ -1,7 +1,16 @@
 # AbuseBox
 
-AbuseBox is an open-source blacklist monitoring platform built with Django REST Framework and React (Vite).
+AbuseBox is an open-source blacklist monitoring platform built with FastAPI and React (Vite).
 It helps teams check hostnames/IPs against DNSBL providers, monitor tracked hostnames, and manage blacklist operations.
+
+![AbuseBox landing preview](files/landing.png)
+
+## Project status
+
+As of **March 2, 2026**, AbuseBox is back under active development and maintenance.
+
+- Current release: **v1.0.0**
+- Focus: stability, security, and better operator UX
 
 ## Features
 
@@ -13,22 +22,27 @@ It helps teams check hostnames/IPs against DNSBL providers, monitor tracked host
 
 ## Tech stack
 
-- Backend: Django 5, Django REST Framework, Simple JWT
+- Backend: FastAPI, SQLAlchemy, JWT auth
 - Frontend: React 18, Vite, Tailwind CSS
 - Default DB: SQLite (configurable via environment variables)
 - Containerization: Docker + Docker Compose
 
 ## Repository structure
 
-- `backend/`: Django API service
+- `backend/`: FastAPI API service
+  - `app/api/routers/`: feature routers
+  - `app/core/`: config and auth security
+  - `app/db/`: DB session and seed init
+  - `app/models/`: SQLAlchemy models
+  - `app/schemas/`: API schemas
+  - `app/services/`: blacklist checker services
 - `frontend/`: React app
 - `docker-compose.yml`: local multi-service setup
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`: open-source project standards
 
 ## Prerequisites
 
-- Python 3.10+
-- Poetry
+- Python 3.11+
 - Node.js 18+
 - Yarn
 - Docker (optional)
@@ -40,13 +54,17 @@ It helps teams check hostnames/IPs against DNSBL providers, monitor tracked host
 ```bash
 cd backend
 cp .env.example .env
-poetry install
-poetry run python src/manage.py migrate
-poetry run python src/manage.py createsuperuser  # optional
-poetry run python src/manage.py runserver 0.0.0.0:8000
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Backend is available at `http://localhost:8000`.
+
+Default admin account (seeded at startup):
+
+- Username: `admin`
+- Email: `admin@abusebox.local`
+- Password: `password123`
 
 ### 2. Frontend setup
 
@@ -59,22 +77,84 @@ yarn dev
 
 Frontend is available at `http://localhost:3000`.
 
+## Installation guide
+
+### Option A: Docker (recommended)
+
+```bash
+git clone https://github.com/bekkaze/abusebox
+cd abusebox
+docker compose up --build
+```
+
+Then open:
+
+- Frontend: `http://localhost:3000`
+- Backend Swagger: `http://localhost:8000/swagger/`
+
+### Option B: Manual install
+
+1. Clone repository and enter project directory.
+2. Start backend:
+
+```bash
+cd backend
+cp .env.example .env
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+3. Start frontend in a second terminal:
+
+```bash
+cd frontend
+cp .env.example .env
+yarn install
+yarn dev
+```
+
+4. Open `http://localhost:3000`.
+
+## Usage guide
+
+### 1. Sign in
+
+- Go to `/login`
+- Use default local admin credentials:
+  - Username: `admin`
+  - Password: `password123`
+
+### 2. Run quick blacklist check (public)
+
+- From landing page, enter a domain/IP and click **Run Quick Check**
+- Or directly open `/quick-check` via the UI flow
+
+### 3. Use dashboard monitor flow
+
+- Open `/dashboard`
+- Go to **Blacklist Monitor**
+- Click **Add New**, add hostname/domain/IP, and submit
+- Open **View Report** for provider-by-provider blacklist status
+
+### 4. Delist workflow
+
+- In report view, use **Delist** for supported providers
+- Current automated provider support is limited; unsupported providers return `Not implemented`
+
 ## Environment configuration
 
 ### Backend (`backend/.env`)
 
 Key variables:
 
-- `DJANGO_SECRET_KEY`
-- `DJANGO_DEBUG` (`true`/`false`)
-- `DJANGO_ALLOWED_HOSTS` (comma-separated)
-- `DJANGO_CORS_ALLOWED_ORIGINS` (comma-separated)
-- `DJANGO_DB_ENGINE`
-- `DJANGO_DB_NAME`
-- `DJANGO_DB_USER`
-- `DJANGO_DB_PASSWORD`
-- `DJANGO_DB_HOST`
-- `DJANGO_DB_PORT`
+- `APP_SECRET_KEY`
+- `APP_DEBUG` (`true`/`false`)
+- `APP_CORS_ALLOWED_ORIGINS` (comma-separated)
+- `DATABASE_URL` (`sqlite:///./app.db` by default)
+- `DEFAULT_ADMIN_USERNAME`
+- `DEFAULT_ADMIN_PASSWORD`
+- `DEFAULT_ADMIN_EMAIL`
+- `DEFAULT_ADMIN_PHONE`
 
 ### Frontend (`frontend/.env`)
 
@@ -100,6 +180,10 @@ After backend startup:
 - Swagger UI: `http://localhost:8000/swagger/`
 - ReDoc: `http://localhost:8000/redoc/`
 
+## Release
+
+- **v1.0.0** released on **March 2, 2026**
+
 ## Quality checks
 
 ### Frontend
@@ -114,7 +198,7 @@ yarn lint
 
 ```bash
 cd backend
-poetry run python src/manage.py check
+python -m py_compile $(find app -name '*.py')
 ```
 
 ## Open source guidelines

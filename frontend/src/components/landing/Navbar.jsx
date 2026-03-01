@@ -3,43 +3,72 @@ import { AiOutlineClose, AiOutlineMenu } from 'react-icons/ai';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../services/auth/authProvider';
 
+const itemClass = 'px-4 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors';
+
 const Navbar = () => {
   const { token } = useAuth();
   const [nav, setNav] = useState(false);
   const navigate = useNavigate();
 
-  const handleNav = () => {
-    setNav(!nav);
+  const go = (path) => {
+    setNav(false);
+    navigate(path);
   };
 
   return (
-    <div className='flex justify-between items-center h-24 max-w-[1240px] mx-auto px-4 text-white'>
-      <h1 className='w-full text-3xl font-bold text-[#00df9a]'>AbuseBox</h1>
-      <ul className='hidden md:flex'>
-        <li className='p-4 hover:bg-[#00df9a] cursor-pointer rounded-md' onClick={() => navigate('/')}>Home</li>
-        <li className='p-4 hover:bg-[#00df9a] cursor-pointer rounded-md' onClick={() => navigate('/quick-check')}>Quick Check</li>
-        {!token ? (
-            <>
-              <li className='p-4 hover:bg-[#00df9a] cursor-pointer rounded-md' onClick={() => navigate('/login')}>Signin</li>
-            </>
-        ) : (
-            <li className='p-4 hover:bg-[#00df9a] cursor-pointer rounded-md' onClick={() => navigate('/dashboard')}>Dashboard</li>
-        )}
-        </ul>
-      <div onClick={handleNav} className='block md:hidden'>
-          {nav ? <AiOutlineClose size={20}/> : <AiOutlineMenu size={20} />}
-      </div>
-      <ul className={nav ? 'fixed left-0 top-0 w-[60%] h-full border-r border-r-gray-900 bg-[#000300] ease-in-out duration-500' : 'ease-in-out duration-500 fixed left-[-100%]'}>
-        <h1 className='w-full text-3xl font-bold text-[#00df9a] m-4'>AbuseBox</h1>
-          <li className='p-4 hover:bg-[#00df9a] border-b border-gray-600 cursor-pointer rounded-md' onClick={() => navigate('/')}>Home</li>
-          <li className='p-4 hover:bg-[#00df9a] border-b border-gray-600 cursor-pointer rounded-md' onClick={() => navigate('/quick-check')}>Quick Check</li>
+    <header className='sticky top-0 z-20 backdrop-blur-md bg-slate-950/60 border-b border-white/10'>
+      <div className='max-w-6xl mx-auto px-4 h-20 flex justify-between items-center text-white'>
+        <button className='flex items-center gap-3' onClick={() => go('/')}>
+          <div className='h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-slate-900 font-black grid place-items-center'>A</div>
+          <div className='text-left'>
+            <p className='text-base font-semibold'>AbuseBox</p>
+            <p className='text-xs text-slate-400'>Blacklist Intelligence</p>
+          </div>
+        </button>
+
+        <nav className='hidden md:flex items-center gap-2'>
+          <button className={itemClass} onClick={() => go('/')}>Home</button>
+          <button className={itemClass} onClick={() => go('/quick-check')}>Quick Check</button>
           {!token ? (
-            <li className='p-4 hover:bg-[#00df9a] border-b border-gray-600 cursor-pointer rounded-md' onClick={() => navigate('/login')}>Sign in</li>
+            <button
+              className='px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 hover:opacity-90 transition-opacity'
+              onClick={() => go('/login')}
+            >
+              Sign in
+            </button>
           ) : (
-            <li className='p-4 hover:bg-[#00df9a] border-b border-gray-600 cursor-pointer rounded-md' onClick={() => navigate('/dashboard')}>Dashboard</li>
+            <button
+              className='px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 hover:opacity-90 transition-opacity'
+              onClick={() => go('/dashboard')}
+            >
+              Open Dashboard
+            </button>
           )}
-      </ul>
-    </div>
+        </nav>
+
+        <button onClick={() => setNav((prev) => !prev)} className='md:hidden text-slate-200'>
+          {nav ? <AiOutlineClose size={22} /> : <AiOutlineMenu size={22} />}
+        </button>
+      </div>
+
+      {nav ? (
+        <div className='md:hidden border-t border-white/10 px-4 py-3 bg-slate-950/95'>
+          <div className='flex flex-col gap-2'>
+            <button className={itemClass} onClick={() => go('/')}>Home</button>
+            <button className={itemClass} onClick={() => go('/quick-check')}>Quick Check</button>
+            {!token ? (
+              <button className='px-4 py-2 rounded-lg text-sm font-semibold bg-cyan-400 text-slate-950' onClick={() => go('/login')}>
+                Sign in
+              </button>
+            ) : (
+              <button className='px-4 py-2 rounded-lg text-sm font-semibold bg-cyan-400 text-slate-950' onClick={() => go('/dashboard')}>
+                Open Dashboard
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </header>
   );
 };
 

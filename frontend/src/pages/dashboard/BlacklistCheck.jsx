@@ -17,7 +17,7 @@ export default function BlacklistCheck() {
       }
     } catch (error) {
       setData(null);
-      setError('Failed to run blacklist check.');
+      setError(error.message || 'Failed to run blacklist check.');
       console.log('Failed to check blacklist: ', error);
     } finally {
       setLoading(false);
@@ -34,43 +34,42 @@ export default function BlacklistCheck() {
   };
 
   return (
-    <>
-      <div className='bg-white h-16 px-4 flex items-center border-b border-color-gray-200'>
-        <div className="flex items-center w-full max-w-3xl mx-auto">
-          <div className="flex-1 flex items-center">
-            <div className="relative flex-1">
-              <i className="fa fa-search text-gray-400 z-10 absolute left-3"></i>
-              <input
-                type="text"
-                className="h-10 w-full pl-10 pr-12 rounded-l-lg focus:shadow focus:outline-none border border-color-slate-900"
-                placeholder="IP address or domain name"
-                value={hostname}
-                onChange={(e) => setHostname(e.target.value)}
-              />
-            </div>
-            <button 
-              className={`h-10 px-4 rounded-r-lg ${loading ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'} text-white`}
-              onClick={handleBlacklistCheck}
-              disabled={loading}
-            >
-              {loading ? 'Processing...' : 'Blacklist Check'}
-            </button>
-          </div>
+    <section className='space-y-5'>
+      <div className='bg-white border border-slate-200 rounded-xl p-5 shadow-sm'>
+        <p className='text-sm text-slate-500'>Quick Probe</p>
+        <h2 className='text-2xl font-semibold text-slate-900 mt-1'>Blacklist Check</h2>
+        <div className="mt-4 flex flex-col md:flex-row gap-3">
+          <input
+            type="text"
+            className="h-11 w-full px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+            placeholder="IP address or domain name"
+            value={hostname}
+            onChange={(e) => setHostname(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleBlacklistCheck()}
+          />
+          <button
+            className={`h-11 px-6 rounded-xl font-medium ${loading ? 'bg-slate-300 text-slate-500' : 'bg-cyan-600 hover:bg-cyan-700 text-white'} transition-colors`}
+            onClick={handleBlacklistCheck}
+            disabled={loading}
+          >
+            {loading ? 'Checking...' : 'Run Check'}
+          </button>
         </div>
+        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       </div>
-      <div className="bg-white px-4 pt-3 pb-4 rounded-sm border border-gray-200 flex-1">
-        <div className="border-x border-gray-200 rounded-sm mt-3">
-          {error ? <p className="px-6 py-4 text-sm text-red-600">{error}</p> : null}
-          {data ? (        
-            <div className="inline-block min-w-full py-2 sm:px-6 lg:px-8">
-              <h1 className="text-2xl font-bold mb-4 text-center">Report of {hostname}</h1>
-              <div className="overflow-hidden">
-                <ResultTableQuick data={data} />
-              </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        {!data ? (
+          <p className="text-slate-500 text-sm">Run a check to view provider-level status.</p>
+        ) : (
+          <>
+            <h3 className="text-xl font-semibold text-slate-900">Report for {hostname}</h3>
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
+              <ResultTableQuick data={data} />
             </div>
-          ) : null}
-        </div>
+          </>
+        )}
       </div>
-    </>
+    </section>
   );
 }

@@ -2,6 +2,7 @@ __pycache__
 .env
 db.sqlite3
 *.sqlite3
+*.db
 *.pyc
 .venv/
 venv/

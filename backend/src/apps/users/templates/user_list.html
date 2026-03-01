@@ -1,4 +1,0 @@
-{% for user in users %}
-  <p><a href="{% url 'update_user' pk=user.pk %}">{{ user }}</a>
-  <a href="{% url 'delete_user' pk=user.pk %}">(delete)</a></p>
-{% endfor %}

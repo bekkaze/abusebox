@@ -35,27 +35,29 @@ const ResultTable = ({ data }) => {
   const modalFields = selectedProvider ? providerFields[selectedProvider] : [];
 
   return (
-    <div className="scrollable-table overflow-auto h-screen">
-      <table className="w-full text-gray-700 border-collapse">
-        <thead>
-          <tr className="text-left border-b border-gray-300">
-            <th className="px-4 py-2">Provider</th>
-            <th className="px-4 py-2">Status</th>
-            <th className="px-4 py-2">Action</th>
+    <div className="scrollable-table overflow-auto max-h-[70vh] rounded-lg border border-slate-200">
+      <table className="w-full text-slate-700 border-collapse">
+        <thead className="sticky top-0 bg-slate-50">
+          <tr className="text-left border-b border-slate-200">
+            <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Provider</th>
+            <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Status</th>
+            <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Action</th>
           </tr>
         </thead>
         <tbody>
           {providers.map((provider, index) => (
-            <tr key={index} className="border-b border-gray-300">
-              <td className="px-4 py-2">{provider}</td>
-              <td className={`px-4 py-2 ${isBlacklisted(provider) ? 'text-red-600 font-bold' : 'text-green-600'}`}>
-                {isBlacklisted(provider) ? 'Blacklisted' : 'Clear'}
+            <tr key={index} className="border-b border-slate-200 hover:bg-slate-50/60">
+              <td className="px-4 py-2.5 font-medium">{provider}</td>
+              <td className="px-4 py-2.5">
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${isBlacklisted(provider) ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {isBlacklisted(provider) ? 'Blacklisted' : 'Clear'}
+                </span>
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-2.5">
                 {isBlacklisted(provider) ? (
                   getProviderStatus(provider) === 'open' ? (
                     <button
-                      className="bg-[#EF4444] hover:bg-[#ff7676] text-white font-bold py-0.5 px-4 rounded"
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-1 px-4 rounded-lg transition-colors"
                       onClick={() => handleDelist(provider)}
                     >
                       Delist

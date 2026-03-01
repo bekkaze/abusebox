@@ -4,7 +4,7 @@ import '../index.css';
 
 const LandingPage = () => {
   return (
-    <div className="landing">
+    <div className="landing min-h-screen">
       <Navbar/>
       <Hero/>
     </div>

@@ -7,7 +7,7 @@ import classNames from 'classnames'
 import { useAuth } from '../../services/auth/authProvider'
 
 const linkClass =
-	'flex items-center gap-2 font-light px-3 py-2 hover:bg-slate-700 hover:no-underline active:bg-slate-600 rounded-sm text-base'
+	'flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800 hover:no-underline active:bg-slate-700 rounded-xl text-sm font-medium transition-colors'
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -19,37 +19,56 @@ export default function Sidebar() {
   }
 
   return (
-    <div className='bg-slate-900 w-60 p-3 flex flex-col text-white'>
-      <div className='flex items-center gap-2 px-1 py-3'>
-        <BsBoxSeamFill fontSize={24}/>
-        <span className='text-slate-100' text-lg>AbuseBox</span>
+    <aside className='bg-slate-900 w-64 p-4 flex flex-col text-white border-r border-slate-800'>
+      <div className='flex items-center gap-3 px-2 py-3'>
+        <div className='h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center'>
+          <BsBoxSeamFill fontSize={18}/>
+        </div>
+        <div>
+          <p className='text-slate-100 text-lg font-semibold leading-none'>AbuseBox</p>
+          <p className='text-slate-400 text-xs mt-1'>Threat Monitoring</p>
+        </div>
       </div> 
-      <div className='flex-1 py-8 flex flex-col gap0.5'>
+      <div className='flex-1 py-8 flex flex-col gap-1'>
         {DASHBOARD_SIDEBAR_LINKS.map( (item) => (
           <SidebarLink key={item.key} item={item}/>
         ))}
       </div>
-      <div className='flex flex-col gap-0.5 pt-2 border-t border-slate-700'>
+      <div className='flex flex-col gap-1 pt-3 border-t border-slate-800'>
         {DASHBOARD_SIDEBAR_BOTTOM_LINKS.map(item => (
           <SidebarLink key={item.key} item={item}/>
         ))}
         <div
-          className={classNames('text-red-500 cursor-pointer', linkClass)}
+          className={classNames('text-rose-400 cursor-pointer', linkClass)}
           onClick={handleLogout}>
           <span className='text-xl'><HiOutlineLogout /></span>
           Logout
         </div>
       </div>
-    </div>
+    </aside>
   )
 }
 
 function SidebarLink({item}) {
   const { pathname } = useLocation()
+  const isExternal = item.path.startsWith('http') || item.path.startsWith('/swagger/')
+  const classes = classNames(
+    !isExternal && pathname === item.path ? 'bg-slate-800 text-white' : 'text-slate-300',
+    linkClass
+  )
+
+  if (isExternal) {
+    return (
+      <a href={item.path} className={classes} target='_blank' rel='noreferrer'>
+        <span className='text-lg'>{item.icon}</span>
+        {item.label}
+      </a>
+    )
+  }
 
   return (
-    <Link to={item.path} className={classNames(pathname === item.path ? 'bg-slate-700 text-white' : 'text-slate-400', linkClass)}>
-      <span className='text-xl'>{item.icon}</span>
+    <Link to={item.path} className={classes}>
+      <span className='text-lg'>{item.icon}</span>
       {item.label}
     </Link>
   )

@@ -7,15 +7,15 @@ export default function ViewReport() {
   const hostnameData = location.state.hostnameData;
 
   return (
-    <div className="bg-white px-4 pt-3 pb-4 rounded-sm border border-gray-200 flex-1">
-      <div className="border-x border-gray-200 rounded-sm mt-3">
+    <section className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="rounded-xl border border-slate-200 p-4">
         {hostnameData ? (        
-          <div className="inline-block min-w-full py-2 sm:px-6 lg:px-8">
-            <h1 className="text-2xl font-bold mb-4 text-center">Report of {hostnameData.hostname}</h1>
+          <div className="inline-block min-w-full py-2">
+            <h1 className="text-2xl font-semibold mb-4 text-slate-900">Report of {hostnameData.hostname}</h1>
             <ResultTable data={hostnameData.result}/>
         </div>
         ) : null}
       </div>
-    </div>
+    </section>
   )
 }
