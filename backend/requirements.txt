@@ -2,6 +2,6 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 sqlalchemy==2.0.36
 passlib==1.7.4
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 pydantic==2.10.3
 requests==2.32.3
