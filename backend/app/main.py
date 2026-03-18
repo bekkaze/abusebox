@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import auth_router, blacklist_router, hostname_router
+from app.api.routers import auth_router, blacklist_router, hostname_router, tools_router
 from app.core.config import settings
 from app.db.init_data import seed_default_admin
 from app.db.session import Base, SessionLocal, engine
@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(blacklist_router)
     app.include_router(hostname_router)
+    app.include_router(tools_router)
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:

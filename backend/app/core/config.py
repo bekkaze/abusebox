@@ -32,6 +32,8 @@ class Settings:
     default_admin_password: str = os.getenv("DEFAULT_ADMIN_PASSWORD", "password123")
     default_admin_phone: str = os.getenv("DEFAULT_ADMIN_PHONE", "11111111")
 
+    abuseipdb_api_key: str = os.getenv("ABUSEIPDB_API_KEY", "")
+
     def __post_init__(self) -> None:
         object.__setattr__(self, "cors_allowed_origins", parse_csv("APP_CORS_ALLOWED_ORIGINS", "http://localhost:3000"))
 

@@ -1,6 +1,8 @@
 services:
   backend:
     build: ./backend
+    env_file:
+      - .env
     environment:
       - APP_DEBUG=true
       - APP_SECRET_KEY=change-me-in-production
@@ -11,12 +13,12 @@ services:
       - DEFAULT_ADMIN_PASSWORD=password123
       - DEFAULT_ADMIN_PHONE=11111111
     ports:
-      - 8000:8000
+      - 8100:8100
   frontend:
     build: ./frontend
     depends_on:
       - backend
     environment:
-      - VITE_BASE_URL=http://backend:8000
+      - VITE_BASE_URL=http://backend:8100
     ports:
       - 3000:3000

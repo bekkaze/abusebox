@@ -1,16 +1,38 @@
 import axios from 'axios';
 
+// Public endpoints should not send the Authorization header — it can
+// contain non-ISO-8859-1 characters that cause XMLHttpRequest to throw.
+const publicRequest = axios.create();
+delete publicRequest.defaults.headers.common['Authorization'];
+publicRequest.interceptors.request.use((config) => {
+  delete config.headers['Authorization'];
+  return config;
+});
+
 export const checkBlacklist = async (hostname) => {
   try {
     const query = new URLSearchParams({ hostname }).toString();
-    const response = await axios.get(`/api/blacklist/quick-check/?${query}`, {
-      headers: {
-        'Accept': 'application/json'
-      },
-      timeout: 30000,
-    });
+    const [blacklistRes, abuseipdbRes] = await Promise.allSettled([
+      publicRequest.get(`/api/blacklist/quick-check/?${query}`, {
+        headers: { 'Accept': 'application/json' },
+        timeout: 30000,
+      }),
+      publicRequest.get(`/api/tools/abuseipdb/?${query}`, {
+        headers: { 'Accept': 'application/json' },
+        timeout: 30000,
+      }),
+    ]);
 
-    return response.data;
+    if (blacklistRes.status === 'rejected') {
+      throw blacklistRes.reason;
+    }
+
+    const result = blacklistRes.value.data;
+    result.abuseipdb = abuseipdbRes.status === 'fulfilled'
+      ? abuseipdbRes.value.data
+      : null;
+
+    return result;
   } catch (error) {
     handleRequestError(error, 'Error checking blacklist');
   }

@@ -10,6 +10,9 @@ import BlacklistCheck from "../pages/dashboard/BlacklistCheck";
 import BlacklistMonitor from "../pages/dashboard/BlacklistMonitor";
 import ViewReport from "../pages/dashboard/ViewReport";
 import Home from "../pages/dashboard/Home";
+import AbuseIPDB from "../pages/dashboard/AbuseIPDB";
+import Whois from "../pages/dashboard/Whois";
+import ServerStatus from "../pages/dashboard/ServerStatus";
 
 const Routes = () => {
   const { token } = useAuth();
@@ -48,6 +51,18 @@ const Routes = () => {
             {
               path: 'blacklist-monitor/report',
               element: <ViewReport />
+            },
+            {
+              path: 'abuseipdb',
+              element: <AbuseIPDB />
+            },
+            {
+              path: 'whois',
+              element: <Whois />
+            },
+            {
+              path: 'server-status',
+              element: <ServerStatus />
             }
           ]
         },

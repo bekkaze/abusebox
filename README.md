@@ -18,6 +18,9 @@ As of **March 2, 2026**, AbuseBox is back under active development and maintenan
 - Authenticated dashboard for monitored hostnames
 - Hostname health/report history
 - Delist request workflow (provider-specific)
+- AbuseIPDB integration — IP reputation scoring and abuse reports
+- WHOIS lookup — domain registration data with raw/parsed views
+- Server status checker — DNS, port, HTTP reachability and response time
 - Swagger/OpenAPI docs for backend endpoints
 
 ## Tech stack
@@ -35,7 +38,7 @@ As of **March 2, 2026**, AbuseBox is back under active development and maintenan
   - `app/db/`: DB session and seed init
   - `app/models/`: SQLAlchemy models
   - `app/schemas/`: API schemas
-  - `app/services/`: blacklist checker services
+  - `app/services/`: blacklist checker, AbuseIPDB, WHOIS, and server status services
 - `frontend/`: React app
 - `docker-compose.yml`: local multi-service setup
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`: open-source project standards
@@ -55,10 +58,10 @@ As of **March 2, 2026**, AbuseBox is back under active development and maintenan
 cd backend
 cp .env.example .env
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
 
-Backend is available at `http://localhost:8000`.
+Backend is available at `http://localhost:8100`.
 
 Default admin account (seeded at startup):
 
@@ -90,7 +93,7 @@ docker compose up --build
 Then open:
 
 - Frontend: `http://localhost:3000`
-- Backend Swagger: `http://localhost:8000/swagger/`
+- Backend Swagger: `http://localhost:8100/swagger/`
 
 ### Option B: Manual install
 
@@ -101,7 +104,7 @@ Then open:
 cd backend
 cp .env.example .env
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
 
 3. Start frontend in a second terminal:
@@ -141,6 +144,23 @@ yarn dev
 - In report view, use **Delist** for supported providers
 - Current automated provider support is limited; unsupported providers return `Not implemented`
 
+### 5. AbuseIPDB check
+
+- Open **AbuseIPDB** from the dashboard sidebar
+- Enter an IP or hostname to see its abuse confidence score, ISP, country, total reports, and more
+- Requires an API key (see Environment configuration below)
+
+### 6. WHOIS lookup
+
+- Open **WHOIS Lookup** from the dashboard sidebar
+- Enter a domain to retrieve registrar, creation/expiry dates, name servers, and registrant info
+- Toggle between parsed table and raw WHOIS output
+
+### 7. Server status check
+
+- Open **Is Server Up?** from the dashboard sidebar
+- Enter a hostname or URL to check DNS resolution, TCP port availability (80/443), HTTP status, and response time
+
 ## Environment configuration
 
 ### Backend (`backend/.env`)
@@ -155,10 +175,11 @@ Key variables:
 - `DEFAULT_ADMIN_PASSWORD`
 - `DEFAULT_ADMIN_EMAIL`
 - `DEFAULT_ADMIN_PHONE`
+- `ABUSEIPDB_API_KEY` — API key for AbuseIPDB integration (get one free at [abuseipdb.com](https://www.abuseipdb.com/account/api))
 
 ### Frontend (`frontend/.env`)
 
-- `VITE_BASE_URL=http://localhost:8000`
+- `VITE_BASE_URL=http://localhost:8100`
 
 Vite proxies `/api/*` requests to `VITE_BASE_URL` during development.
 
@@ -171,14 +192,14 @@ docker compose up --build
 Services:
 
 - Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8000`
+- Backend: `http://localhost:8100`
 
 ## API docs
 
 After backend startup:
 
-- Swagger UI: `http://localhost:8000/swagger/`
-- ReDoc: `http://localhost:8000/redoc/`
+- Swagger UI: `http://localhost:8100/swagger/`
+- ReDoc: `http://localhost:8100/redoc/`
 
 ## Release
 
