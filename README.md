@@ -87,8 +87,32 @@ Frontend is available at `http://localhost:3000`.
 ```bash
 git clone https://github.com/bekkaze/abusebox
 cd abusebox
+cp backend/.env.example .env   # create root .env from template
+```
+
+Edit `.env` with your settings (API keys, secrets, etc.):
+
+```env
+APP_SECRET_KEY=replace-this-secret
+APP_DEBUG=true
+APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
+DATABASE_URL=sqlite:///./app.db
+
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=password123
+DEFAULT_ADMIN_EMAIL=admin@abusebox.local
+DEFAULT_ADMIN_PHONE=11111111
+
+ABUSEIPDB_API_KEY=your-key-here
+```
+
+Then start the services:
+
+```bash
 docker compose up --build
 ```
+
+The backend service loads the root `.env` file automatically via `env_file` in `docker-compose.yml`. Values set in the `environment:` block take precedence over `.env`.
 
 Then open:
 
