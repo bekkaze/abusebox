@@ -1,58 +1,71 @@
+<div align="center">
+
 # AbuseBox
 
-AbuseBox is an open-source blacklist monitoring platform built with FastAPI and React (Vite).
-It helps teams check hostnames/IPs against DNSBL providers, monitor tracked hostnames, and manage blacklist operations.
+**Open-source threat monitoring toolkit for IPs, domains, and servers.**
+
+Check blacklists, query AbuseIPDB, run WHOIS lookups, and verify server uptime — all from one dashboard.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/bekkaze/abusebox)](https://github.com/bekkaze/abusebox/releases)
+[![GitHub stars](https://img.shields.io/github/stars/bekkaze/abusebox?style=social)](https://github.com/bekkaze/abusebox/stargazers)
 
 ![AbuseBox landing preview](files/landing.png)
 
-## Project status
+</div>
 
-As of **March 2, 2026**, AbuseBox is back under active development and maintenance.
+---
 
-- Current release: **v1.0.0**
-- Focus: stability, security, and better operator UX
+## Why AbuseBox?
+
+Most blacklist tools check one thing at a time. AbuseBox gives you a **single pane of glass** to:
+
+- Scan **40+ DNSBL providers** in seconds
+- Get **AbuseIPDB reputation scores** alongside blacklist results
+- Pull **WHOIS registration data** with one click
+- Check if a server is **up or down** with DNS, port, and HTTP checks
+
+No vendor lock-in. No paid tiers. Self-host it and own your data.
+
+---
 
 ## Features
 
-- Quick blacklist check (public endpoint)
-- Authenticated dashboard for monitored hostnames
-- Hostname health/report history
-- Delist request workflow (provider-specific)
-- AbuseIPDB integration — IP reputation scoring and abuse reports
-- WHOIS lookup — domain registration data with raw/parsed views
-- Server status checker — DNS, port, HTTP reachability and response time
-- Swagger/OpenAPI docs for backend endpoints
+| Feature | Description | Auth required |
+|---|---|---|
+| **Blacklist Quick Check** | Scan hostname/IP against 40+ DNSBL providers | No |
+| **AbuseIPDB** | IP reputation score, abuse reports, ISP & geolocation | No |
+| **WHOIS Lookup** | Domain registrar, dates, name servers, registrant info | No |
+| **Is Server Up?** | DNS resolution, port scan (80/443), HTTP status & response time | No |
+| **Blacklist Monitor** | Track hostnames with persistent check history & alerts | Yes |
+| **Delist Workflow** | Request delisting from supported providers | Yes |
+| **API Documentation** | Swagger UI & ReDoc for all endpoints | No |
 
-## Tech stack
+---
 
-- Backend: FastAPI, SQLAlchemy, JWT auth
-- Frontend: React 18, Vite, Tailwind CSS
-- Default DB: SQLite (configurable via environment variables)
-- Containerization: Docker + Docker Compose
+## Quick Start
 
-## Repository structure
+### Docker (recommended)
 
-- `backend/`: FastAPI API service
-  - `app/api/routers/`: feature routers
-  - `app/core/`: config and auth security
-  - `app/db/`: DB session and seed init
-  - `app/models/`: SQLAlchemy models
-  - `app/schemas/`: API schemas
-  - `app/services/`: blacklist checker, AbuseIPDB, WHOIS, and server status services
-- `frontend/`: React app
-- `docker-compose.yml`: local multi-service setup
-- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`: open-source project standards
+```bash
+git clone https://github.com/bekkaze/abusebox
+cd abusebox
+cp backend/.env.example .env    # configure your settings
+docker compose up --build
+```
 
-## Prerequisites
+Open `http://localhost:3000` and you're ready to go.
 
-- Python 3.11+
-- Node.js 18+
-- Yarn
-- Docker (optional)
+> Default login: `admin` / `password123`
 
-## Local development
+### Manual Setup
 
-### 1. Backend setup
+<details>
+<summary>Click to expand</summary>
+
+**Prerequisites:** Python 3.11+, Node.js 18+, Yarn
+
+**Backend:**
 
 ```bash
 cd backend
@@ -61,15 +74,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
 
-Backend is available at `http://localhost:8100`.
-
-Default admin account (seeded at startup):
-
-- Username: `admin`
-- Email: `admin@abusebox.local`
-- Password: `password123`
-
-### 2. Frontend setup
+**Frontend** (new terminal):
 
 ```bash
 cd frontend
@@ -78,19 +83,15 @@ yarn install
 yarn dev
 ```
 
-Frontend is available at `http://localhost:3000`.
+Open `http://localhost:3000`.
 
-## Installation guide
+</details>
 
-### Option A: Docker (recommended)
+---
 
-```bash
-git clone https://github.com/bekkaze/abusebox
-cd abusebox
-cp backend/.env.example .env   # create root .env from template
-```
+## Configuration
 
-Edit `.env` with your settings (API keys, secrets, etc.):
+Create a `.env` file in the project root (Docker reads it automatically):
 
 ```env
 APP_SECRET_KEY=replace-this-secret
@@ -98,154 +99,111 @@ APP_DEBUG=true
 APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
 DATABASE_URL=sqlite:///./app.db
 
+# Default admin credentials
 DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=password123
 DEFAULT_ADMIN_EMAIL=admin@abusebox.local
 DEFAULT_ADMIN_PHONE=11111111
 
-ABUSEIPDB_API_KEY=your-key-here
+# Optional: AbuseIPDB (free key at https://www.abuseipdb.com/account/api)
+ABUSEIPDB_API_KEY=
 ```
 
-Then start the services:
+| Variable | Description | Required |
+|---|---|---|
+| `APP_SECRET_KEY` | JWT signing secret (change in production) | Yes |
+| `APP_DEBUG` | Enable debug mode | No |
+| `DATABASE_URL` | Database connection string (SQLite default) | No |
+| `ABUSEIPDB_API_KEY` | Enables AbuseIPDB reputation checks | No |
 
-```bash
-docker compose up --build
+> WHOIS and Server Status work out of the box with no API keys.
+
+Frontend config (`frontend/.env`):
+
+| Variable | Description |
+|---|---|
+| `VITE_BASE_URL` | Backend URL for Vite proxy (default: `http://localhost:8100`) |
+
+---
+
+## API Endpoints
+
+All tool endpoints are public (no auth required):
+
+```
+GET /blacklist/quick-check/?hostname=example.com
+GET /tools/abuseipdb/?hostname=8.8.8.8
+GET /tools/whois/?hostname=example.com
+GET /tools/server-status/?hostname=example.com
 ```
 
-The backend service loads the root `.env` file automatically via `env_file` in `docker-compose.yml`. Values set in the `environment:` block take precedence over `.env`.
+Full interactive docs available after startup:
 
-Then open:
+- **Swagger UI:** `http://localhost:8100/swagger/`
+- **ReDoc:** `http://localhost:8100/redoc/`
 
-- Frontend: `http://localhost:3000`
-- Backend Swagger: `http://localhost:8100/swagger/`
+---
 
-### Option B: Manual install
+## Tech Stack
 
-1. Clone repository and enter project directory.
-2. Start backend:
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI, SQLAlchemy, JWT (python-jose) |
+| Frontend | React 18, Vite, Tailwind CSS, Mantine |
+| Database | SQLite (swappable via `DATABASE_URL`) |
+| Deployment | Docker + Docker Compose |
 
-```bash
-cd backend
-cp .env.example .env
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+---
+
+## Project Structure
+
+```
+abusebox/
+├── backend/
+│   └── app/
+│       ├── api/routers/       # auth, blacklist, hostname, tools
+│       ├── core/              # config, JWT security
+│       ├── db/                # SQLAlchemy session, seed data
+│       ├── models/            # ORM models
+│       ├── schemas/           # Pydantic schemas
+│       └── services/          # dnsbl, abuseipdb, whois, server status
+├── frontend/
+│   └── src/
+│       ├── pages/             # Landing, Login, Dashboard views
+│       ├── components/        # Reusable UI components
+│       ├── services/          # API client functions
+│       └── routes/            # React Router config
+├── docker-compose.yml
+└── .env
 ```
 
-3. Start frontend in a second terminal:
+---
 
-```bash
-cd frontend
-cp .env.example .env
-yarn install
-yarn dev
-```
+## Releases
 
-4. Open `http://localhost:3000`.
+| Version | Date | Highlights |
+|---|---|---|
+| **v1.1.0** | March 19, 2026 | AbuseIPDB, WHOIS lookup, server status checker |
+| **v1.0.0** | March 2, 2026 | Initial release — DNSBL monitoring, dashboard, delist workflow |
 
-## Usage guide
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
-### 1. Sign in
+---
 
-- Go to `/login`
-- Use default local admin credentials:
-  - Username: `admin`
-  - Password: `password123`
+## Contributing
 
-### 2. Run quick blacklist check (public)
-
-- From landing page, enter a domain/IP and click **Run Quick Check**
-- Or directly open `/quick-check` via the UI flow
-
-### 3. Use dashboard monitor flow
-
-- Open `/dashboard`
-- Go to **Blacklist Monitor**
-- Click **Add New**, add hostname/domain/IP, and submit
-- Open **View Report** for provider-by-provider blacklist status
-
-### 4. Delist workflow
-
-- In report view, use **Delist** for supported providers
-- Current automated provider support is limited; unsupported providers return `Not implemented`
-
-### 5. AbuseIPDB check
-
-- Open **AbuseIPDB** from the dashboard sidebar
-- Enter an IP or hostname to see its abuse confidence score, ISP, country, total reports, and more
-- Requires an API key (see Environment configuration below)
-
-### 6. WHOIS lookup
-
-- Open **WHOIS Lookup** from the dashboard sidebar
-- Enter a domain to retrieve registrar, creation/expiry dates, name servers, and registrant info
-- Toggle between parsed table and raw WHOIS output
-
-### 7. Server status check
-
-- Open **Is Server Up?** from the dashboard sidebar
-- Enter a hostname or URL to check DNS resolution, TCP port availability (80/443), HTTP status, and response time
-
-## Environment configuration
-
-### Backend (`backend/.env`)
-
-Key variables:
-
-- `APP_SECRET_KEY`
-- `APP_DEBUG` (`true`/`false`)
-- `APP_CORS_ALLOWED_ORIGINS` (comma-separated)
-- `DATABASE_URL` (`sqlite:///./app.db` by default)
-- `DEFAULT_ADMIN_USERNAME`
-- `DEFAULT_ADMIN_PASSWORD`
-- `DEFAULT_ADMIN_EMAIL`
-- `DEFAULT_ADMIN_PHONE`
-- `ABUSEIPDB_API_KEY` — API key for AbuseIPDB integration (get one free at [abuseipdb.com](https://www.abuseipdb.com/account/api))
-
-### Frontend (`frontend/.env`)
-
-- `VITE_BASE_URL=http://localhost:8100`
-
-Vite proxies `/api/*` requests to `VITE_BASE_URL` during development.
-
-## Run with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-Services:
-
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8100`
-
-## API docs
-
-After backend startup:
-
-- Swagger UI: `http://localhost:8100/swagger/`
-- ReDoc: `http://localhost:8100/redoc/`
-
-## Release
-
-- **v1.0.0** released on **March 2, 2026**
-
-## Quality checks
-
-### Frontend
-
-```bash
-cd frontend
-yarn build
-yarn lint
-```
-
-### Backend
-
-```bash
-cd backend
-python -m py_compile $(find app -name '*.py')
-```
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR.
 
 ## License
 
-This project is licensed under the terms in [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+**If AbuseBox helps you, consider giving it a star!**
+
+[![GitHub stars](https://img.shields.io/github/stars/bekkaze/abusebox?style=social)](https://github.com/bekkaze/abusebox/stargazers)
+
+</div>
