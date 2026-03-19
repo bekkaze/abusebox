@@ -16,7 +16,7 @@
     "@mantine/hooks": "^7.4.2",
     "@mantine/notifications": "^7.4.2",
     "autoprefixer": "^10.4.17",
-    "axios": "^1.12.2",
+    "axios": "^1.13.6",
     "classnames": "^2.5.1",
     "jwt-decode": "^4.0.0",
     "postcss": "^8.4.33",
@@ -24,7 +24,7 @@
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
     "react-icons": "^5.0.1",
-    "react-router-dom": "^6.30.1",
+    "react-router-dom": "^6.30.3",
     "react-toastify": "^10.0.4",
     "react-typed": "^1.2.0",
     "tailwindcss": "^3.4.1"
@@ -32,21 +32,22 @@
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^4.5.2",
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "vite": "^5.4.19"
+    "vite": "^6.4.1"
   },
   "resolutions": {
-    "rollup": "^4.52.4",
+    "rollup": "^4.59.0",
     "follow-redirects": "^1.15.11",
     "form-data": "^4.0.4",
     "glob": "^10.4.5",
     "cross-spawn": "^7.0.6",
     "braces": "^3.0.3",
     "minimatch": "^10.2.3",
-    "@remix-run/router": "^1.23.1"
+    "@remix-run/router": "^1.23.1",
+    "@babel/runtime": "^7.29.2"
   }
 }
