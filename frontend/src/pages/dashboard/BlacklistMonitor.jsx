@@ -19,6 +19,13 @@ export default function BlacklistMonitor() {
     description: "",
     is_alert_enabled: false,
     is_monitor_enabled: false,
+    check_blacklist: true,
+    check_abuseipdb: false,
+    check_dns: false,
+    check_ssl: false,
+    check_whois: false,
+    check_email_security: false,
+    check_server_status: false,
   });
   const hostnameService = HostnameService();
   const [hostnameListData, setHostnameListData] = useState([]);
@@ -42,6 +49,13 @@ export default function BlacklistMonitor() {
           description: "",
           is_alert_enabled: false,
           is_monitor_enabled: false,
+          check_blacklist: true,
+          check_abuseipdb: false,
+          check_dns: false,
+          check_ssl: false,
+          check_whois: false,
+          check_email_security: false,
+          check_server_status: false,
         });
         fetchHostnameList();
       }
@@ -75,14 +89,16 @@ export default function BlacklistMonitor() {
    }
 
   const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this monitor?')) return;
+
     try {
       const result = await hostnameService.deleteHostname(id);
 
       if (result.status === 204) {
-        toast.success('Successfully delete hostname');
+        toast.success('Successfully deleted hostname');
         fetchHostnameList();
       }
-      
+
     } catch (error) {
       toast.error('Failed to delete hostname. Please try again.');
     }

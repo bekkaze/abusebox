@@ -61,3 +61,78 @@ export const checkServerStatus = async (hostname) => {
     handleRequestError(error, 'Error checking server status');
   }
 };
+
+export const checkDns = async (hostname) => {
+  try {
+    const query = new URLSearchParams({ hostname }).toString();
+    const response = await publicRequest.get(`/api/tools/dns/?${query}`, {
+      headers: { 'Accept': 'application/json' },
+      timeout: 30000,
+    });
+    return response.data;
+  } catch (error) {
+    handleRequestError(error, 'Error looking up DNS records');
+  }
+};
+
+export const checkSsl = async (hostname) => {
+  try {
+    const query = new URLSearchParams({ hostname }).toString();
+    const response = await publicRequest.get(`/api/tools/ssl/?${query}`, {
+      headers: { 'Accept': 'application/json' },
+      timeout: 30000,
+    });
+    return response.data;
+  } catch (error) {
+    handleRequestError(error, 'Error checking SSL certificate');
+  }
+};
+
+export const checkEmailSecurity = async (hostname) => {
+  try {
+    const query = new URLSearchParams({ hostname }).toString();
+    const response = await publicRequest.get(`/api/tools/email-security/?${query}`, {
+      headers: { 'Accept': 'application/json' },
+      timeout: 30000,
+    });
+    return response.data;
+  } catch (error) {
+    handleRequestError(error, 'Error checking email security');
+  }
+};
+
+export const checkSubnet = async (cidr) => {
+  try {
+    const query = new URLSearchParams({ cidr }).toString();
+    const response = await publicRequest.get(`/api/tools/subnet/?${query}`, {
+      headers: { 'Accept': 'application/json' },
+      timeout: 120000,
+    });
+    return response.data;
+  } catch (error) {
+    handleRequestError(error, 'Error checking subnet');
+  }
+};
+
+export const bulkCheck = async (hostnames) => {
+  try {
+    const query = new URLSearchParams({ hostnames }).toString();
+    const response = await publicRequest.get(`/api/tools/bulk-check/?${query}`, {
+      headers: { 'Accept': 'application/json' },
+      timeout: 120000,
+    });
+    return response.data;
+  } catch (error) {
+    handleRequestError(error, 'Error running bulk check');
+  }
+};
+
+export const exportBlacklistCsv = (hostname) => {
+  const query = new URLSearchParams({ hostname }).toString();
+  window.open(`/api/tools/export/blacklist/?${query}`, '_blank');
+};
+
+export const exportSubnetCsv = (cidr) => {
+  const query = new URLSearchParams({ cidr }).toString();
+  window.open(`/api/tools/export/subnet/?${query}`, '_blank');
+};

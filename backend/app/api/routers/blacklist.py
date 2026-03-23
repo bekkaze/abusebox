@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -54,7 +54,7 @@ def delist(
 
     result["detected_on"] = detected
     history.result = result
-    history.updated = datetime.utcnow()
+    history.updated = datetime.now(timezone.utc)
     db.commit()
 
     return {"msg": "success", "result": result}

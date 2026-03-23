@@ -8,6 +8,7 @@ from app.api.routers import auth_router, blacklist_router, hostname_router, tool
 from app.core.config import settings
 from app.db.init_data import seed_default_admin
 from app.db.session import Base, SessionLocal, engine
+from app.services.scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
@@ -20,7 +21,11 @@ async def lifespan(_: FastAPI):
     finally:
         db.close()
 
+    start_scheduler()
+
     yield
+
+    stop_scheduler()
 
 
 def create_app() -> FastAPI:

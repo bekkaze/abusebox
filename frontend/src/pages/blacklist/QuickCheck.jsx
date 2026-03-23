@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { checkBlacklist } from '../../services/blacklist/checkService';
+import { exportBlacklistCsv } from '../../services/tools';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
 
 const QuickCheck = () => {
@@ -55,12 +56,22 @@ const QuickCheck = () => {
             <p className='text-sm text-slate-500'>Public Check</p>
             <h2 className='text-2xl font-semibold text-slate-900'>Blacklist Report</h2>
           </div>
-          <button
-            className='text-sm font-medium text-cyan-700 hover:text-cyan-800'
-            onClick={() => navigate('/')}
-          >
-            Back to Home
-          </button>
+          <div className="flex gap-3">
+            {data && hostname && (
+              <button
+                className='text-sm font-medium text-cyan-700 hover:text-cyan-800'
+                onClick={() => exportBlacklistCsv(hostname)}
+              >
+                Export CSV
+              </button>
+            )}
+            <button
+              className='text-sm font-medium text-cyan-700 hover:text-cyan-800'
+              onClick={() => navigate('/')}
+            >
+              Back to Home
+            </button>
+          </div>
         </div>
         {error ? (
           <p className="text-red-600 text-center py-6">{error}</p>

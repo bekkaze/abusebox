@@ -1,8 +1,13 @@
 import axios from 'axios';
 
+// Login is a public endpoint — use a clean axios instance to avoid
+// inheriting a potentially corrupted Authorization header.
+const publicRequest = axios.create();
+delete publicRequest.defaults.headers.common['Authorization'];
+
 export const loginUser = async (username, password) => {
   try {
-    const response = await axios.post('/api/user/login/', {
+    const response = await publicRequest.post('/api/user/login/', {
       username,
       password,
     });

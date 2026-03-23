@@ -5,53 +5,98 @@ import {
 	HiOutlineQuestionMarkCircle,
 	HiShieldExclamation,
 	HiGlobe,
-	HiStatusOnline
+	HiStatusOnline,
+	HiServer,
+	HiLockClosed,
+	HiMail,
+	HiViewList,
+	HiCollection,
 } from 'react-icons/hi'
 
-export const DASHBOARD_SIDEBAR_LINKS = [
+export const DASHBOARD_SIDEBAR_SECTIONS = [
 	{
-		key: 'dashboard',
-		label: 'Dashboard',
-		path: '/dashboard',
-		icon: <HiOutlineViewGrid />
+		label: 'Monitor',
+		links: [
+			{
+				key: 'dashboard',
+				label: 'Dashboard',
+				path: '/dashboard',
+				icon: <HiOutlineViewGrid />
+			},
+			{
+				key: 'assets',
+				label: 'Assets',
+				path: '/dashboard/assets',
+				icon: <HiDesktopComputer />
+			},
+		],
 	},
 	{
-		key: 'blacklist-monitor',
-		label: 'Blacklist monitor',
-		path: '/dashboard/blacklist-monitor',
-		icon: <HiDesktopComputer />
+		label: 'Check & Lookup',
+		links: [
+			{
+				key: 'blacklist-check',
+				label: 'Blacklist Check',
+				path: '/dashboard/blacklist-check',
+				icon: <HiCheck />
+			},
+			{
+				key: 'bulk-check',
+				label: 'Bulk Check',
+				path: '/dashboard/bulk-check',
+				icon: <HiCollection />
+			},
+			{
+				key: 'subnet-check',
+				label: 'Subnet / CIDR',
+				path: '/dashboard/subnet-check',
+				icon: <HiViewList />
+			},
+			{
+				key: 'abuseipdb',
+				label: 'AbuseIPDB',
+				path: '/dashboard/abuseipdb',
+				icon: <HiShieldExclamation />
+			},
+			{
+				key: 'whois',
+				label: 'WHOIS Lookup',
+				path: '/dashboard/whois',
+				icon: <HiGlobe />
+			},
+			{
+				key: 'dns-records',
+				label: 'DNS Records',
+				path: '/dashboard/dns-records',
+				icon: <HiServer />
+			},
+			{
+				key: 'ssl-checker',
+				label: 'SSL Checker',
+				path: '/dashboard/ssl-checker',
+				icon: <HiLockClosed />
+			},
+			{
+				key: 'email-security',
+				label: 'SPF/DKIM/DMARC',
+				path: '/dashboard/email-security',
+				icon: <HiMail />
+			},
+			{
+				key: 'server-status',
+				label: 'Is Server Up?',
+				path: '/dashboard/server-status',
+				icon: <HiStatusOnline />
+			},
+		],
 	},
-	{
-		key: 'blacklist-check',
-		label: 'Blacklist check',
-		path: '/dashboard/blacklist-check',
-		icon: <HiCheck />
-	},
-	{
-		key: 'abuseipdb',
-		label: 'AbuseIPDB',
-		path: '/dashboard/abuseipdb',
-		icon: <HiShieldExclamation />
-	},
-	{
-		key: 'whois',
-		label: 'WHOIS Lookup',
-		path: '/dashboard/whois',
-		icon: <HiGlobe />
-	},
-	{
-		key: 'server-status',
-		label: 'Is Server Up?',
-		path: '/dashboard/server-status',
-		icon: <HiStatusOnline />
-	}
 ]
 
 export const DASHBOARD_SIDEBAR_BOTTOM_LINKS = [
 	{
 		key: 'support',
 		label: 'API Docs',
-		path: 'http://localhost:8100/swagger/',
+		path: `${import.meta.env.VITE_BASE_URL || ''}/swagger/`,
 		icon: <HiOutlineQuestionMarkCircle />
 	}
 ]

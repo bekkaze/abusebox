@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,8 +18,17 @@ class Hostname(Base):
     is_monitor_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     is_blacklisted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Check toggles — which tools to run during monitoring
+    check_blacklist: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    check_abuseipdb: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    check_dns: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    check_ssl: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    check_whois: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    check_email_security: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    check_server_status: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = relationship("User", back_populates="hostnames")
     checks = relationship("CheckHistory", back_populates="hostname_ref", cascade="all, delete-orphan")

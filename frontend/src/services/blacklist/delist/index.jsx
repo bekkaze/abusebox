@@ -1,42 +1,40 @@
 import axios from "axios";
-import { useAuth } from "../../auth/authProvider";
 
-const DelistSerivce = () => {
-  const { token } = useAuth();
+const DelistService = () => {
+  // Authorization header is set globally by authProvider.
+  // Do NOT set it manually — see hostname/index.jsx for explanation.
 
   const delistRequest = async (body) => {
     try {
-      const response = await axios.post('/api/blacklist/delist/',
-      body, {
+      const response = await axios.post('/api/blacklist/delist/', body, {
         headers: {
-          'accept': 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
       });
 
       return response.data;
     } catch (error) {
-      handleRequestError(error, 'Error sent delist request');
+      handleRequestError(error, 'Error sending delist request');
     }
   };
 
   const handleRequestError = (error, customErrorMessage) => {
     if (error.response) {
-      console.error(`HTTP error! status: ${error.response.status}`);
-      throw new Error(`HTTP error! status: ${error.response.status}`);
+      const detail =
+        error.response?.data?.detail ||
+        `HTTP error! status: ${error.response.status}`;
+      throw new Error(detail);
     } else if (error.request) {
-      console.error('No response received');
-      throw new Error('No response received');
+      throw new Error('No response received from backend.');
     } else {
-      console.error(customErrorMessage || 'Error setting up the request', error.message);
-      throw new Error(customErrorMessage || 'Error setting up the request');
+      throw new Error(error.message || customErrorMessage || 'Error setting up the request');
     }
   };
 
   return {
     delistRequest,
-  }
-}
+  };
+};
 
-export default DelistSerivce;
+export default DelistService;

@@ -46,7 +46,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/token/refresh/", response_model=TokenResponse)
-def refresh_token(payload: RefreshRequest):
+def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
     decoded = decode_token(payload.refresh)
     if decoded.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
@@ -54,5 +54,11 @@ def refresh_token(payload: RefreshRequest):
     subject = decoded.get("sub")
     if not subject:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    user = db.query(User).filter(User.username == subject).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
 
     return TokenResponse(access=create_access_token(subject), refresh=create_refresh_token(subject))

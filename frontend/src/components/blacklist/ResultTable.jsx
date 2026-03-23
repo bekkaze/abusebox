@@ -23,7 +23,6 @@ const ResultTable = ({ data }) => {
   const handleDelist = (provider) => {
     setSelectedProvider(provider);
     setIsModalOpen(true);
-    const fields = providerFields[provider];
   };
 
   const [isModalOpen, setIsModalOpen] = useState(false);

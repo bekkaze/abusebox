@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import FormFieldRender from './FormFieldRender';
-import DelistSerivce from '../../../services/blacklist/delist';
+import DelistService from '../../../services/blacklist/delist';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from "react-router-dom";
 
 const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
   const [formData, setFormData] = useState({});
-  const delistService = DelistSerivce(); 
+  const delistService = DelistService();
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 

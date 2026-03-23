@@ -9,6 +9,7 @@ BASE_PROVIDERS = [
     "aspews.ext.sorbs.net",
     "b.barracudacentral.org",
     "bl.nordspam.com",
+    "bl.spamcop.net",
     "blackholes.five-ten-sg.com",
     "blacklist.woody.ch",
     "bogons.cymru.com",
@@ -16,15 +17,25 @@ BASE_PROVIDERS = [
     "combined.abuse.ch",
     "combined.rbl.msrbl.net",
     "db.wpbl.info",
+    "dnsbl-1.uceprotect.net",
     "dnsbl-2.uceprotect.net",
     "dnsbl-3.uceprotect.net",
     "dnsbl.cyberlogic.net",
+    "dnsbl.dronebl.org",
     "dnsbl.sorbs.net",
     "drone.abuse.ch",
+    "duinv.aupads.org",
+    "dul.dnsbl.sorbs.net",
+    "dyna.spamrats.com",
+    "http.dnsbl.sorbs.net",
     "images.rbl.msrbl.net",
     "ips.backscatterer.org",
+    "ix.dnsbl.manitu.net",
     "korea.services.net",
     "matrix.spfbl.net",
+    "misc.dnsbl.sorbs.net",
+    "noptr.spamrats.com",
+    "orvedb.aupads.org",
     "phishing.rbl.msrbl.net",
     "proxy.bl.gweep.ca",
     "proxy.block.transip.nl",
@@ -35,8 +46,13 @@ BASE_PROVIDERS = [
     "relays.nether.net",
     "residential.block.transip.nl",
     "singular.ttk.pte.hu",
+    "smtp.dnsbl.sorbs.net",
+    "socks.dnsbl.sorbs.net",
+    "spam.abuse.ch",
+    "spam.dnsbl.anonmails.de",
     "spam.dnsbl.sorbs.net",
     "spam.rbl.msrbl.net",
+    "spam.spamrats.com",
     "spambot.bls.digibase.ca",
     "spamrbl.imp.ch",
     "spamsources.fabel.dk",
@@ -44,11 +60,14 @@ BASE_PROVIDERS = [
     "virbl.bit.nl",
     "virus.rbl.msrbl.net",
     "virus.rbl.jp",
+    "web.dnsbl.sorbs.net",
     "wormrbl.imp.ch",
     "z.mailspike.net",
+    "zen.spamhaus.org",
+    "zombie.dnsbl.sorbs.net",
 ]
 
-socket.setdefaulttimeout(1.5)
+_DNSBL_TIMEOUT = 1.5
 
 
 def _resolve_ipv4(value: str) -> str | None:
@@ -86,11 +105,15 @@ def _resolve_ipv4(value: str) -> str | None:
 
 def _check_provider(reversed_ip: str, provider: str) -> tuple[str, bool]:
     query = f"{reversed_ip}.{provider}"
+    old_timeout = socket.getdefaulttimeout()
     try:
+        socket.setdefaulttimeout(_DNSBL_TIMEOUT)
         socket.gethostbyname(query)
         return provider, True
     except (socket.gaierror, socket.timeout):
         return provider, False
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 
 def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:

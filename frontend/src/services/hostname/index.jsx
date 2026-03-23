@@ -1,75 +1,55 @@
 import axios from 'axios';
-import { useAuth } from '../auth/authProvider';
 
 const HostnameService = () => {
-  const { token } = useAuth();
+  // Authorization header is set globally by authProvider via
+  // axios.defaults.headers.common['Authorization']. Do NOT set it
+  // manually — the raw token can contain non-ISO-8859-1 characters
+  // that cause XMLHttpRequest.setRequestHeader to throw.
 
   const createHostname = async (hostnameData) => {
     try {
-      const response = await axios.post(
-        '/api/hostname/',
-        hostnameData,
-        {
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
-      return response.data; 
+      const response = await axios.post('/api/hostname/', hostnameData, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data;
     } catch (error) {
-      console.error('Error creating hostname: ', error);
+      console.error('Error creating hostname:', error);
       throw error;
     }
   };
 
   const listHostname = async () => {
     try {
-      const response = await axios.get(
-        '/api/hostname/list/',
-        {
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
+      const response = await axios.get('/api/hostname/list/', {
+        headers: { 'Accept': 'application/json' },
+      });
       return response.data;
     } catch (error) {
-      console.error('Error retrieve hostname list');
+      console.error('Error retrieving hostname list:', error);
       throw error;
     }
   };
 
   const deleteHostname = async (id) => {
     try {
-      const response = await axios.delete(
-        `/api/hostname/${id}`,
-        {
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
+      const response = await axios.delete(`/api/hostname/${id}`, {
+        headers: { 'Accept': 'application/json' },
+      });
       return response;
     } catch (error) {
-      console.error('Error delete hostname');
+      console.error('Error deleting hostname:', error);
       throw error;
     }
-  }
+  };
 
   return {
     createHostname,
     listHostname,
     deleteHostname,
-  }
-}
+  };
+};
 
 export default HostnameService;

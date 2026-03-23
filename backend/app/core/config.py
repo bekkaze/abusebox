@@ -34,6 +34,21 @@ class Settings:
 
     abuseipdb_api_key: str = os.getenv("ABUSEIPDB_API_KEY", "")
 
+    # SMTP settings for email alerts
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username: str = os.getenv("SMTP_USERNAME", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
+    smtp_use_tls: bool = parse_bool("SMTP_USE_TLS", True)
+
+    # Webhook alerts
+    webhook_url: str = os.getenv("WEBHOOK_URL", "")
+
+    # Scheduler settings
+    scheduler_enabled: bool = parse_bool("SCHEDULER_ENABLED", False)
+    scheduler_interval_minutes: int = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "360"))
+
     def __post_init__(self) -> None:
         object.__setattr__(self, "cors_allowed_origins", parse_csv("APP_CORS_ALLOWED_ORIGINS", "http://localhost:3000"))
 

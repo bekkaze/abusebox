@@ -9,15 +9,18 @@ function ViewReport({ hostnameData, isOpen, setIsOpen }) {
     overflowY: 'auto',
   };
 
-  const providers = [...hostnameData.result.providers].sort((a, b) => {
-    const isBlacklistedA = hostnameData.result.detected_on.some((item) => item.provider === a);
-    const isBlacklistedB = hostnameData.result.detected_on.some((item) => item.provider === b);
+  const result = hostnameData?.result || {};
+  const providerList = result.providers || result.blacklist?.providers || [];
+  const detectedOn = result.detected_on || result.blacklist?.detected_on || [];
 
+  const providers = [...providerList].sort((a, b) => {
+    const isBlacklistedA = detectedOn.some((item) => item.provider === a);
+    const isBlacklistedB = detectedOn.some((item) => item.provider === b);
     return isBlacklistedB - isBlacklistedA;
   });
 
   const isBlacklisted = (provider) => {
-    return hostnameData.result.detected_on.some((item) => item.provider === provider);
+    return detectedOn.some((item) => item.provider === provider);
   };
 
   return (

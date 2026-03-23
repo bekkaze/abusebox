@@ -10,9 +10,19 @@ from app.schemas import (
     HostnameResponse,
     HostnameUpdateRequest,
 )
-from app.services.dnsbl import check_dnsbl_providers
+from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
 
 router = APIRouter(prefix="/hostname", tags=["hostname"])
+
+CHECK_TOGGLE_FIELDS = [
+    "check_blacklist",
+    "check_abuseipdb",
+    "check_dns",
+    "check_ssl",
+    "check_whois",
+    "check_email_security",
+    "check_server_status",
+]
 
 
 def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
@@ -26,6 +36,13 @@ def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
         is_monitor_enabled=hostname.is_monitor_enabled,
         status=hostname.status,
         is_blacklisted=hostname.is_blacklisted,
+        check_blacklist=hostname.check_blacklist,
+        check_abuseipdb=hostname.check_abuseipdb,
+        check_dns=hostname.check_dns,
+        check_ssl=hostname.check_ssl,
+        check_whois=hostname.check_whois,
+        check_email_security=hostname.check_email_security,
+        check_server_status=hostname.check_server_status,
         created=hostname.created,
         updated=hostname.updated,
     )
@@ -48,15 +65,29 @@ def create_hostname(
         description=payload.description,
         is_alert_enabled=payload.is_alert_enabled,
         is_monitor_enabled=payload.is_monitor_enabled,
+        check_blacklist=payload.check_blacklist,
+        check_abuseipdb=payload.check_abuseipdb,
+        check_dns=payload.check_dns,
+        check_ssl=payload.check_ssl,
+        check_whois=payload.check_whois,
+        check_email_security=payload.check_email_security,
+        check_server_status=payload.check_server_status,
         status="active",
     )
     db.add(hostname)
     db.commit()
     db.refresh(hostname)
 
-    check_result = check_dnsbl_providers(payload.hostname)
-    if not check_result.get("error"):
-        hostname.is_blacklisted = bool(check_result.get("is_blacklisted", False))
+    # Run all enabled checks
+    toggles = get_toggles_from_hostname(hostname)
+    check_result = run_enabled_checks(payload.hostname, toggles)
+
+    if check_result:
+        # Update blacklist status from blacklist check
+        bl = check_result.get("blacklist", {})
+        if bl and not bl.get("error"):
+            hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
+
         db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
         db.commit()
         db.refresh(hostname)
@@ -119,10 +150,46 @@ def update_hostname(
     hostname.is_alert_enabled = payload.is_alert_enabled
     hostname.is_monitor_enabled = payload.is_monitor_enabled
     hostname.status = payload.status
+    for field in CHECK_TOGGLE_FIELDS:
+        setattr(hostname, field, getattr(payload, field))
     db.commit()
     db.refresh(hostname)
 
     return _to_hostname_response(hostname)
+
+
+@router.get("/{pk}/history/")
+def get_hostname_history(pk: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
+    if not hostname:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
+
+    checks = (
+        db.query(CheckHistory)
+        .filter(CheckHistory.hostname_id == pk)
+        .order_by(CheckHistory.created.asc())
+        .all()
+    )
+
+    history = []
+    for check in checks:
+        result = check.result or {}
+        bl = result.get("blacklist", result)  # backward compat: old results have flat structure
+        history.append({
+            "id": check.id,
+            "date": check.created.isoformat() if check.created else None,
+            "status": check.status,
+            "is_blacklisted": bool(bl.get("is_blacklisted", False)),
+            "detected_count": len(bl.get("detected_on", [])),
+            "total_providers": len(bl.get("providers", [])),
+            "checks_run": [k for k in result if k != "id"],
+        })
+
+    return {
+        "hostname": hostname.hostname,
+        "hostname_id": hostname.id,
+        "history": history,
+    }
 
 
 @router.delete("/{pk}", status_code=status.HTTP_204_NO_CONTENT)

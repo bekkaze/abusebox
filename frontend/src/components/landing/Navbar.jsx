@@ -19,10 +19,10 @@ const Navbar = () => {
     <header className='sticky top-0 z-20 backdrop-blur-md bg-slate-950/60 border-b border-white/10'>
       <div className='max-w-6xl mx-auto px-4 h-20 flex justify-between items-center text-white'>
         <button className='flex items-center gap-3' onClick={() => go('/')}>
-          <div className='h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-400 text-slate-900 font-black grid place-items-center'>A</div>
+          <img src="/logo.png" alt="AbuseBox" className='h-9 w-9 rounded-xl object-cover' />
           <div className='text-left'>
             <p className='text-base font-semibold'>AbuseBox</p>
-            <p className='text-xs text-slate-400'>Blacklist Intelligence</p>
+            <p className='text-xs text-slate-400'>Threat Monitoring</p>
           </div>
         </button>
 
