@@ -49,6 +49,10 @@
     "braces": "^3.0.3",
     "minimatch": "^10.2.3",
     "@remix-run/router": "^1.23.1",
-    "@babel/runtime": "^7.29.2"
+    "@babel/runtime": "^7.29.2",
+    "flatted": "^3.3.3",
+    "micromatch": "^4.0.8",
+    "js-yaml": "^4.1.0",
+    "nanoid": "^5.1.5"
   }
 }
