@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { HiArrowLeft, HiRefresh, HiShieldCheck, HiShieldExclamation, HiClock, HiStatusOnline } from 'react-icons/hi';
+import { HiArrowLeft, HiRefresh, HiShieldCheck, HiShieldExclamation, HiClock, HiStatusOnline, HiDocumentReport } from 'react-icons/hi';
 import axios from 'axios';
 import HistoryChart from '../../components/dashboard/home/HistoryChart';
 import ResultTable from '../../components/blacklist/ResultTable';
@@ -18,6 +18,7 @@ const CHECK_LABELS = {
   whois: { label: 'WHOIS', icon: HiClock },
   email_security: { label: 'SPF/DKIM/DMARC', icon: HiShieldCheck },
   server_status: { label: 'Server Status', icon: HiStatusOnline },
+  dmarc_reports: { label: 'DMARC Reports', icon: HiDocumentReport },
 };
 
 export default function AssetDetail() {
@@ -25,6 +26,7 @@ export default function AssetDetail() {
   const navigate = useNavigate();
   const [asset, setAsset] = useState(null);
   const [result, setResult] = useState(null);
+  const [dmarcSummary, setDmarcSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rechecking, setRechecking] = useState(false);
   const [error, setError] = useState('');
@@ -38,13 +40,24 @@ export default function AssetDetail() {
         axios.get(`/api/hostname/${id}`, { headers: { Accept: 'application/json' } }),
         axios.get('/api/hostname/list/', { headers: { Accept: 'application/json' } }),
       ]);
-      setAsset(assetRes.data);
+      const assetData = assetRes.data;
+      setAsset(assetData);
 
       const listItem = (listRes.data || []).find((h) => h.id === Number(id));
       if (listItem?.result) {
         setResult(listItem.result);
-        const tabs = getAvailableTabs(listItem.result);
+        const tabs = getAvailableTabs(listItem.result, assetData);
         if (tabs.length > 0 && !activeTab) setActiveTab(tabs[0]);
+      }
+
+      // Fetch DMARC summary for domain-type assets
+      if (assetData.hostname_type === 'domain') {
+        try {
+          const dmarcRes = await axios.get(`/api/dmarc/summary/?domain=${encodeURIComponent(assetData.hostname)}`);
+          setDmarcSummary(dmarcRes.data);
+        } catch {
+          setDmarcSummary(null);
+        }
       }
     } catch (err) {
       setError('Failed to load asset details.');
@@ -73,12 +86,15 @@ export default function AssetDetail() {
     fetchAsset();
   }, [id]);
 
-  const getAvailableTabs = (data) => {
+  const getAvailableTabs = (data, assetData) => {
     if (!data) return [];
     const newFormatTabs = Object.keys(data).filter((k) => k !== 'id' && k in CHECK_LABELS);
-    if (newFormatTabs.length > 0) return newFormatTabs;
-    if (data.providers || data.detected_on) return ['blacklist'];
-    return [];
+    let tabs = newFormatTabs.length > 0 ? newFormatTabs : (data.providers || data.detected_on) ? ['blacklist'] : [];
+    // Add DMARC reports tab for domains (shown even without check results)
+    if ((assetData || asset)?.hostname_type === 'domain' && !tabs.includes('dmarc_reports')) {
+      tabs = [...tabs, 'dmarc_reports'];
+    }
+    return tabs;
   };
 
   const getTabData = (tab) => {
@@ -89,7 +105,7 @@ export default function AssetDetail() {
     return result[tab] || null;
   };
 
-  const tabs = result ? getAvailableTabs(result) : [];
+  const tabs = result ? getAvailableTabs(result, asset) : (asset?.hostname_type === 'domain' ? ['dmarc_reports'] : []);
 
   if (loading) return <DetailSkeleton />;
 
@@ -235,6 +251,7 @@ export default function AssetDetail() {
             {activeTab === 'whois' && <WhoisPanel data={getTabData('whois')} />}
             {activeTab === 'email_security' && <EmailSecurityPanel data={getTabData('email_security')} />}
             {activeTab === 'server_status' && <ServerStatusPanel data={getTabData('server_status')} />}
+            {activeTab === 'dmarc_reports' && <DmarcReportsPanel domain={asset?.hostname} summary={dmarcSummary} />}
           </div>
         </div>
       ) : (
@@ -430,6 +447,89 @@ function ServerStatusPanel({ data }) {
       {data.ports && Object.entries(data.ports).map(([port, open]) => (
         <InfoCard key={port} label={`Port ${port}`} value={open ? 'Open' : 'Closed'} />
       ))}
+    </div>
+  );
+}
+
+function DmarcReportsPanel({ domain, summary }) {
+  if (!summary) {
+    return (
+      <div className="text-center py-6">
+        <HiDocumentReport className="text-4xl text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+        <p className="text-sm text-slate-500 dark:text-slate-400">No DMARC aggregate reports uploaded for this domain.</p>
+        <a href="/dashboard/dmarc-reports" className="inline-block mt-3 text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline">
+          Go to DMARC Reports to upload
+        </a>
+      </div>
+    );
+  }
+
+  const { pass_rate, total_messages, disposition_breakdown, top_senders, report_count, date_range, policy } = summary;
+
+  return (
+    <div className="space-y-4">
+      {/* Pass rates */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+        <InfoCard label="Total Messages" value={total_messages?.toLocaleString()} />
+        <InfoCard label="DKIM Aligned" value={`${pass_rate?.dkim ?? 0}%`} />
+        <InfoCard label="SPF Aligned" value={`${pass_rate?.spf ?? 0}%`} />
+        <InfoCard label="Overall Aligned" value={`${pass_rate?.aligned ?? 0}%`} />
+      </div>
+
+      {/* Policy + meta */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <span className="bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1.5 text-sm font-mono text-slate-700 dark:text-slate-300">p={policy?.p || 'none'}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {report_count} report{report_count !== 1 ? 's' : ''} &middot; {date_range?.earliest?.slice(0, 10)} to {date_range?.latest?.slice(0, 10)}
+        </span>
+      </div>
+
+      {/* Disposition */}
+      {disposition_breakdown && Object.keys(disposition_breakdown).length > 0 && (
+        <div className="flex gap-4">
+          {Object.entries(disposition_breakdown).map(([key, val]) => (
+            <div key={key} className="text-center">
+              <p className="text-lg font-bold text-slate-800 dark:text-white">{val.toLocaleString()}</p>
+              <p className="text-[10px] uppercase text-slate-500">{key}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Top senders */}
+      {top_senders?.length > 0 && (
+        <div className="rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
+          <div className="px-4 py-2 bg-slate-50 dark:bg-slate-700">
+            <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Top Senders</p>
+          </div>
+          <div className="overflow-auto max-h-[30vh]">
+            <table className="w-full text-sm text-slate-700 dark:text-slate-300 border-collapse">
+              <thead className="bg-slate-50 dark:bg-slate-700 sticky top-0">
+                <tr className="text-left">
+                  <th className="px-3 py-2 text-xs uppercase text-slate-500">IP</th>
+                  <th className="px-3 py-2 text-xs uppercase text-slate-500">Messages</th>
+                  <th className="px-3 py-2 text-xs uppercase text-slate-500">DKIM</th>
+                  <th className="px-3 py-2 text-xs uppercase text-slate-500">SPF</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-600">
+                {top_senders.slice(0, 10).map((s, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2 font-mono flex items-center gap-1">{s.ip} <CopyButton text={s.ip} /></td>
+                    <td className="px-3 py-2">{s.count.toLocaleString()}</td>
+                    <td className="px-3 py-2"><span className={s.dkim_rate >= 90 ? 'text-emerald-600' : 'text-rose-600'}>{s.dkim_rate}%</span></td>
+                    <td className="px-3 py-2"><span className={s.spf_rate >= 90 ? 'text-emerald-600' : 'text-rose-600'}>{s.spf_rate}%</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <a href="/dashboard/dmarc-reports" className="inline-block text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline">
+        View all reports &rarr;
+      </a>
     </div>
   );
 }
