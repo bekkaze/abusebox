@@ -24,10 +24,8 @@ jobs:
         include:
           - component: backend
             context: ./backend
-            image: ghcr.io/bekkaze/abusebox-backend
           - component: frontend
             context: ./frontend
-            image: ghcr.io/bekkaze/abusebox-frontend
 
     steps:
       - name: Checkout repository
@@ -50,7 +48,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ matrix.image }}
+          images: ghcr.io/${{ github.repository }}-${{ matrix.component }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
@@ -75,6 +73,6 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ${{ matrix.image }}
+          subject-name: ghcr.io/${{ github.repository }}-${{ matrix.component }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
