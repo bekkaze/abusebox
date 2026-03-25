@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { HiBell, HiDesktopComputer, HiShieldCheck, HiExclamationCircle } from "react-icons/hi";
 import StatGrid from "../../components/dashboard/home/StatGrid";
 import HistoryChart from "../../components/dashboard/home/HistoryChart";
+import { StatSkeleton } from "../../components/shared/Skeleton";
+import AutoRefresh from "../../components/shared/AutoRefresh";
 import HostnameService from "../../services/hostname";
 import { useAuth } from "../../services/auth/authProvider";
 
@@ -18,41 +20,57 @@ export default function Home() {
     blacklisted: 0,
   });
 
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        setError("");
-        const list = await hostnameService.listHostname();
-        setHostnames(list);
-        setStats({
-          total: list.length,
-          monitoringEnabled: list.filter((item) => item.is_monitor_enabled).length,
-          alertEnabled: list.filter((item) => item.is_alert_enabled).length,
-          blacklisted: list.filter((item) => item.result?.is_blacklisted).length,
-        });
-      } catch (error) {
-        setError("Failed to load dashboard stats. Please check your connection.");
-        console.error("Failed to load dashboard stats", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (token) loadStats();
+  const loadStats = useCallback(async () => {
+    try {
+      setError("");
+      const list = await hostnameService.listHostname();
+      setHostnames(list);
+      setStats({
+        total: list.length,
+        monitoringEnabled: list.filter((item) => item.is_monitor_enabled).length,
+        alertEnabled: list.filter((item) => item.is_alert_enabled).length,
+        blacklisted: list.filter((item) => item.result?.is_blacklisted).length,
+      });
+    } catch (err) {
+      setError("Failed to load dashboard stats. Please check your connection.");
+      console.error("Failed to load dashboard stats", err);
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    if (token) loadStats();
+  }, [token, loadStats]);
+
+  // Favicon badge for blacklisted assets
+  useEffect(() => {
+    const link = document.querySelector("link[rel~='icon']");
+    if (!link) return;
+    if (stats.blacklisted > 0) {
+      link.href = '/favicon-alert.svg';
+    } else {
+      link.href = '/favicon.svg';
+    }
+  }, [stats.blacklisted]);
 
   return (
     <section className="space-y-5">
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
-        <p className="text-sm text-slate-500 dark:text-slate-400">Overview</p>
-        <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mt-1">Monitoring Summary</h2>
-        <p className="text-slate-600 dark:text-slate-300 mt-2 text-sm">Track your monitored assets and prioritize blacklist incidents.</p>
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex items-center justify-between">
+        <div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Overview</p>
+          <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mt-1">Monitoring Summary</h2>
+          <p className="text-slate-600 dark:text-slate-300 mt-2 text-sm">Track your monitored assets and prioritize blacklist incidents.</p>
+        </div>
+        <AutoRefresh onRefresh={loadStats} loading={loading} />
       </div>
 
       {error ? (
         <div className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl p-4 text-sm text-rose-700 dark:text-rose-300">{error}</div>
       ) : loading ? (
-        <div className="text-sm text-slate-500 dark:text-slate-400 p-4">Loading stats...</div>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+          {[...Array(4)].map((_, i) => <StatSkeleton key={i} />)}
+        </div>
       ) : (
         <>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">

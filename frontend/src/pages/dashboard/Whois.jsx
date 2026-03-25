@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { checkWhois } from '../../services/tools';
+import CopyButton from '../../components/shared/CopyButton';
 
 export default function Whois() {
   const [hostname, setHostname] = useState('');
@@ -105,7 +106,9 @@ function WhoisRow({ label, value }) {
   return (
     <tr className="border-b border-slate-200 hover:bg-slate-50/60">
       <td className="px-4 py-2.5 text-xs uppercase tracking-wide text-slate-500 w-48 font-medium">{label}</td>
-      <td className="px-4 py-2.5 font-medium text-sm break-all">{value}</td>
+      <td className="px-4 py-2.5 font-medium text-sm break-all">
+        <span className="flex items-center gap-2">{value} <CopyButton text={value} /></span>
+      </td>
     </tr>
   );
 }

@@ -74,8 +74,15 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 | **Asset Detail View** | Tabbed results for every check type with summary cards | Yes |
 | **Scheduled Monitoring** | Automatic periodic re-checks with email/webhook alerts | Yes |
 | **Historical Charts** | Visual blacklist history per monitored asset | Yes |
+| **Re-check Asset** | Re-run all enabled checks on any asset with one click | Yes |
 | **Delist Workflow** | Request delisting from supported providers | Yes |
-| **Dark Mode** | Toggle between light and dark themes | - |
+| **Search & Filter** | Search assets by hostname/type, filter by clean/listed status | Yes |
+| **Auto-refresh** | Configurable auto-refresh (30s/1m/5m) on Dashboard and Assets | Yes |
+| **Copy to Clipboard** | One-click copy on IPs, DNS records, WHOIS data, SSL details | - |
+| **Relative Timestamps** | "2 hours ago" with full datetime tooltip on hover | - |
+| **Dark Mode** | Toggle between light and dark themes, persisted to localStorage | - |
+| **Responsive Layout** | Collapsible sidebar with hamburger menu on mobile | - |
+| **Favicon Alert** | Red badge on favicon when any asset is blacklisted | - |
 | **API Documentation** | Swagger UI & ReDoc for all endpoints | No |
 
 ---
@@ -198,6 +205,7 @@ GET /tools/subnet/?cidr=192.168.1.0/24
 GET /tools/bulk-check/?hostnames=example.com,8.8.8.8
 GET /tools/export/blacklist/?hostname=example.com
 GET /tools/export/subnet/?cidr=192.168.1.0/24
+POST /hostname/{id}/recheck/              # (auth required)
 ```
 
 Full interactive docs available after startup:
@@ -236,7 +244,8 @@ abusebox/
 │   └── src/
 │       ├── pages/             # Landing, Login, Assets, AssetDetail,
 │       │                      # Dashboard, Check & Lookup tools
-│       ├── components/        # Reusable UI components
+│       ├── components/        # Reusable UI (shared: Skeleton, CopyButton,
+│       │                      # TimeAgo, AutoRefresh, ErrorBoundary)
 │       ├── services/          # API client functions, auth, theme
 │       └── routes/            # React Router config
 ├── docker-compose.yml
@@ -249,6 +258,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.1.1** | March 25, 2026 | UX polish, responsive mobile layout, asset re-check, code splitting, security fixes |
 | **v1.1.0** | March 23, 2026 | Asset management with per-asset check toggles, asset detail page with tabbed results, DNS records, SSL checker, SPF/DKIM/DMARC, bulk check, subnet scan, scheduled monitoring, email/webhook alerts, historical charts, CSV export, dark mode, 60 DNSBL providers, security & bug fixes |
 | **v1.0.0** | March 2, 2026 | Initial release — DNSBL monitoring, dashboard, delist workflow |
 

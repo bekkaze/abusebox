@@ -192,6 +192,33 @@ def get_hostname_history(pk: int, db: Session = Depends(get_db), user: User = De
     }
 
 
+@router.post("/{pk}/recheck/", response_model=HostnameResponse)
+def recheck_hostname(pk: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
+    if not hostname:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
+
+    toggles = get_toggles_from_hostname(hostname)
+    check_result = run_enabled_checks(hostname.hostname, toggles)
+
+    if check_result:
+        bl = check_result.get("blacklist", {})
+        if bl and not bl.get("error"):
+            hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
+
+        # Mark old checks as historical
+        db.query(CheckHistory).filter(
+            CheckHistory.hostname_id == hostname.id,
+            CheckHistory.status == "current",
+        ).update({"status": "historical"})
+
+        db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
+        db.commit()
+        db.refresh(hostname)
+
+    return _to_hostname_response(hostname)
+
+
 @router.delete("/{pk}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_hostname(pk: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()

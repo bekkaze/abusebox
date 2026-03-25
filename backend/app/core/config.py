@@ -14,6 +14,16 @@ def parse_csv(name: str, default: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def parse_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "AbuseBox API")
@@ -21,11 +31,11 @@ class Settings:
 
     app_secret_key: str = os.getenv("APP_SECRET_KEY", "insecure-dev-secret-key-change-me")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
-    access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "30"))
-    refresh_token_days: int = int(os.getenv("REFRESH_TOKEN_DAYS", "14"))
+    access_token_minutes: int = parse_int("ACCESS_TOKEN_MINUTES", 30)
+    refresh_token_days: int = parse_int("REFRESH_TOKEN_DAYS", 14)
 
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./app.db")
-    cors_allowed_origins: list[str] = None  # type: ignore[assignment]
+    cors_allowed_origins: list[str] | None = None
 
     default_admin_username: str = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")
     default_admin_email: str = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@abusebox.local")
@@ -36,7 +46,7 @@ class Settings:
 
     # SMTP settings for email alerts
     smtp_host: str = os.getenv("SMTP_HOST", "")
-    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_port: int = parse_int("SMTP_PORT", 587)
     smtp_username: str = os.getenv("SMTP_USERNAME", "")
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
@@ -47,7 +57,7 @@ class Settings:
 
     # Scheduler settings
     scheduler_enabled: bool = parse_bool("SCHEDULER_ENABLED", False)
-    scheduler_interval_minutes: int = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "360"))
+    scheduler_interval_minutes: int = parse_int("SCHEDULER_INTERVAL_MINUTES", 360)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "cors_allowed_origins", parse_csv("APP_CORS_ALLOWED_ORIGINS", "http://localhost:3000"))

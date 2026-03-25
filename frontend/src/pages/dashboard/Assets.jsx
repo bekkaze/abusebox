@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
-import { HiOutlinePlusCircle, HiShieldCheck, HiShieldExclamation, HiExternalLink, HiTrash } from 'react-icons/hi';
+import { HiOutlinePlusCircle, HiShieldCheck, HiShieldExclamation, HiExternalLink, HiTrash, HiSearch } from 'react-icons/hi';
 import HostnameService from "../../services/hostname";
 import { useAuth } from "../../services/auth/authProvider";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
+import { AssetCardSkeleton } from "../../components/shared/Skeleton";
+import AutoRefresh from "../../components/shared/AutoRefresh";
+import TimeAgo from "../../components/shared/TimeAgo";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -34,8 +37,11 @@ const initialFormData = {
 
 export default function Assets() {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all"); // all | clean | listed
   const navigate = useNavigate();
   const { token } = useAuth();
   const [formData, setFormData] = useState({ ...initialFormData });
@@ -48,20 +54,23 @@ export default function Assets() {
   };
 
   const handleSubmit = async () => {
+    setSubmitting(true);
     try {
       const result = await hostnameService.createHostname(formData);
       if (result.status === 'active') {
         toast.success(`Added ${formData.hostname}`);
         setFormData({ ...initialFormData });
+        setAddModalOpen(false);
         fetchHostnameList();
       }
     } catch {
       toast.error("Failed to create asset. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setAddModalOpen(false);
   };
 
-  const fetchHostnameList = async () => {
+  const fetchHostnameList = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage("");
     try {
@@ -72,9 +81,9 @@ export default function Assets() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
-  useEffect(() => { if (token) fetchHostnameList(); }, [token]);
+  useEffect(() => { if (token) fetchHostnameList(); }, [token, fetchHostnameList]);
 
   const handleDelete = async (e, id, hostname) => {
     e.stopPropagation();
@@ -90,16 +99,19 @@ export default function Assets() {
     }
   };
 
-  const formatDateTime = (v) => {
-    if (!v || v === 'Not checked') return null;
-    const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
-  };
+  // Filter & search
+  const filtered = hostnameListData.filter((item) => {
+    const matchSearch = !search || item.hostname.toLowerCase().includes(search.toLowerCase()) || item.hostname_type.toLowerCase().includes(search.toLowerCase());
+    if (!matchSearch) return false;
+    if (filterStatus === 'listed') return item.is_blacklisted;
+    if (filterStatus === 'clean') return !item.is_blacklisted;
+    return true;
+  });
 
   return (
     <section className="space-y-5">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">Monitor</p>
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Assets</h2>
@@ -107,18 +119,52 @@ export default function Assets() {
             {hostnameListData.length} asset{hostnameListData.length !== 1 ? 's' : ''} tracked
           </p>
         </div>
-        <button
-          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-5 flex items-center gap-2 rounded-xl transition-colors font-medium"
-          onClick={() => setAddModalOpen(true)}
-        >
-          <HiOutlinePlusCircle className="text-lg" /> Add Asset
-        </button>
+        <div className="flex items-center gap-3">
+          <AutoRefresh onRefresh={fetchHostnameList} loading={isLoading} />
+          <button
+            className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-5 flex items-center gap-2 rounded-xl transition-colors font-medium"
+            onClick={() => setAddModalOpen(true)}
+          >
+            <HiOutlinePlusCircle className="text-lg" /> Add Asset
+          </button>
+        </div>
       </div>
+
+      {/* Search & Filter */}
+      {hostnameListData.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search assets..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+          <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'clean', label: 'Clean' },
+              { key: 'listed', label: 'Listed' },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilterStatus(f.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterStatus === f.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-cyan-600"></div>
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {[...Array(6)].map((_, i) => <AssetCardSkeleton key={i} />)}
         </div>
       ) : errorMessage ? (
         <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl p-4 text-sm text-rose-700 dark:text-rose-300">{errorMessage}</div>
@@ -136,13 +182,17 @@ export default function Assets() {
             Add Your First Asset
           </button>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center shadow-sm">
+          <HiSearch className="text-4xl text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-500 dark:text-slate-400 text-sm">No assets match your search.</p>
+        </div>
       ) : (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-          {hostnameListData.map((item) => {
+          {filtered.map((item) => {
             const bl = item.result?.blacklist || (item.result?.detected_on ? item.result : null);
             const detectedCount = bl?.detected_on?.length ?? 0;
             const totalProviders = bl?.providers?.length ?? 0;
-            const checked = formatDateTime(item.checked);
             const enabledChecks = Object.entries(CHECK_BADGE_MAP).filter(([key]) => item[key]).map(([, label]) => label);
 
             return (
@@ -179,7 +229,6 @@ export default function Assets() {
                   </div>
                 </div>
 
-                {/* Description */}
                 {item.description && (
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 truncate">{item.description}</p>
                 )}
@@ -189,11 +238,9 @@ export default function Assets() {
                   {!item.result ? (
                     <p className="text-xs text-slate-400">Not checked yet</p>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-semibold ${detectedCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                        {detectedCount > 0 ? `Listed on ${detectedCount} of ${totalProviders}` : totalProviders > 0 ? `Clear on ${totalProviders} providers` : 'Checked'}
-                      </span>
-                    </div>
+                    <span className={`text-sm font-semibold ${detectedCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {detectedCount > 0 ? `Listed on ${detectedCount} of ${totalProviders}` : totalProviders > 0 ? `Clear on ${totalProviders} providers` : 'Checked'}
+                    </span>
                   )}
                 </div>
 
@@ -204,9 +251,7 @@ export default function Assets() {
                       <span key={label} className="inline-flex rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 text-[10px] font-bold">{label}</span>
                     ))}
                   </div>
-                  {checked && (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0 ml-2">{checked}</span>
-                  )}
+                  <TimeAgo date={item.checked} className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0 ml-2" />
                 </div>
               </div>
             );
@@ -220,6 +265,7 @@ export default function Assets() {
         handleSubmit={handleSubmit}
         isOpen={addModalOpen}
         setIsOpen={setAddModalOpen}
+        submitting={submitting}
       />
 
       <ToastContainer position="top-center" autoClose={3000} />

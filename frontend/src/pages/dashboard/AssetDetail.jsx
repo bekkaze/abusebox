@@ -4,6 +4,11 @@ import { HiArrowLeft, HiRefresh, HiShieldCheck, HiShieldExclamation, HiClock, Hi
 import axios from 'axios';
 import HistoryChart from '../../components/dashboard/home/HistoryChart';
 import ResultTable from '../../components/blacklist/ResultTable';
+import { DetailSkeleton } from '../../components/shared/Skeleton';
+import CopyButton from '../../components/shared/CopyButton';
+import TimeAgo from '../../components/shared/TimeAgo';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const CHECK_LABELS = {
   blacklist: { label: 'Blacklist', icon: HiShieldExclamation },
@@ -21,6 +26,7 @@ export default function AssetDetail() {
   const [asset, setAsset] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rechecking, setRechecking] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(null);
 
@@ -34,11 +40,9 @@ export default function AssetDetail() {
       ]);
       setAsset(assetRes.data);
 
-      // Find this asset's latest result from the list endpoint
-      const listItem = listRes.data.find((h) => h.id === Number(id));
+      const listItem = (listRes.data || []).find((h) => h.id === Number(id));
       if (listItem?.result) {
         setResult(listItem.result);
-        // Set first available tab
         const tabs = getAvailableTabs(listItem.result);
         if (tabs.length > 0 && !activeTab) setActiveTab(tabs[0]);
       }
@@ -50,16 +54,29 @@ export default function AssetDetail() {
     }
   };
 
+  const handleRecheck = async () => {
+    setRechecking(true);
+    try {
+      await axios.post(`/api/hostname/${id}/recheck/`, {}, { headers: { Accept: 'application/json' } });
+      toast.success('Re-check started');
+      // Refresh after a brief delay to allow backend to process
+      setTimeout(() => {
+        fetchAsset().finally(() => setRechecking(false));
+      }, 2000);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to re-check');
+      setRechecking(false);
+    }
+  };
+
   useEffect(() => {
     fetchAsset();
   }, [id]);
 
   const getAvailableTabs = (data) => {
     if (!data) return [];
-    // New format: keys like "blacklist", "abuseipdb", etc.
     const newFormatTabs = Object.keys(data).filter((k) => k !== 'id' && k in CHECK_LABELS);
     if (newFormatTabs.length > 0) return newFormatTabs;
-    // Old format: flat structure is the blacklist data
     if (data.providers || data.detected_on) return ['blacklist'];
     return [];
   };
@@ -74,13 +91,7 @@ export default function AssetDetail() {
 
   const tabs = result ? getAvailableTabs(result) : [];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-cyan-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <DetailSkeleton />;
 
   if (error || !asset) {
     return (
@@ -118,6 +129,7 @@ export default function AssetDetail() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{asset.hostname}</h1>
+                <CopyButton text={asset.hostname} />
                 <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${asset.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-rose-100 text-rose-700'}`}>
                   {asset.status}
                 </span>
@@ -147,10 +159,19 @@ export default function AssetDetail() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 dark:text-slate-500">
-              Created {new Date(asset.created).toLocaleDateString()}
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRecheck}
+              disabled={rechecking}
+              className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <HiRefresh className={rechecking ? 'animate-spin' : ''} />
+              {rechecking ? 'Checking...' : 'Re-check Now'}
+            </button>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400 dark:text-slate-500">Created</p>
+              <TimeAgo date={asset.created} className="text-xs text-slate-500 dark:text-slate-400" />
+            </div>
           </div>
         </div>
       </div>
@@ -185,7 +206,6 @@ export default function AssetDetail() {
       {/* Tabbed Results */}
       {tabs.length > 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
-          {/* Tab Bar */}
           <div className="flex border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
             {tabs.map((tab) => {
               const info = CHECK_LABELS[tab] || { label: tab };
@@ -207,7 +227,6 @@ export default function AssetDetail() {
             })}
           </div>
 
-          {/* Tab Content */}
           <div className="p-5">
             {activeTab === 'blacklist' && <BlacklistPanel data={getTabData('blacklist')} />}
             {activeTab === 'abuseipdb' && <AbuseIPDBPanel data={getTabData('abuseipdb')} />}
@@ -220,9 +239,11 @@ export default function AssetDetail() {
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400">No check results available yet.</p>
+          <p className="text-slate-500 dark:text-slate-400">No check results available yet. Click "Re-check Now" to run checks.</p>
         </div>
       )}
+
+      <ToastContainer position="top-center" autoClose={3000} />
     </section>
   );
 }
@@ -287,7 +308,10 @@ function DnsPanel({ data }) {
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-600">
             {values.map((v, i) => (
-              <div key={i} className="px-4 py-2 text-sm font-mono text-slate-700 dark:text-slate-300 break-all">{v}</div>
+              <div key={i} className="px-4 py-2 text-sm font-mono text-slate-700 dark:text-slate-300 break-all flex items-center justify-between">
+                <span>{v}</span>
+                <CopyButton text={v} />
+              </div>
             ))}
           </div>
         </div>
@@ -336,7 +360,7 @@ function WhoisPanel({ data }) {
       {data.parsed && (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
           {Object.entries(data.parsed).map(([key, value]) => (
-            <InfoCard key={key} label={key} value={Array.isArray(value) ? value.join(', ') : String(value ?? '—')} />
+            <InfoCard key={key} label={key} value={Array.isArray(value) ? value.join(', ') : String(value ?? '—')} copyable />
           ))}
         </div>
       )}
@@ -382,7 +406,12 @@ function RecordBlock({ title, data }) {
         <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</span>
         {data.policy && <span className="text-xs text-slate-500 ml-2">Policy: {data.policy}</span>}
       </div>
-      {data.record && <pre className="text-xs font-mono text-slate-600 dark:text-slate-400 mt-2 break-all whitespace-pre-wrap bg-slate-100 dark:bg-slate-700 rounded-lg p-2">{data.record}</pre>}
+      {data.record && (
+        <div className="flex items-start gap-2 mt-2">
+          <pre className="text-xs font-mono text-slate-600 dark:text-slate-400 break-all whitespace-pre-wrap bg-slate-100 dark:bg-slate-700 rounded-lg p-2 flex-1">{data.record}</pre>
+          <CopyButton text={data.record} className="mt-1" />
+        </div>
+      )}
       {data.warnings?.map((w, i) => (
         <p key={i} className="text-xs text-amber-600 dark:text-amber-400 mt-1">Warning: {w}</p>
       ))}
@@ -394,7 +423,7 @@ function ServerStatusPanel({ data }) {
   if (!data || data.error) return <ErrorMsg msg={data?.error} />;
   return (
     <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
-      <InfoCard label="IP Address" value={data.ip} />
+      <InfoCard label="IP Address" value={data.ip} copyable />
       <InfoCard label="DNS Resolved" value={data.dns_resolved ? 'Yes' : 'No'} />
       <InfoCard label="HTTP Status" value={data.http_status} />
       <InfoCard label="Response Time" value={data.response_time_ms ? `${data.response_time_ms}ms` : '—'} />
@@ -406,11 +435,14 @@ function ServerStatusPanel({ data }) {
 }
 
 /* ---------- Shared ---------- */
-function InfoCard({ label, value }) {
+function InfoCard({ label, value, copyable }) {
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-600 p-3 bg-slate-50/50 dark:bg-slate-700/30">
       <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400 font-medium">{label}</p>
-      <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-0.5 break-all">{value ?? '—'}</p>
+      <div className="flex items-center justify-between mt-0.5">
+        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 break-all">{value ?? '—'}</p>
+        {copyable && <CopyButton text={value} />}
+      </div>
     </div>
   );
 }

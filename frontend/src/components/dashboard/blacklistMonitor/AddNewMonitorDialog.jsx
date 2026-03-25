@@ -11,7 +11,7 @@ const CHECK_TOGGLES = [
   { name: "check_server_status", label: "Server Status" },
 ];
 
-export default function AddNewMonitorDialog({ formData, handleInputChange, handleSubmit, isOpen, setIsOpen }) {
+export default function AddNewMonitorDialog({ formData, handleInputChange, handleSubmit, isOpen, setIsOpen, submitting = false }) {
   return (
     <Transition show={isOpen} as={React.Fragment}>
       <Dialog
@@ -135,18 +135,29 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                   <div className="mt-5 flex justify-end gap-2">
                     <button
                       type="button"
-                      className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                      className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
                       onClick={() => setIsOpen(false)}
+                      disabled={submitting}
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
-                      className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={!formData.hostname.trim() || !formData.hostname_type}
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 min-w-[120px] justify-center"
+                      disabled={!formData.hostname.trim() || !formData.hostname_type || submitting}
                       onClick={handleSubmit}
                     >
-                      Submit
+                      {submitting ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Running checks...
+                        </>
+                      ) : (
+                        'Submit'
+                      )}
                     </button>
                   </div>
                 </form>

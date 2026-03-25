@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { checkDns } from '../../services/tools';
+import CopyButton from '../../components/shared/CopyButton';
 
 const RECORD_COLORS = {
   A: 'bg-sky-100 text-sky-800',
@@ -78,8 +79,9 @@ export default function DnsRecords() {
                 </div>
                 <div className="divide-y divide-slate-100 dark:divide-slate-600">
                   {records.map((record, i) => (
-                    <div key={i} className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300 break-all">
-                      {record}
+                    <div key={i} className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300 break-all flex items-center justify-between">
+                      <span>{record}</span>
+                      <CopyButton text={record} />
                     </div>
                   ))}
                 </div>

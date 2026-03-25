@@ -3,19 +3,22 @@ import providerFields from './delist/constant';
 import DelistModal from './delist/DelistModal';
 
 const ResultTable = ({ data }) => {
-  const providers = [...data.providers].sort((a, b) => {
-    const isBlacklistedA = data.detected_on.some((item) => item.provider === a);
-    const isBlacklistedB = data.detected_on.some((item) => item.provider === b);
+  const providerList = data?.providers || [];
+  const detectedList = data?.detected_on || [];
+
+  const providers = [...providerList].sort((a, b) => {
+    const isBlacklistedA = detectedList.some((item) => item.provider === a);
+    const isBlacklistedB = detectedList.some((item) => item.provider === b);
 
     return isBlacklistedB - isBlacklistedA;
   });
 
   const isBlacklisted = (provider) => {
-    return data.detected_on.some((item) => item.provider === provider);
+    return detectedList.some((item) => item.provider === provider);
   };
 
   const getProviderStatus = (provider) => {
-    const detectedProvider = data.detected_on.find((item) => item.provider === provider);
+    const detectedProvider = detectedList.find((item) => item.provider === provider);
     return detectedProvider ? detectedProvider.status : 'unknown';
   };
 

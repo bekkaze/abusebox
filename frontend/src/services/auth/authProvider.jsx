@@ -9,8 +9,18 @@ import {
 
 const AuthContext = createContext()
 
+// Set the axios header synchronously on module load so the very first
+// request that fires (before any useEffect runs) already carries the token.
+const initToken = localStorage.getItem('token');
+if (initToken && /^[\x20-\x7E]+$/.test(initToken)) {
+  axios.defaults.headers.common['Authorization'] = 'Bearer ' + initToken;
+} else if (initToken) {
+  // Corrupted token — clear it
+  localStorage.removeItem('token');
+}
+
 const AuthProvider = ({ children }) => {
-  const [token, setToken_] = useState(localStorage.getItem('token'));
+  const [token, setToken_] = useState(initToken && /^[\x20-\x7E]+$/.test(initToken) ? initToken : null);
 
   const setToken = (newToken) => {
     setToken_(newToken);
@@ -18,12 +28,8 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (token) {
-      // Ensure the token only contains ASCII characters that are safe
-      // for HTTP headers. Non-ISO-8859-1 code points cause
-      // XMLHttpRequest.setRequestHeader to throw.
       const safeToken = token.replace(/[^\x20-\x7E]/g, '');
       if (safeToken !== token) {
-        // Token was corrupted — clear it and force re-login.
         setToken_(null);
         localStorage.removeItem('token');
         delete axios.defaults.headers.common['Authorization'];

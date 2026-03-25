@@ -1,15 +1,18 @@
 import React from 'react';
 
 const ResultTableQuick = ({ data }) => {
-  const providers = [...data.providers].sort((a, b) => {
-    const isBlacklistedA = data.detected_on.some((item) => item.provider === a);
-    const isBlacklistedB = data.detected_on.some((item) => item.provider === b);
+  const providerList = data?.providers || [];
+  const detectedList = data?.detected_on || [];
+
+  const providers = [...providerList].sort((a, b) => {
+    const isBlacklistedA = detectedList.some((item) => item.provider === a);
+    const isBlacklistedB = detectedList.some((item) => item.provider === b);
 
     return isBlacklistedB - isBlacklistedA;
   });
 
   const isBlacklisted = (provider) => {
-    return data.detected_on.some((item) => item.provider === provider);
+    return detectedList.some((item) => item.provider === provider);
   };
 
   const abuse = data.abuseipdb;
