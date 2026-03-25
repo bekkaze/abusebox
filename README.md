@@ -70,6 +70,8 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 | **SPF / DKIM / DMARC** | Email authentication validation with A-F grading | No |
 | **Is Server Up?** | DNS resolution, port scan (80/443), HTTP status & response time | No |
 | **CSV Export** | Download blacklist and subnet results as CSV | No |
+| **Bulk Asset Import** | Create up to 50 assets in one API request | Yes |
+| **CIDR Import** | Import an IP range (max /24) as monitored assets from the UI | Yes |
 | **Assets** | Register domains/IPs and run all checks with per-asset toggles | Yes |
 | **Asset Detail View** | Tabbed results for every check type with summary cards | Yes |
 | **Scheduled Monitoring** | Automatic periodic re-checks with email/webhook alerts | Yes |
@@ -205,6 +207,8 @@ GET /tools/subnet/?cidr=192.168.1.0/24
 GET /tools/bulk-check/?hostnames=example.com,8.8.8.8
 GET /tools/export/blacklist/?hostname=example.com
 GET /tools/export/subnet/?cidr=192.168.1.0/24
+POST /hostname/bulk/                      # (auth required)
+POST /hostname/cidr-import/               # (auth required)
 POST /hostname/{id}/recheck/              # (auth required)
 ```
 
@@ -258,6 +262,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.1.2** | March 26, 2026 | Bulk asset import, CIDR import, auto-refresh auth, persistent DB, DNSBL false positive fix, community bug fixes |
 | **v1.1.1** | March 25, 2026 | UX polish, responsive mobile layout, asset re-check, code splitting, security fixes |
 | **v1.1.0** | March 23, 2026 | Asset management, DNS/SSL/DMARC tools, bulk & subnet check, scheduled monitoring, dark mode, 60+ DNSBL providers |
 | **v1.0.1** | March 19, 2026 | AbuseIPDB, WHOIS lookup, server status checker, security hardening |

@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2026-03-26
+
+### Added
+
+- Bulk asset creation endpoint (`POST /hostname/bulk/`) — create up to 50 assets in one request.
+- CIDR import endpoint (`POST /hostname/cidr-import/`) and UI dialog — import an IP range (max /24) as monitored assets.
+- Automatic token refresh — axios interceptor silently refreshes expired access tokens using the refresh token, with request queuing for concurrent calls.
+- DMARC aggregate report parsing — upload XML/gz/zip reports, view pass/fail rates per sender, link to monitored domains.
+- Persistent database storage — Docker Compose now uses a named volume (`abusebox-data`) so data survives container restarts.
+
+### Fixed
+
+- DNSBL false positives from Spamhaus and CBL — now validates response codes, only `127.0.0.x` counts as a real listing (#9).
+- Session expiry after 30 minutes of inactivity — frontend now auto-refreshes tokens in the background (#11).
+- API Docs sidebar link pointing to internal Docker hostname `backend:8100` instead of browser-accessible URL (#12).
+- Data loss on Docker restart — SQLite database was stored inside the container with no volume mount (#13).
+- ReDoc page failing to load due to unstable `@next` CDN tag — pinned to stable v2.1.5 (#7).
+- Swagger UI returning "invalid version field" when accessed via Vite proxy — link now opens backend directly.
+- `python-multipart` arbitrary file write vulnerability (upgraded to 0.0.22).
+
 ## [1.1.1] - 2026-03-25
 
 ### Added
