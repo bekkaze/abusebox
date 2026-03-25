@@ -9,11 +9,13 @@ services:
       - APP_DEBUG=true
       - APP_SECRET_KEY=change-me-in-production
       - APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
-      - DATABASE_URL=sqlite:///./app.db
+      - DATABASE_URL=sqlite:////app/data/app.db
       - DEFAULT_ADMIN_USERNAME=admin
       - DEFAULT_ADMIN_EMAIL=admin@abusebox.local
       - DEFAULT_ADMIN_PASSWORD=password123
       - DEFAULT_ADMIN_PHONE=11111111
+    volumes:
+      - abusebox-data:/app/data
     ports:
       - 8100:8100
   frontend:
@@ -25,3 +27,6 @@ services:
       - VITE_BASE_URL=http://backend:8100
     ports:
       - 3000:3000
+
+volumes:
+  abusebox-data:

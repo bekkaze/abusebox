@@ -23,7 +23,7 @@ const Login = () => {
     try {
       const response = await loginUser(username.trim(), password);
       if (response.data.access) {
-        setToken(response.data.access);
+        setToken(response.data.access, response.data.refresh);
         navigate("/dashboard/", { replace: true });
       } else {
         setDetail("Login failed: Access token not found in response.");

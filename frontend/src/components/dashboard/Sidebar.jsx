@@ -13,7 +13,7 @@ export default function Sidebar({ open, onClose }) {
   const { setToken } = useAuth();
 
   const handleLogout = () => {
-    setToken(null);
+    setToken(null, null);
     navigate('/', { replace: true });
   }
 

@@ -103,7 +103,7 @@ export const DASHBOARD_SIDEBAR_BOTTOM_LINKS = [
 	{
 		key: 'support',
 		label: 'API Docs',
-		path: `${import.meta.env.VITE_BASE_URL || 'http://localhost:8100'}/swagger/`,
+		path: '/api/swagger/',
 		icon: <HiOutlineQuestionMarkCircle />
 	}
 ]
