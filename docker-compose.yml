@@ -25,6 +25,7 @@ services:
       - backend
     environment:
       - VITE_BASE_URL=http://backend:8100
+      - VITE_API_DOCS_URL=http://localhost:8100/swagger/
     ports:
       - 3000:3000
 
