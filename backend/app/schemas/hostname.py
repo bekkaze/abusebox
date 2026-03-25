@@ -76,3 +76,27 @@ class HostnameResponse(BaseModel):
 class HostnameListItem(HostnameResponse):
     result: dict[str, Any] | None
     checked: datetime | str
+
+
+class BulkHostnameCreateRequest(BaseModel):
+    hostnames: list[HostnameCreateRequest] = Field(min_length=1, max_length=50)
+
+
+class CidrImportRequest(BaseModel):
+    cidr: str = Field(min_length=1, max_length=50, description="CIDR notation e.g. 192.168.1.0/24")
+    description: str | None = Field(default=None, max_length=255)
+    is_alert_enabled: bool = False
+    is_monitor_enabled: bool = False
+    check_blacklist: bool = True
+    check_abuseipdb: bool = False
+    check_dns: bool = False
+    check_ssl: bool = False
+    check_whois: bool = False
+    check_email_security: bool = False
+    check_server_status: bool = False
+
+
+class BulkCreateResult(BaseModel):
+    created: int
+    skipped: int
+    errors: list[str]

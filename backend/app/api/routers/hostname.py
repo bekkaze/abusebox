@@ -1,3 +1,5 @@
+import ipaddress
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -5,6 +7,9 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models import CheckHistory, Hostname, User
 from app.schemas import (
+    BulkCreateResult,
+    BulkHostnameCreateRequest,
+    CidrImportRequest,
     HostnameCreateRequest,
     HostnameListItem,
     HostnameResponse,
@@ -93,6 +98,118 @@ def create_hostname(
         db.refresh(hostname)
 
     return _to_hostname_response(hostname)
+
+
+@router.post("/bulk/", response_model=BulkCreateResult)
+def create_hostnames_bulk(
+    payload: BulkHostnameCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    created = 0
+    skipped = 0
+    errors: list[str] = []
+
+    existing_set = {
+        h.hostname
+        for h in db.query(Hostname.hostname).filter(Hostname.user_id == user.id).all()
+    }
+
+    for item in payload.hostnames:
+        if item.hostname in existing_set:
+            skipped += 1
+            continue
+        try:
+            hostname = Hostname(
+                user_id=user.id,
+                hostname_type=item.hostname_type,
+                hostname=item.hostname,
+                description=item.description,
+                is_alert_enabled=item.is_alert_enabled,
+                is_monitor_enabled=item.is_monitor_enabled,
+                check_blacklist=item.check_blacklist,
+                check_abuseipdb=item.check_abuseipdb,
+                check_dns=item.check_dns,
+                check_ssl=item.check_ssl,
+                check_whois=item.check_whois,
+                check_email_security=item.check_email_security,
+                check_server_status=item.check_server_status,
+                status="active",
+            )
+            db.add(hostname)
+            db.flush()
+
+            toggles = get_toggles_from_hostname(hostname)
+            check_result = run_enabled_checks(item.hostname, toggles)
+            if check_result:
+                bl = check_result.get("blacklist", {})
+                if bl and not bl.get("error"):
+                    hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
+                db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
+
+            existing_set.add(item.hostname)
+            created += 1
+        except Exception as exc:
+            errors.append(f"{item.hostname}: {exc}")
+
+    db.commit()
+    return BulkCreateResult(created=created, skipped=skipped, errors=errors)
+
+
+@router.post("/cidr-import/", response_model=BulkCreateResult)
+def import_cidr(
+    payload: CidrImportRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        network = ipaddress.IPv4Network(payload.cidr, strict=False)
+    except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid CIDR: {exc}")
+
+    if network.prefixlen < 24:
+        raise HTTPException(status_code=400, detail="Maximum /24 (256 addresses) allowed")
+
+    existing_set = {
+        h.hostname
+        for h in db.query(Hostname.hostname).filter(Hostname.user_id == user.id).all()
+    }
+
+    created = 0
+    skipped = 0
+    errors: list[str] = []
+
+    for ip in network.hosts():
+        ip_str = str(ip)
+        if ip_str in existing_set:
+            skipped += 1
+            continue
+        try:
+            hostname = Hostname(
+                user_id=user.id,
+                hostname_type="ipv4",
+                hostname=ip_str,
+                description=payload.description or f"CIDR import: {payload.cidr}",
+                is_alert_enabled=payload.is_alert_enabled,
+                is_monitor_enabled=payload.is_monitor_enabled,
+                check_blacklist=payload.check_blacklist,
+                check_abuseipdb=payload.check_abuseipdb,
+                check_dns=payload.check_dns,
+                check_ssl=payload.check_ssl,
+                check_whois=payload.check_whois,
+                check_email_security=payload.check_email_security,
+                check_server_status=payload.check_server_status,
+                status="active",
+            )
+            db.add(hostname)
+            db.flush()
+            existing_set.add(ip_str)
+            created += 1
+        except Exception as exc:
+            errors.append(f"{ip_str}: {exc}")
+
+    db.commit()
+    return BulkCreateResult(created=created, skipped=skipped, errors=errors)
 
 
 @router.get("/list/", response_model=list[HostnameListItem])
