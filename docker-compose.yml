@@ -1,5 +1,6 @@
 services:
   backend:
+    image: ghcr.io/${GHCR_REPO:-bekkaze/abusebox}-backend:latest
     build: ./backend
     env_file:
       - path: .env
@@ -16,6 +17,7 @@ services:
     ports:
       - 8100:8100
   frontend:
+    image: ghcr.io/${GHCR_REPO:-bekkaze/abusebox}-frontend:latest
     build: ./frontend
     depends_on:
       - backend
