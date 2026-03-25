@@ -45,10 +45,36 @@ const HostnameService = () => {
     }
   };
 
+  const createBulk = async (hostnames) => {
+    try {
+      const response = await axios.post('/api/hostname/bulk/', { hostnames }, {
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating hostnames in bulk:', error);
+      throw error;
+    }
+  };
+
+  const importCidr = async (payload) => {
+    try {
+      const response = await axios.post('/api/hostname/cidr-import/', payload, {
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error importing CIDR:', error);
+      throw error;
+    }
+  };
+
   return {
     createHostname,
     listHostname,
     deleteHostname,
+    createBulk,
+    importCidr,
   };
 };
 

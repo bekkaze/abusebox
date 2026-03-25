@@ -108,8 +108,15 @@ def _check_provider(reversed_ip: str, provider: str) -> tuple[str, bool]:
     old_timeout = socket.getdefaulttimeout()
     try:
         socket.setdefaulttimeout(_DNSBL_TIMEOUT)
-        socket.gethostbyname(query)
-        return provider, True
+        result = socket.gethostbyname(query)
+        # Only 127.0.0.x responses indicate a real listing.
+        # 127.255.255.x are error/informational codes (e.g. Spamhaus
+        # returns 127.255.255.252 when queried via unsupported public
+        # DNS resolvers, CBL returns similar codes for rate limits).
+        parts = result.split(".")
+        if parts[0] == "127" and parts[1] == "0" and parts[2] == "0":
+            return provider, True
+        return provider, False
     except (socket.gaierror, socket.timeout):
         return provider, False
     finally:

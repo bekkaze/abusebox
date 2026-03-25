@@ -7,6 +7,9 @@ from app.schemas.auth import (
 )
 from app.schemas.blacklist import DelistRequest
 from app.schemas.hostname import (
+    BulkCreateResult,
+    BulkHostnameCreateRequest,
+    CidrImportRequest,
     HostnameCreateRequest,
     HostnameListItem,
     HostnameResponse,
@@ -24,4 +27,7 @@ __all__ = [
     "HostnameResponse",
     "HostnameListItem",
     "DelistRequest",
+    "BulkHostnameCreateRequest",
+    "CidrImportRequest",
+    "BulkCreateResult",
 ]
