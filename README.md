@@ -260,6 +260,7 @@ abusebox/
 |---|---|---|
 | **v1.1.1** | March 25, 2026 | UX polish, responsive mobile layout, asset re-check, code splitting, security fixes |
 | **v1.1.0** | March 23, 2026 | Asset management with per-asset check toggles, asset detail page with tabbed results, DNS records, SSL checker, SPF/DKIM/DMARC, bulk check, subnet scan, scheduled monitoring, email/webhook alerts, historical charts, CSV export, dark mode, 60 DNSBL providers, security & bug fixes |
+| **v1.0.1** | March 19, 2026 | AbuseIPDB, WHOIS lookup, server status checker, security hardening |
 | **v1.0.0** | March 2, 2026 | Initial release — DNSBL monitoring, dashboard, delist workflow |
 
 See [CHANGELOG.md](CHANGELOG.md) for full details.
