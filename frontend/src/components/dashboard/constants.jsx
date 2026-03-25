@@ -11,6 +11,7 @@ import {
 	HiMail,
 	HiViewList,
 	HiCollection,
+	HiDocumentReport,
 } from 'react-icons/hi'
 
 export const DASHBOARD_SIDEBAR_SECTIONS = [
@@ -81,6 +82,12 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 				label: 'SPF/DKIM/DMARC',
 				path: '/dashboard/email-security',
 				icon: <HiMail />
+			},
+			{
+				key: 'dmarc-reports',
+				label: 'DMARC Reports',
+				path: '/dashboard/dmarc-reports',
+				icon: <HiDocumentReport />
 			},
 			{
 				key: 'server-status',
