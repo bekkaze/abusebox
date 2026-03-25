@@ -10,7 +10,7 @@ export default function Header({ onMenuToggle }) {
   const { dark, toggleTheme } = useTheme();
 
   const handleLogout = () => {
-    setToken(null);
+    setToken(null, null);
     navigate('/', { replace: true });
   };
 
