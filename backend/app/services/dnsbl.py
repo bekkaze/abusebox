@@ -1,8 +1,13 @@
 import ipaddress
+import os
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from urllib.parse import urlparse
+
+import dns.resolver
+import dns.name
+import dns.rdatatype
 
 BASE_PROVIDERS = [
     "all.s5h.net",
@@ -67,7 +72,19 @@ BASE_PROVIDERS = [
     "zombie.dnsbl.sorbs.net",
 ]
 
-_DNSBL_TIMEOUT = 1.5
+_DNSBL_TIMEOUT = 5.0
+
+
+def _make_resolver() -> dns.resolver.Resolver:
+    resolver = dns.resolver.Resolver()
+    resolver.lifetime = _DNSBL_TIMEOUT
+    resolver.timeout = _DNSBL_TIMEOUT
+
+    nameservers = os.environ.get("DNSBL_NAMESERVERS", "").strip()
+    if nameservers:
+        resolver.nameservers = [ns.strip() for ns in nameservers.split(",") if ns.strip()]
+
+    return resolver
 
 
 def _resolve_ipv4(value: str) -> str | None:
@@ -75,7 +92,6 @@ def _resolve_ipv4(value: str) -> str | None:
     if not target:
         return None
 
-    # Accept inputs like "https://example.com/path" or "example.com:443".
     if "://" in target:
         parsed = urlparse(target)
         target = parsed.hostname or ""
@@ -83,7 +99,6 @@ def _resolve_ipv4(value: str) -> str | None:
         parsed = urlparse(f"//{target}", scheme="http")
         target = parsed.hostname or target.split("/", 1)[0]
 
-    # Strip optional port from host:port.
     if ":" in target and target.count(":") == 1:
         host, port = target.rsplit(":", 1)
         if port.isdigit():
@@ -103,24 +118,40 @@ def _resolve_ipv4(value: str) -> str | None:
         return None
 
 
-def _check_provider(reversed_ip: str, provider: str) -> tuple[str, bool]:
+def _check_provider(
+    reversed_ip: str,
+    provider: str,
+    resolver: dns.resolver.Resolver | None = None,
+) -> tuple[str, bool, bool]:
+    """Check a single DNSBL provider.
+
+    Returns (provider, is_listed, failed).
+    """
+    if resolver is None:
+        resolver = _make_resolver()
+
     query = f"{reversed_ip}.{provider}"
-    old_timeout = socket.getdefaulttimeout()
     try:
-        socket.setdefaulttimeout(_DNSBL_TIMEOUT)
-        result = socket.gethostbyname(query)
-        # Only 127.0.0.x responses indicate a real listing.
-        # 127.255.255.x are error/informational codes (e.g. Spamhaus
-        # returns 127.255.255.252 when queried via unsupported public
-        # DNS resolvers, CBL returns similar codes for rate limits).
-        parts = result.split(".")
-        if parts[0] == "127" and parts[1] == "0" and parts[2] == "0":
-            return provider, True
-        return provider, False
-    except (socket.gaierror, socket.timeout):
-        return provider, False
-    finally:
-        socket.setdefaulttimeout(old_timeout)
+        answers = resolver.resolve(query, "A")
+        for rdata in answers:
+            result = rdata.to_text()
+            parts = result.split(".")
+            # Only 127.0.0.x responses indicate a real listing.
+            # 127.255.255.x are error/informational codes (e.g. Spamhaus
+            # returns 127.255.255.252 when queried via unsupported public
+            # DNS resolvers, CBL returns similar codes for rate limits).
+            if parts[0] == "127" and parts[1] == "0" and parts[2] == "0":
+                return provider, True, False
+        return provider, False, False
+    except dns.resolver.NXDOMAIN:
+        # NXDOMAIN = not listed on this provider
+        return provider, False, False
+    except dns.resolver.NoAnswer:
+        # No A record = not listed
+        return provider, False, False
+    except (dns.resolver.NoNameservers, dns.resolver.LifetimeTimeout, dns.exception.DNSException):
+        # Actual failures: timeout, servfail, etc.
+        return provider, False, True
 
 
 def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
@@ -138,22 +169,36 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
 
     reversed_ip = ".".join(reversed(resolved_ip.split(".")))
     listed: set[str] = set()
-    failed_providers: list[str] = []
+    failed_providers: set[str] = set()
+    resolver = _make_resolver()
 
-    with ThreadPoolExecutor(max_workers=12) as executor:
-        future_map = {
-            executor.submit(_check_provider, reversed_ip, provider): provider
-            for provider in BASE_PROVIDERS
-        }
+    def _run_batch(providers: list[str] | set[str]) -> None:
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            future_map = {
+                executor.submit(_check_provider, reversed_ip, provider, resolver): provider
+                for provider in providers
+            }
+            for future in as_completed(future_map):
+                provider = future_map[future]
+                try:
+                    _, is_listed, failed = future.result()
+                    if is_listed:
+                        listed.add(provider)
+                        failed_providers.discard(provider)
+                    elif failed:
+                        failed_providers.add(provider)
+                except Exception:
+                    failed_providers.add(provider)
 
-        for future in as_completed(future_map):
-            provider = future_map[future]
-            try:
-                _, is_listed = future.result()
-                if is_listed:
-                    listed.add(provider)
-            except Exception:
-                failed_providers.append(provider)
+    # First pass: query all providers concurrently.
+    _run_batch(BASE_PROVIDERS)
+
+    # Retry pass: providers that timed out may succeed on a second attempt
+    # when there is less concurrent load on the resolver.
+    if failed_providers:
+        retry = set(failed_providers)
+        failed_providers.clear()
+        _run_batch(retry)
 
     detected_on = [
         {
@@ -168,7 +213,7 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
     return {
         "detected_on": detected_on,
         "providers": BASE_PROVIDERS,
-        "failed_providers": failed_providers,
+        "failed_providers": sorted(failed_providers),
         "is_blacklisted": bool(detected_on),
         "hostname": hostname_or_ip,
         "categories": ["unknown"] if detected_on else [],
