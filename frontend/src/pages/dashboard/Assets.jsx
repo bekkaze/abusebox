@@ -34,6 +34,7 @@ const initialFormData = {
   check_whois: false,
   check_email_security: false,
   check_server_status: false,
+  check_interval_minutes: null,
 };
 
 export default function Assets() {

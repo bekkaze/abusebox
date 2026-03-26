@@ -29,6 +29,7 @@ class HostnameCreateRequest(BaseModel):
     check_whois: bool = False
     check_email_security: bool = False
     check_server_status: bool = False
+    check_interval_minutes: int | None = None
 
 
 class HostnameUpdateRequest(BaseModel):
@@ -46,6 +47,7 @@ class HostnameUpdateRequest(BaseModel):
     check_whois: bool = False
     check_email_security: bool = False
     check_server_status: bool = False
+    check_interval_minutes: int | None = None
 
 
 class HostnameResponse(BaseModel):
@@ -68,6 +70,7 @@ class HostnameResponse(BaseModel):
     check_whois: bool
     check_email_security: bool
     check_server_status: bool
+    check_interval_minutes: int | None
 
     created: datetime
     updated: datetime

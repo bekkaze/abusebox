@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html
 
-from app.api.routers import auth_router, blacklist_router, dmarc_router, hostname_router, tools_router
+from app.api.routers import auth_router, blacklist_router, dmarc_router, hostname_router, settings_router, tools_router
 from app.core.config import settings
 from app.db.init_data import seed_default_admin
 from app.db.session import Base, SessionLocal, engine
@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(blacklist_router)
     app.include_router(dmarc_router)
     app.include_router(hostname_router)
+    app.include_router(settings_router)
     app.include_router(tools_router)
 
     @app.get("/redoc/", include_in_schema=False)

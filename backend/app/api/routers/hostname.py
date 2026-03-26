@@ -48,6 +48,7 @@ def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
         check_whois=hostname.check_whois,
         check_email_security=hostname.check_email_security,
         check_server_status=hostname.check_server_status,
+        check_interval_minutes=hostname.check_interval_minutes,
         created=hostname.created,
         updated=hostname.updated,
     )
@@ -77,6 +78,7 @@ def create_hostname(
         check_whois=payload.check_whois,
         check_email_security=payload.check_email_security,
         check_server_status=payload.check_server_status,
+        check_interval_minutes=payload.check_interval_minutes,
         status="active",
     )
     db.add(hostname)
@@ -269,6 +271,7 @@ def update_hostname(
     hostname.status = payload.status
     for field in CHECK_TOGGLE_FIELDS:
         setattr(hostname, field, getattr(payload, field))
+    hostname.check_interval_minutes = payload.check_interval_minutes
     db.commit()
     db.refresh(hostname)
 
