@@ -27,6 +27,8 @@ class Hostname(Base):
     check_whois: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     check_email_security: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     check_server_status: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    check_interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    last_checked: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
     created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 

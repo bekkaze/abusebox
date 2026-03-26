@@ -132,6 +132,32 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                     </label>
                   </div>
 
+                  {/* Per-asset check interval */}
+                  {formData.is_monitor_enabled && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Check Interval</label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <select
+                          name="check_interval_minutes"
+                          value={formData.check_interval_minutes || ""}
+                          onChange={(e) => handleInputChange({
+                            target: { name: "check_interval_minutes", value: e.target.value ? parseInt(e.target.value) : null, type: "select" }
+                          })}
+                          className="p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white text-sm"
+                        >
+                          <option value="">Use default (from Settings)</option>
+                          <option value="15">Every 15 min</option>
+                          <option value="30">Every 30 min</option>
+                          <option value="60">Every 1 hour</option>
+                          <option value="180">Every 3 hours</option>
+                          <option value="360">Every 6 hours</option>
+                          <option value="720">Every 12 hours</option>
+                          <option value="1440">Every 24 hours</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mt-5 flex justify-end gap-2">
                     <button
                       type="button"

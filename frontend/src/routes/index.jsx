@@ -23,6 +23,7 @@ const EmailSecurity = lazy(() => import("../pages/dashboard/EmailSecurity"));
 const SubnetCheck = lazy(() => import("../pages/dashboard/SubnetCheck"));
 const BulkCheck = lazy(() => import("../pages/dashboard/BulkCheck"));
 const DmarcReports = lazy(() => import("../pages/dashboard/DmarcReports"));
+const Settings = lazy(() => import("../pages/dashboard/Settings"));
 
 function LazyPage({ children }) {
   return (
@@ -73,6 +74,7 @@ const Routes = () => {
             { path: 'subnet-check', element: <LazyPage><SubnetCheck /></LazyPage> },
             { path: 'bulk-check', element: <LazyPage><BulkCheck /></LazyPage> },
             { path: 'dmarc-reports', element: <LazyPage><DmarcReports /></LazyPage> },
+            { path: 'settings', element: <LazyPage><Settings /></LazyPage> },
           ]
         },
       ],
