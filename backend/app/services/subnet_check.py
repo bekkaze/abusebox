@@ -2,7 +2,7 @@ import ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from app.services.dnsbl import BASE_PROVIDERS, _check_provider
+from app.services.dnsbl import BASE_PROVIDERS, _check_provider, _make_resolver
 
 
 MAX_SUBNET_SIZE = 256  # /24 max
@@ -34,6 +34,7 @@ def check_subnet(cidr: str, providers: list[str] | None = None) -> dict[str, Any
             "dnsbl.dronebl.org",
         ]
 
+    resolver = _make_resolver()
     results: list[dict[str, Any]] = []
 
     def _check_ip(ip: str) -> dict[str, Any]:
@@ -42,12 +43,12 @@ def check_subnet(cidr: str, providers: list[str] | None = None) -> dict[str, Any
 
         with ThreadPoolExecutor(max_workers=len(providers)) as executor:
             futures = {
-                executor.submit(_check_provider, reversed_ip, provider): provider
+                executor.submit(_check_provider, reversed_ip, provider, resolver): provider
                 for provider in providers
             }
             for future in as_completed(futures):
                 try:
-                    _, is_listed = future.result()
+                    _, is_listed, _failed = future.result()
                     if is_listed:
                         listed_on.append(futures[future])
                 except Exception:
