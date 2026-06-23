@@ -9,6 +9,10 @@ import { useNavigate } from "react-router-dom";
 const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
   const [formData, setFormData] = useState({});
   const delistService = DelistService();
+
+  const safeFields = Array.isArray(fields) ? fields : [];
+  const isUnsupportedProvider = safeFields.length === 0;
+  const unsupportedProviderMessage = `No automatic delist workflow is available for ${provider || 'this provider'}. Please check the blacklist provider manually.`;
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -21,7 +25,13 @@ const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
    
 
   const handleSubmit = async () => {
-    console.log(data);
+    
+    if (isUnsupportedProvider) {
+      if (typeof toast !== 'undefined' && toast.info) {
+        toast.info(unsupportedProviderMessage);
+      }
+      return;
+    }
     setIsLoading(true);
     const body = {
       'provider': provider,
@@ -64,7 +74,12 @@ const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
                 Delist Provider: {provider}
               </Dialog.Title>
               <div className="mt-4">
-                {fields.map((field, index) => (
+                {isUnsupportedProvider && (
+                <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                  {unsupportedProviderMessage}
+                </div>
+                )}
+                {safeFields.map((field, index) => (
                   <FormFieldRender 
                     key={index} 
                     label={field.label} 
@@ -79,7 +94,7 @@ const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
                 <button
                   onClick={handleSubmit}
                   className={`py-2 px-4 rounded ${isLoading ? 'opacity-50 cursor-not-allowed' : 'inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500'}`}
-                  disabled={isLoading}
+                  disabled={isLoading || isUnsupportedProvider}
                   >
                   {isLoading ? 'Loading...' : 'Send delist request'}
                 </button>
