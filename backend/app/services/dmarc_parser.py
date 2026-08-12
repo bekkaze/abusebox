@@ -34,22 +34,40 @@ def _ts_to_dt(ts: str) -> datetime | None:
 
 def extract_xml(data: bytes) -> str:
     """Extract XML from raw bytes — handles plain XML, gzip, and zip."""
-    # Try gzip first
+    max_output_size = 10 * 1024 * 1024
+
+    # Try gzip first. Read only one byte beyond the limit so a small
+    # compressed file cannot expand into an unbounded in-memory document.
     try:
-        return gzip.decompress(data).decode("utf-8", errors="replace")
+        with gzip.GzipFile(fileobj=io.BytesIO(data)) as gz:
+            content = gz.read(max_output_size + 1)
+        if len(content) > max_output_size:
+            raise ValueError("Decompressed XML exceeds 10 MB limit.")
+        return content.decode("utf-8", errors="replace")
     except (gzip.BadGzipFile, OSError):
         pass
 
     # Try zip
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            for name in zf.namelist():
-                if name.lower().endswith(".xml"):
-                    return zf.read(name).decode("utf-8", errors="replace")
+            xml_entries = [entry for entry in zf.infolist() if entry.filename.lower().endswith(".xml")]
+            if len(xml_entries) > 1:
+                raise ValueError("Archive must contain exactly one XML report.")
+            if xml_entries:
+                entry = xml_entries[0]
+                if entry.file_size > max_output_size:
+                    raise ValueError("Decompressed XML exceeds 10 MB limit.")
+                with zf.open(entry) as xml_file:
+                    content = xml_file.read(max_output_size + 1)
+                if len(content) > max_output_size:
+                    raise ValueError("Decompressed XML exceeds 10 MB limit.")
+                return content.decode("utf-8", errors="replace")
     except zipfile.BadZipFile:
         pass
 
     # Assume raw XML
+    if len(data) > max_output_size:
+        raise ValueError("XML exceeds 10 MB limit.")
     return data.decode("utf-8", errors="replace")
 
 
@@ -118,18 +136,30 @@ def parse_dmarc_xml(xml_string: str) -> dict[str, Any]:
 
         # Auth results
         auth_results = record_el.find("auth_results")
-        dkim_el = auth_results.find("dkim") if auth_results is not None else None
-        spf_el = auth_results.find("spf") if auth_results is not None else None
+        dkim_results = []
+        spf_results = []
+        if auth_results is not None:
+            for dkim_el in auth_results.findall("dkim"):
+                dkim_results.append({"domain": _text(dkim_el, "domain"), "result": _text(dkim_el, "result"), "selector": _text(dkim_el, "selector")})
+            for spf_el in auth_results.findall("spf"):
+                spf_results.append({"domain": _text(spf_el, "domain"), "result": _text(spf_el, "result")})
+
+        # Keep the scalar fields for existing API consumers, while retaining
+        # all results so a multi-signature record is not misrepresented.
+        dkim_el = dkim_results[0] if dkim_results else {}
+        spf_el = spf_results[0] if spf_results else {}
 
         records.append({
             "source_ip": source_ip,
             "count": count,
             "disposition": disposition,
-            "dkim_domain": _text(dkim_el, "domain"),
-            "dkim_result": _text(dkim_el, "result"),
-            "dkim_selector": _text(dkim_el, "selector"),
-            "spf_domain": _text(spf_el, "domain"),
-            "spf_result": _text(spf_el, "result"),
+            "dkim_domain": dkim_el.get("domain", ""),
+            "dkim_result": dkim_el.get("result", ""),
+            "dkim_selector": dkim_el.get("selector", ""),
+            "spf_domain": spf_el.get("domain", ""),
+            "spf_result": spf_el.get("result", ""),
+            "dkim_results": dkim_results,
+            "spf_results": spf_results,
             "dkim_aligned": dkim_aligned,
             "spf_aligned": spf_aligned,
         })

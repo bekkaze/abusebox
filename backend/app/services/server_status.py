@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
+from app.core.network_safety import resolve_public_ipv4, validate_public_url
 
 
 def _normalize_url(value: str) -> tuple[str, str]:
@@ -33,10 +34,11 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
 
     # DNS resolution check
     try:
-        ip = socket.gethostbyname(hostname)
+        validate_public_url(url)
+        ip = resolve_public_ipv4(hostname)
         result["resolved_ip"] = ip
         result["dns_resolves"] = True
-    except (socket.gaierror, socket.timeout):
+    except (socket.gaierror, socket.timeout, ValueError):
         result["resolved_ip"] = None
         result["dns_resolves"] = False
         result["is_up"] = False

@@ -75,8 +75,10 @@ async def upload_dmarc_report(
             dkim_domain=rec.get("dkim_domain"),
             dkim_result=rec.get("dkim_result"),
             dkim_selector=rec.get("dkim_selector"),
+            dkim_results=rec.get("dkim_results", []),
             spf_domain=rec.get("spf_domain"),
             spf_result=rec.get("spf_result"),
+            spf_results=rec.get("spf_results", []),
             dkim_aligned=rec.get("dkim_aligned"),
             spf_aligned=rec.get("spf_aligned"),
         ))
@@ -219,8 +221,10 @@ def get_report_detail(
                 "dkim_domain": rec.dkim_domain,
                 "dkim_result": rec.dkim_result,
                 "dkim_selector": rec.dkim_selector,
+                "dkim_results": rec.dkim_results or [],
                 "spf_domain": rec.spf_domain,
                 "spf_result": rec.spf_result,
+                "spf_results": rec.spf_results or [],
                 "dkim_aligned": rec.dkim_aligned,
                 "spf_aligned": rec.spf_aligned,
             }

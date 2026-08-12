@@ -293,8 +293,8 @@ function RecordTable({ records }) {
                 <td className="px-3 py-2">
                   <span className={r.spf_aligned === 'pass' ? 'text-emerald-600' : 'text-rose-600'}>{r.spf_aligned}</span>
                 </td>
-                <td className="px-3 py-2 text-xs">{r.dkim_domain || '—'}</td>
-                <td className="px-3 py-2 text-xs">{r.spf_domain || '—'}</td>
+                <td className="px-3 py-2 text-xs">{formatAuthResults(r.dkim_results, r.dkim_domain, r.dkim_result)}</td>
+                <td className="px-3 py-2 text-xs">{formatAuthResults(r.spf_results, r.spf_domain, r.spf_result)}</td>
               </tr>
             ))}
           </tbody>
@@ -302,6 +302,13 @@ function RecordTable({ records }) {
       </div>
     </div>
   );
+}
+
+function formatAuthResults(results, domain, result) {
+  if (results?.length) {
+    return results.map((item) => `${item.domain || '—'} (${item.result || 'unknown'})`).join(', ');
+  }
+  return domain ? `${domain} (${result || 'unknown'})` : '—';
 }
 
 function StatCard({ label, value, tone }) {

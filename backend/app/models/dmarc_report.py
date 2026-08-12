@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -56,10 +56,12 @@ class DmarcReportRecord(Base):
     dkim_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     dkim_result: Mapped[str | None] = mapped_column(String(20), nullable=True)  # pass, fail
     dkim_selector: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    dkim_results: Mapped[list[dict] | None] = mapped_column(JSON, default=list, nullable=True)
 
     # SPF
     spf_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     spf_result: Mapped[str | None] = mapped_column(String(20), nullable=True)  # pass, fail
+    spf_results: Mapped[list[dict] | None] = mapped_column(JSON, default=list, nullable=True)
 
     # Alignment (header_from vs envelope)
     dkim_aligned: Mapped[str | None] = mapped_column(String(10), nullable=True)  # pass, fail

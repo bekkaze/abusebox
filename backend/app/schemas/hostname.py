@@ -82,7 +82,7 @@ class HostnameListItem(HostnameResponse):
 
 
 class BulkHostnameCreateRequest(BaseModel):
-    hostnames: list[HostnameCreateRequest] = Field(min_length=1, max_length=50)
+    hostnames: list[HostnameCreateRequest] = Field(min_length=1, max_length=300)
 
 
 class CidrImportRequest(BaseModel):

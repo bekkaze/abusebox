@@ -5,6 +5,7 @@ import HostnameService from "../../services/hostname";
 import { useAuth } from "../../services/auth/authProvider";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
 import CidrImportDialog from "../../components/dashboard/blacklistMonitor/CidrImportDialog";
+import BulkMonitorDialog from "../../components/dashboard/blacklistMonitor/BulkMonitorDialog";
 import { AssetCardSkeleton } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
@@ -40,6 +41,7 @@ const initialFormData = {
 export default function Assets() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [cidrModalOpen, setCidrModalOpen] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -119,6 +121,20 @@ export default function Assets() {
     }
   };
 
+  const handleBulkImport = async (hostnames) => {
+    try {
+      const result = await hostnameService.createBulk(hostnames);
+      toast.success(`Added ${result.created} asset${result.created !== 1 ? 's' : ''}${result.skipped > 0 ? `, ${result.skipped} skipped (already exist)` : ''}`);
+      if (result.errors?.length > 0) toast.warn(`${result.errors.length} target(s) could not be added`);
+      setBulkModalOpen(false);
+      fetchHostnameList();
+      return result;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to add the bulk monitoring list.');
+      throw error;
+    }
+  };
+
   // Filter & search
   const filtered = hostnameListData.filter((item) => {
     const matchSearch = !search || item.hostname.toLowerCase().includes(search.toLowerCase()) || item.hostname_type.toLowerCase().includes(search.toLowerCase());
@@ -146,6 +162,12 @@ export default function Assets() {
             onClick={() => setCidrModalOpen(true)}
           >
             <HiCloudUpload className="text-lg" /> CIDR Import
+          </button>
+          <button
+            className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 py-2.5 px-4 flex items-center gap-2 rounded-xl transition-colors font-medium text-sm"
+            onClick={() => setBulkModalOpen(true)}
+          >
+            <HiCloudUpload className="text-lg" /> Bulk List
           </button>
           <button
             className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-5 flex items-center gap-2 rounded-xl transition-colors font-medium"
@@ -219,6 +241,8 @@ export default function Assets() {
             const bl = item.result?.blacklist || (item.result?.detected_on ? item.result : null);
             const detectedCount = bl?.detected_on?.length ?? 0;
             const totalProviders = bl?.providers?.length ?? 0;
+            const failedProviders = bl?.failed_providers?.length ?? 0;
+            const isInconclusive = Boolean(bl?.is_inconclusive);
             const enabledChecks = Object.entries(CHECK_BADGE_MAP).filter(([key]) => item[key]).map(([, label]) => label);
 
             return (
@@ -264,8 +288,8 @@ export default function Assets() {
                   {!item.result ? (
                     <p className="text-xs text-slate-400">Not checked yet</p>
                   ) : (
-                    <span className={`text-sm font-semibold ${detectedCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      {detectedCount > 0 ? `Listed on ${detectedCount} of ${totalProviders}` : totalProviders > 0 ? `Clear on ${totalProviders} providers` : 'Checked'}
+                    <span className={`text-sm font-semibold ${detectedCount > 0 ? 'text-rose-600 dark:text-rose-400' : isInconclusive ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {detectedCount > 0 ? `Listed on ${detectedCount} of ${totalProviders}` : isInconclusive ? `Inconclusive — ${failedProviders} providers unavailable` : totalProviders > 0 ? `Clear on ${totalProviders} providers` : 'Checked'}
                     </span>
                   )}
                 </div>
@@ -298,6 +322,12 @@ export default function Assets() {
         isOpen={cidrModalOpen}
         setIsOpen={setCidrModalOpen}
         onImport={handleCidrImport}
+      />
+
+      <BulkMonitorDialog
+        isOpen={bulkModalOpen}
+        setIsOpen={setBulkModalOpen}
+        onImport={handleBulkImport}
       />
 
       <ToastContainer position="top-center" autoClose={3000} />

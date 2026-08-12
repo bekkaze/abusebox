@@ -56,7 +56,7 @@ class Settings:
     webhook_url: str = os.getenv("WEBHOOK_URL", "")
 
     # Scheduler settings
-    scheduler_enabled: bool = parse_bool("SCHEDULER_ENABLED", False)
+    scheduler_enabled: bool = parse_bool("SCHEDULER_ENABLED", True)
     scheduler_interval_minutes: int = parse_int("SCHEDULER_INTERVAL_MINUTES", 360)
 
     def __post_init__(self) -> None:

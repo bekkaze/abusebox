@@ -3,6 +3,7 @@ import React from 'react';
 const ResultTableQuick = ({ data }) => {
   const providerList = data?.providers || [];
   const detectedList = data?.detected_on || [];
+  const failedProviders = data?.failed_providers || [];
 
   const providers = [...providerList].sort((a, b) => {
     const isBlacklistedA = detectedList.some((item) => item.provider === a);
@@ -14,6 +15,8 @@ const ResultTableQuick = ({ data }) => {
   const isBlacklisted = (provider) => {
     return detectedList.some((item) => item.provider === provider);
   };
+
+  const isUnavailable = (provider) => failedProviders.includes(provider);
 
   const abuse = data.abuseipdb;
 
@@ -79,8 +82,8 @@ const ResultTableQuick = ({ data }) => {
               <tr key={index} className="border-b border-slate-200 hover:bg-slate-50/60">
                 <td className="px-4 py-2.5 font-medium">{provider}</td>
                 <td className="px-4 py-2.5">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${isBlacklisted(provider) ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                    {isBlacklisted(provider) ? 'Blacklisted' : 'Clear'}
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${isBlacklisted(provider) ? 'bg-rose-100 text-rose-700' : isUnavailable(provider) ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                    {isBlacklisted(provider) ? 'Blacklisted' : isUnavailable(provider) ? 'Unavailable' : 'Clear'}
                   </span>
                 </td>
               </tr>

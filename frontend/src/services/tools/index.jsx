@@ -26,7 +26,7 @@ publicRequest.interceptors.request.use((config) => {
 export const checkAbuseIPDB = async (hostname) => {
   try {
     const query = new URLSearchParams({ hostname }).toString();
-    const response = await publicRequest.get(`/api/tools/abuseipdb/?${query}`, {
+    const response = await axios.get(`/api/tools/abuseipdb/?${query}`, {
       headers: { 'Accept': 'application/json' },
       timeout: 30000,
     });
@@ -39,7 +39,7 @@ export const checkAbuseIPDB = async (hostname) => {
 export const checkWhois = async (hostname) => {
   try {
     const query = new URLSearchParams({ hostname }).toString();
-    const response = await publicRequest.get(`/api/tools/whois/?${query}`, {
+    const response = await axios.get(`/api/tools/whois/?${query}`, {
       headers: { 'Accept': 'application/json' },
       timeout: 30000,
     });
@@ -52,7 +52,7 @@ export const checkWhois = async (hostname) => {
 export const checkServerStatus = async (hostname) => {
   try {
     const query = new URLSearchParams({ hostname }).toString();
-    const response = await publicRequest.get(`/api/tools/server-status/?${query}`, {
+    const response = await axios.get(`/api/tools/server-status/?${query}`, {
       headers: { 'Accept': 'application/json' },
       timeout: 30000,
     });
@@ -65,7 +65,7 @@ export const checkServerStatus = async (hostname) => {
 export const checkDns = async (hostname) => {
   try {
     const query = new URLSearchParams({ hostname }).toString();
-    const response = await publicRequest.get(`/api/tools/dns/?${query}`, {
+    const response = await axios.get(`/api/tools/dns/?${query}`, {
       headers: { 'Accept': 'application/json' },
       timeout: 30000,
     });
@@ -78,7 +78,7 @@ export const checkDns = async (hostname) => {
 export const checkSsl = async (hostname) => {
   try {
     const query = new URLSearchParams({ hostname }).toString();
-    const response = await publicRequest.get(`/api/tools/ssl/?${query}`, {
+    const response = await axios.get(`/api/tools/ssl/?${query}`, {
       headers: { 'Accept': 'application/json' },
       timeout: 30000,
     });
@@ -88,10 +88,11 @@ export const checkSsl = async (hostname) => {
   }
 };
 
-export const checkEmailSecurity = async (hostname) => {
+export const checkEmailSecurity = async (hostname, dkimSelectors = '') => {
   try {
-    const query = new URLSearchParams({ hostname }).toString();
-    const response = await publicRequest.get(`/api/tools/email-security/?${query}`, {
+    const query = new URLSearchParams({ hostname });
+    if (dkimSelectors.trim()) query.set('dkim_selectors', dkimSelectors.trim());
+    const response = await axios.get(`/api/tools/email-security/?${query.toString()}`, {
       headers: { 'Accept': 'application/json' },
       timeout: 30000,
     });
@@ -104,7 +105,7 @@ export const checkEmailSecurity = async (hostname) => {
 export const checkSubnet = async (cidr) => {
   try {
     const query = new URLSearchParams({ cidr }).toString();
-    const response = await publicRequest.get(`/api/tools/subnet/?${query}`, {
+    const response = await axios.get(`/api/tools/subnet/?${query}`, {
       headers: { 'Accept': 'application/json' },
       timeout: 120000,
     });
@@ -117,13 +118,35 @@ export const checkSubnet = async (cidr) => {
 export const bulkCheck = async (hostnames) => {
   try {
     const query = new URLSearchParams({ hostnames }).toString();
-    const response = await publicRequest.get(`/api/tools/bulk-check/?${query}`, {
+    const response = await axios.get(`/api/tools/bulk-check/?${query}`, {
       headers: { 'Accept': 'application/json' },
-      timeout: 120000,
+      timeout: 300000,
     });
     return response.data;
   } catch (error) {
     handleRequestError(error, 'Error running bulk check');
+  }
+};
+
+export const parseTargetFile = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const response = await axios.post('/api/tools/parse-target-file/', formData, { timeout: 30000 });
+    return response.data.targets;
+  } catch (error) {
+    handleRequestError(error, 'Failed to read target file');
+  }
+};
+
+export const bulkCheckFile = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const response = await axios.post('/api/tools/bulk-check-upload/', formData, { timeout: 300000 });
+    return response.data;
+  } catch (error) {
+    handleRequestError(error, 'Failed to run bulk check from file');
   }
 };
 
