@@ -6,6 +6,7 @@ from typing import Any
 import requests
 
 from app.core.config import settings
+from app.core.network_safety import validate_public_url
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ def send_webhook_alert(payload: dict[str, Any]) -> bool:
         return False
 
     try:
+        validate_public_url(settings.webhook_url)
         resp = requests.post(
             settings.webhook_url,
             json=payload,

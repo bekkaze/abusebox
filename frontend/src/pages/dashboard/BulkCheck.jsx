@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { bulkCheck } from '../../services/tools';
+import { bulkCheck, bulkCheckFile } from '../../services/tools';
 
 export default function BulkCheck() {
   const [input, setInput] = useState('');
@@ -10,8 +10,8 @@ export default function BulkCheck() {
   const handleCheck = async () => {
     const cleaned = input.split(/[\n,]+/).map(h => h.trim()).filter(Boolean);
     if (cleaned.length === 0) return;
-    if (cleaned.length > 20) {
-      setError('Maximum 20 hostnames per request.');
+    if (cleaned.length > 300) {
+      setError('Maximum 300 hostnames per request.');
       return;
     }
 
@@ -28,12 +28,28 @@ export default function BulkCheck() {
     }
   };
 
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    setError('');
+    setData(null);
+    try {
+      setData(await bulkCheckFile(file));
+    } catch (err) {
+      setError(err.message || 'Failed to run bulk check from file.');
+    } finally {
+      setLoading(false);
+      event.target.value = '';
+    }
+  };
+
   return (
     <section className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
       <div>
         <p className="text-sm text-slate-500 dark:text-slate-400">Tools</p>
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Bulk Blacklist Check</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Check multiple IPs or domains at once. Enter one per line or comma-separated (max 20).</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Check up to 300 IPs or domains. Paste a list or upload TXT, CSV, or Excel (.xlsx).</p>
       </div>
 
       <textarea
@@ -44,6 +60,8 @@ export default function BulkCheck() {
         className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none font-mono text-sm dark:bg-slate-700 dark:text-white"
       />
 
+      <label className="inline-flex text-sm font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer">Upload TXT, CSV, or Excel<input type="file" accept=".txt,.csv,.xlsx" onChange={handleFile} disabled={loading} className="hidden" /></label>
+
       <div className="flex items-center gap-3">
         <button
           onClick={handleCheck}
@@ -53,7 +71,7 @@ export default function BulkCheck() {
           {loading ? 'Checking...' : 'Check All'}
         </button>
         <span className="text-xs text-slate-500 dark:text-slate-400">
-          {input.split(/[\n,]+/).filter(h => h.trim()).length} / 20 hostnames
+          {input.split(/[\n,]+/).filter(h => h.trim()).length} / 300 hostnames
         </span>
       </div>
 

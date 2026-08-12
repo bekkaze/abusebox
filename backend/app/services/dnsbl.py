@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import dns.resolver
 import dns.name
 import dns.rdatatype
+from app.core.network_safety import resolve_public_ipv4
 
 BASE_PROVIDERS = [
     "all.s5h.net",
@@ -72,7 +73,47 @@ BASE_PROVIDERS = [
     "zombie.dnsbl.sorbs.net",
 ]
 
+SHARED_PROVIDERS = [
+    "zen.spamhaus.org", "bl.spamcop.net", "b.barracudacentral.org",
+    "dnsbl-1.uceprotect.net", "dnsbl-2.uceprotect.net", "dnsbl-3.uceprotect.net",
+    "dnsbl.dronebl.org", "psbl.surriel.com", "rbl.interserver.net",
+    "bl.mailspike.net", "z.mailspike.net", "bl.spameatingmonkey.net",
+    "truncate.gbudb.net", "bl.blocklist.de", "dnsbl.spfbl.net", "bl.nordspam.com",
+    "dnsrbl.swinog.ch", "spamrbl.imp.ch", "wormrbl.imp.ch", "all.s5h.net",
+    "0spam.fusionzero.com", "dbl.0spam.org", "bl.0spam.org", "rbl.0spam.org",
+    "nbl.0spam.org", "0spam-n.fusionzero.com", "rbl.abuse.ro",
+    "blackholes.alphanet.ch", "spam.dnsbl.anonmails.de", "block.ascams.com",
+    "dnsbl.ascams.com", "superblock.ascams.com", "ips.backscatterer.org",
+    "bb.barracudacentral.org", "list.bbfh.org", "netscan.rbl.blockedservers.com",
+    "rbl.blockedservers.com", "spam.rbl.blockedservers.com", "bsb.spamlookup.net",
+    "black.dnsbl.brukalai.lt", "light.dnsbl.brukalai.lt", "blacklist.sci.kun.nl",
+    "cbl.abuseat.org", "bogons.cymru.com", "v4.fullbogons.cymru.com",
+    "torexit.dan.me.uk", "openproxy.bls.digibase.ca", "proxyabuse.bls.digibase.ca",
+    "spambot.bls.digibase.ca", "rbl.dns-servicios.com", "dnsbl.beetjevreemd.nl",
+    "dnsbl.calivent.com.pe", "dnsbl.isx.fr", "dnsbl.net.ua", "dnsbl.rv-soft.info",
+    "dnsblchile.org", "vote.drbl.caravan.ru", "work.drbl.caravan.ru",
+    "vote.drbl.gremlin.ru", "work.drbl.gremlin.ru", "bl.drmx.org", "rbl.efnet.org",
+    "rbl.efnetrbl.org", "tor.efnet.org", "rbl.fasthosts.co.uk", "bl.fmb.la",
+    "fnrbl.fast.net", "forbidden.icm.edu.pl", "hostkarma.junkemailfilter.com",
+    "black.junkemailfilter.com", "dnsbl.cobion.com", "rbl.iprange.net",
+    "rbl.ircbl.org", "mail-abuse.blacklist.jippg.org", "dnsbl.justspam.org",
+    "dnsbl.kempt.net", "bl.konstant.no", "relays.bl.kundenserver.de",
+    "spamguard.leadmon.net", "iprbl.mailcleaner.net", "niprbl.mailcleaner.net",
+    "bl.mav.com.br", "cidr.bl.mcafee.com", "rbl.metunet.com",
+    "combined.rbl.msrbl.net", "images.rbl.msrbl.net", "phishing.rbl.msrbl.net",
+    "spam.rbl.msrbl.net", "virus.rbl.msrbl.net", "web.rbl.msrbl.net",
+    "relays.nether.net", "unsure.nether.net", "bl.nosolicitado.org",
+    "bl.worst.nosolicitado.org", "dyn.nszones.com", "sbl.nszones.com",
+    "bl.nszones.com", "bl.octopusdns.com", "ip.dnsbl.risk.oxl.app",
+    "bl.pcready.me", "spam.pedantic.org", "pofon.foobar.hu", "bl.rbl.polspam.pl",
+]
+
+# Keep the original curated list and add the shared set without querying any
+# provider twice when the lists overlap.
+BASE_PROVIDERS = list(dict.fromkeys(BASE_PROVIDERS + SHARED_PROVIDERS))
+
 _DNSBL_TIMEOUT = 5.0
+_INCONCLUSIVE_FAILURE_RATIO = 0.20
 
 
 def _make_resolver() -> dns.resolver.Resolver:
@@ -108,13 +149,14 @@ def _resolve_ipv4(value: str) -> str | None:
         return None
 
     try:
-        return str(ipaddress.IPv4Address(target))
+        ip = ipaddress.IPv4Address(target)
+        return str(ip) if ip.is_global else None
     except ipaddress.AddressValueError:
         pass
 
     try:
-        return socket.gethostbyname(target)
-    except (socket.gaierror, socket.timeout):
+        return resolve_public_ipv4(target)
+    except ValueError:
         return None
 
 
@@ -173,7 +215,7 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
     resolver = _make_resolver()
 
     def _run_batch(providers: list[str] | set[str]) -> None:
-        with ThreadPoolExecutor(max_workers=12) as executor:
+        with ThreadPoolExecutor(max_workers=24) as executor:
             future_map = {
                 executor.submit(_check_provider, reversed_ip, provider, resolver): provider
                 for provider in providers
@@ -214,6 +256,7 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
         "detected_on": detected_on,
         "providers": BASE_PROVIDERS,
         "failed_providers": sorted(failed_providers),
+        "is_inconclusive": len(failed_providers) >= max(3, int(len(BASE_PROVIDERS) * _INCONCLUSIVE_FAILURE_RATIO)),
         "is_blacklisted": bool(detected_on),
         "hostname": hostname_or_ip,
         "categories": ["unknown"] if detected_on else [],

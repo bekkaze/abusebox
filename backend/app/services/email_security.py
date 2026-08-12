@@ -20,21 +20,26 @@ def _check_spf(domain: str) -> dict[str, Any]:
         return {"found": False, "record": None, "valid": False, "details": "No SPF record found."}
 
     record = spf_records[0]
-    has_all = any(token in record for token in ["-all", "~all", "?all", "+all"])
+    all_mechanism = next(
+        (token.lower() for token in record.split() if token.lower() in {"-all", "~all", "?all", "+all"}),
+        None,
+    )
 
     warnings = []
-    if "+all" in record:
+    if all_mechanism == "+all":
         warnings.append("SPF uses +all which allows any sender — effectively no protection.")
-    elif "?all" in record:
+    elif all_mechanism == "?all":
         warnings.append("SPF uses ?all (neutral) — provides weak protection.")
+    elif not all_mechanism:
+        warnings.append("SPF record has no all mechanism, so unmatched senders are not handled explicitly.")
     if len(spf_records) > 1:
         warnings.append(f"Multiple SPF records found ({len(spf_records)}). Only one is allowed per RFC 7208.")
 
     return {
         "found": True,
         "record": record,
-        "valid": has_all,
-        "mechanism_all": next((t for t in ["-all", "~all", "?all", "+all"] if t in record), None),
+        "valid": len(spf_records) == 1 and all_mechanism in {"-all", "~all"},
+        "mechanism_all": all_mechanism,
         "warnings": warnings,
     }
 
@@ -67,7 +72,7 @@ def _check_dkim(domain: str, selectors: list[str] | None = None) -> dict[str, An
         "found": bool(found_selectors),
         "selectors_checked": selectors,
         "selectors_found": found_selectors,
-        "details": "DKIM selectors found." if found_selectors else "No DKIM selectors found in common selector names.",
+        "details": "DKIM selectors found." if found_selectors else "No DKIM selectors found. Provide selectors used by your mail provider to check custom names.",
     }
 
 
@@ -106,7 +111,7 @@ def _check_dmarc(domain: str) -> dict[str, Any]:
     }
 
 
-def check_email_security(domain: str) -> dict[str, Any]:
+def check_email_security(domain: str, selectors: list[str] | None = None) -> dict[str, Any]:
     domain = (domain or "").strip().lower()
     if not domain:
         return {"error": "Please provide a domain name."}
@@ -116,7 +121,7 @@ def check_email_security(domain: str) -> dict[str, Any]:
     domain = domain.split("/")[0].split(":")[0]
 
     spf = _check_spf(domain)
-    dkim = _check_dkim(domain)
+    dkim = _check_dkim(domain, selectors)
     dmarc = _check_dmarc(domain)
 
     score = 0

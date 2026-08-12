@@ -3,6 +3,7 @@ import ssl
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
+from app.core.network_safety import resolve_public_ipv4
 
 
 def check_ssl_certificate(hostname: str) -> dict[str, Any]:
@@ -15,6 +16,10 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
         parsed = urlparse(hostname)
         hostname = parsed.hostname or hostname
     hostname = hostname.split("/")[0].split(":")[0]
+    try:
+        resolve_public_ipv4(hostname)
+    except ValueError as exc:
+        return {"hostname": hostname, "error": str(exc)}
 
     port = 443
     context = ssl.create_default_context()

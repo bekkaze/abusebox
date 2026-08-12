@@ -8,8 +8,9 @@ services:
     environment:
       - APP_DEBUG=true
       - APP_SECRET_KEY=change-me-in-production
-      - APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
+      - APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://192.168.1.169:3000
       - DATABASE_URL=sqlite:////app/data/app.db
+      - SCHEDULER_ENABLED=true
       - DEFAULT_ADMIN_USERNAME=admin
       - DEFAULT_ADMIN_EMAIL=admin@abusebox.local
       - DEFAULT_ADMIN_PASSWORD=password123
@@ -26,6 +27,7 @@ services:
     environment:
       - VITE_BASE_URL=http://backend:8100
       - VITE_API_DOCS_URL=http://localhost:8100/swagger/
+      - VITE_ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.169
     ports:
       - 3000:3000
 

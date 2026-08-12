@@ -11,6 +11,7 @@ export default ({ mode }) => {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+  const corsOrigins = allowedHosts.map((allowedHost) => new RegExp(`^https?://${allowedHost.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?::\\d+)?$`));
 
   const config = {
     plugins: [react()],
@@ -20,7 +21,7 @@ export default ({ mode }) => {
       strictPort: true,
       allowedHosts,
       cors: {
-        origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+        origin: corsOrigins,
       },
       fs: {
         strict: true,

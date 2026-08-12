@@ -16,7 +16,8 @@ const CHECK_BADGES = [
 
 const formatDateTime = (value) => {
   if (!value || value === "Not checked") return "Not checked";
-  const date = new Date(value);
+  const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && !/(Z|[+-]\d{2}:\d{2})$/.test(value) ? `${value}Z` : value;
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
 };

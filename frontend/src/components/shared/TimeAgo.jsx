@@ -10,8 +10,18 @@ const UNITS = [
   { label: 'second', seconds: 1 },
 ];
 
+function parseUtcDate(value) {
+  if (value instanceof Date) return value;
+  // SQLite-backed API timestamps are UTC but arrive without an offset.
+  // JavaScript otherwise interprets them as browser-local time.
+  const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && !/(Z|[+-]\d{2}:\d{2})$/.test(value)
+    ? `${value}Z`
+    : value;
+  return new Date(normalized);
+}
+
 function formatRelative(date) {
-  const d = date instanceof Date ? date : new Date(date);
+  const d = parseUtcDate(date);
   if (Number.isNaN(d.getTime())) return null;
   const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
   if (seconds < 5) return 'just now';
@@ -24,7 +34,7 @@ function formatRelative(date) {
 
 export default function TimeAgo({ date, className = '' }) {
   if (!date || date === 'Not checked') return null;
-  const d = new Date(date);
+  const d = parseUtcDate(date);
   if (Number.isNaN(d.getTime())) return null;
   const relative = formatRelative(d);
   const absolute = d.toLocaleString();

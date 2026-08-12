@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from threading import Lock
+from time import monotonic
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -14,6 +17,40 @@ from app.models import User
 from app.schemas import LoginRequest, RefreshRequest, TokenResponse, UserCreateRequest, UserResponse
 
 router = APIRouter(prefix="/user", tags=["auth"])
+
+_LOGIN_WINDOW_SECONDS = 15 * 60
+_LOGIN_MAX_FAILURES = 5
+_LOGIN_LOCK_SECONDS = 15 * 60
+_login_attempts: dict[str, list[float]] = {}
+_login_locked_until: dict[str, float] = {}
+_login_lock = Lock()
+
+
+def _login_key(request: Request, username: str) -> str:
+    return f"{request.client.host if request.client else 'unknown'}:{username.lower()}"
+
+
+def _check_login_limit(key: str) -> None:
+    now = monotonic()
+    with _login_lock:
+        if _login_locked_until.get(key, 0) > now:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed logins. Try again in 15 minutes.")
+
+
+def _record_login_failure(key: str) -> None:
+    now = monotonic()
+    with _login_lock:
+        recent = [timestamp for timestamp in _login_attempts.get(key, []) if now - timestamp < _LOGIN_WINDOW_SECONDS]
+        recent.append(now)
+        _login_attempts[key] = recent
+        if len(recent) >= _LOGIN_MAX_FAILURES:
+            _login_locked_until[key] = now + _LOGIN_LOCK_SECONDS
+
+
+def _clear_login_failures(key: str) -> None:
+    with _login_lock:
+        _login_attempts.pop(key, None)
+        _login_locked_until.pop(key, None)
 
 
 @router.post("/create/", response_model=UserResponse)
@@ -35,13 +72,17 @@ def create_user(payload: UserCreateRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login/", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    key = _login_key(request, payload.username)
+    _check_login_limit(key)
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.hashed_password):
+        _record_login_failure(key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
 
+    _clear_login_failures(key)
     return TokenResponse(access=create_access_token(user.username), refresh=create_refresh_token(user.username))
 
 

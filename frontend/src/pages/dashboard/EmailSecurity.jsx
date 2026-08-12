@@ -10,6 +10,7 @@ const GRADE_COLORS = {
 
 export default function EmailSecurity() {
   const [hostname, setHostname] = useState('');
+  const [dkimSelectors, setDkimSelectors] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -20,7 +21,7 @@ export default function EmailSecurity() {
     setError('');
     setData(null);
     try {
-      const result = await checkEmailSecurity(hostname.trim());
+      const result = await checkEmailSecurity(hostname.trim(), dkimSelectors);
       setData(result);
     } catch (err) {
       setError(err.message || 'Failed to check email security.');
@@ -37,13 +38,21 @@ export default function EmailSecurity() {
         <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Validate email authentication records for any domain.</p>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           value={hostname}
           onChange={(e) => setHostname(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
           placeholder="example.com"
+          className="flex-1 p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white"
+        />
+        <input
+          type="text"
+          value={dkimSelectors}
+          onChange={(e) => setDkimSelectors(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
+          placeholder="Optional DKIM selectors (e.g. s1, selector2026)"
           className="flex-1 p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white"
         />
         <button

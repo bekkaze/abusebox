@@ -1,4 +1,5 @@
 import ipaddress
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session, joinedload
@@ -92,8 +93,9 @@ def create_hostname(
     if check_result:
         # Update blacklist status from blacklist check
         bl = check_result.get("blacklist", {})
-        if bl and not bl.get("error"):
+        if bl and not bl.get("error") and not bl.get("is_inconclusive"):
             hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
+        hostname.last_checked = datetime.now(timezone.utc)
 
         db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
         db.commit()
@@ -140,14 +142,6 @@ def create_hostnames_bulk(
             )
             db.add(hostname)
             db.flush()
-
-            toggles = get_toggles_from_hostname(hostname)
-            check_result = run_enabled_checks(item.hostname, toggles)
-            if check_result:
-                bl = check_result.get("blacklist", {})
-                if bl and not bl.get("error"):
-                    hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
-                db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
 
             existing_set.add(item.hostname)
             created += 1
@@ -323,8 +317,9 @@ def recheck_hostname(pk: int, db: Session = Depends(get_db), user: User = Depend
 
     if check_result:
         bl = check_result.get("blacklist", {})
-        if bl and not bl.get("error"):
+        if bl and not bl.get("error") and not bl.get("is_inconclusive"):
             hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
+        hostname.last_checked = datetime.now(timezone.utc)
 
         # Mark old checks as historical
         db.query(CheckHistory).filter(
