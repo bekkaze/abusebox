@@ -38,10 +38,12 @@ def _xlsx_values(data: bytes) -> list[str]:
             root = ElementTree.fromstring(archive.read("xl/sharedStrings.xml"))
             shared_strings = ["".join(node.itertext()) for node in root.findall(f"{_SPREADSHEET_NS}si")]
 
-        sheets = sorted(name for name in archive.namelist() if name.startswith("xl/worksheets/") and name.endswith(".xml"))
+        sheets = [name for name in archive.namelist() if name.startswith("xl/worksheets/") and name.endswith(".xml")]
         if not sheets:
             raise ValueError("Excel file has no worksheet.")
-        root = ElementTree.fromstring(archive.read(sheets[0]))
+        # Prefer the first sheet; plain sorting would put sheet10.xml before sheet2.xml.
+        first_sheet = "xl/worksheets/sheet1.xml" if "xl/worksheets/sheet1.xml" in sheets else sorted(sheets)[0]
+        root = ElementTree.fromstring(archive.read(first_sheet))
         values: list[str] = []
         for row in root.findall(f".//{_SPREADSHEET_NS}row"):
             cell = row.find(f"{_SPREADSHEET_NS}c")
@@ -64,7 +66,10 @@ def parse_target_file(filename: str, data: bytes) -> list[str]:
         raise ValueError("File exceeds the 2 MB limit.")
     name = (filename or "").lower()
     if name.endswith(".xlsx"):
-        return _clean(_xlsx_values(data))
+        try:
+            return _clean(_xlsx_values(data))
+        except (zipfile.BadZipFile, ElementTree.ParseError, KeyError) as exc:
+            raise ValueError("Could not read the Excel file. Save it as .xlsx and try again.") from exc
     if name.endswith((".txt", ".csv")):
         text = data.decode("utf-8-sig", errors="replace")
         return _clean([cell for row in csv.reader(io.StringIO(text)) for cell in row])

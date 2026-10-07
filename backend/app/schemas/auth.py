@@ -22,6 +22,11 @@ class UserCreateRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -29,3 +34,4 @@ class UserResponse(BaseModel):
     username: str
     email: str
     phone_number: str
+    is_superuser: bool = False

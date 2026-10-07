@@ -1,4 +1,5 @@
 from app.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     RefreshRequest,
     TokenResponse,
@@ -17,6 +18,7 @@ from app.schemas.hostname import (
 )
 
 __all__ = [
+    "ChangePasswordRequest",
     "LoginRequest",
     "RefreshRequest",
     "TokenResponse",

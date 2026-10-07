@@ -1,7 +1,13 @@
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+
+from app.core.timeutil import as_utc
+
+# Stored timestamps are UTC but SQLite hands them back naive; mark them as UTC so
+# the JSON carries an offset and browsers don't shift them into local time.
+UTCDateTime = Annotated[datetime, AfterValidator(as_utc)]
 
 
 CHECK_TOGGLE_DEFAULTS = {
@@ -72,13 +78,13 @@ class HostnameResponse(BaseModel):
     check_server_status: bool
     check_interval_minutes: int | None
 
-    created: datetime
-    updated: datetime
+    created: UTCDateTime
+    updated: UTCDateTime
 
 
 class HostnameListItem(HostnameResponse):
     result: dict[str, Any] | None
-    checked: datetime | str
+    checked: UTCDateTime | str
 
 
 class BulkHostnameCreateRequest(BaseModel):

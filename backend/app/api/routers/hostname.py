@@ -1,8 +1,9 @@
 import ipaddress
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy.orm import Session, joinedload
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
 from app.db.session import get_db
@@ -16,6 +17,7 @@ from app.schemas import (
     HostnameResponse,
     HostnameUpdateRequest,
 )
+from app.core.timeutil import to_utc_iso
 from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
 
 router = APIRouter(prefix="/hostname", tags=["hostname"])
@@ -81,6 +83,9 @@ def create_hostname(
         check_server_status=payload.check_server_status,
         check_interval_minutes=payload.check_interval_minutes,
         status="active",
+        # Checks run right below; mark the asset as checked now so the
+        # scheduler doesn't pick it up and check it a second time meanwhile.
+        last_checked=datetime.now(timezone.utc),
     )
     db.add(hostname)
     db.commit()
@@ -97,6 +102,10 @@ def create_hostname(
             hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
         hostname.last_checked = datetime.now(timezone.utc)
 
+        db.query(CheckHistory).filter(
+            CheckHistory.hostname_id == hostname.id,
+            CheckHistory.status == "current",
+        ).update({"status": "historical"})
         db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
         db.commit()
         db.refresh(hostname)
@@ -138,6 +147,7 @@ def create_hostnames_bulk(
                 check_whois=item.check_whois,
                 check_email_security=item.check_email_security,
                 check_server_status=item.check_server_status,
+                check_interval_minutes=item.check_interval_minutes,
                 status="active",
             )
             db.add(hostname)
@@ -208,42 +218,49 @@ def import_cidr(
     return BulkCreateResult(created=created, skipped=skipped, errors=errors)
 
 
+def _latest_checks(db: Session, hostname_ids: list[int]) -> dict[int, CheckHistory]:
+    """Latest "current" check per hostname, without loading every history row."""
+    if not hostname_ids:
+        return {}
+    latest_ids = (
+        db.query(func.max(CheckHistory.id))
+        .filter(CheckHistory.hostname_id.in_(hostname_ids), CheckHistory.status == "current")
+        .group_by(CheckHistory.hostname_id)
+    )
+    rows = db.query(CheckHistory).filter(CheckHistory.id.in_(latest_ids)).all()
+    return {row.hostname_id: row for row in rows}
+
+
+def _to_list_item(hostname: Hostname, current_check: CheckHistory | None) -> HostnameListItem:
+    check_result = dict(current_check.result) if current_check and current_check.result else None
+    if check_result and current_check:
+        # The check id lets the UI reference this result (e.g. for delist requests).
+        check_result["id"] = current_check.id
+    return HostnameListItem(
+        **_to_hostname_response(hostname).model_dump(),
+        result=check_result,
+        checked=current_check.created if current_check else "Not checked",
+    )
+
+
 @router.get("/list/", response_model=list[HostnameListItem])
 def list_hostnames(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     hostnames = (
         db.query(Hostname)
-        .options(joinedload(Hostname.checks))
         .filter(Hostname.user_id == user.id)
         .order_by(Hostname.created.desc())
         .all()
     )
-
-    output: list[HostnameListItem] = []
-    for hostname in hostnames:
-        current_checks = [check for check in hostname.checks if check.status == "current"]
-        current_check = max(current_checks, key=lambda x: x.created) if current_checks else None
-
-        check_result = dict(current_check.result) if current_check and current_check.result else None
-        if check_result and current_check:
-            check_result["id"] = current_check.id
-
-        output.append(
-            HostnameListItem(
-                **_to_hostname_response(hostname).model_dump(),
-                result=check_result,
-                checked=current_check.created if current_check else "Not checked",
-            )
-        )
-
-    return output
+    latest = _latest_checks(db, [hostname.id for hostname in hostnames])
+    return [_to_list_item(hostname, latest.get(hostname.id)) for hostname in hostnames]
 
 
-@router.get("/{pk}", response_model=HostnameResponse)
+@router.get("/{pk}", response_model=HostnameListItem)
 def get_hostname(pk: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
     if not hostname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
-    return _to_hostname_response(hostname)
+    return _to_list_item(hostname, _latest_checks(db, [hostname.id]).get(hostname.id))
 
 
 @router.put("/{pk}", response_model=HostnameResponse)
@@ -256,6 +273,13 @@ def update_hostname(
     hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
     if not hostname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
+    duplicate = (
+        db.query(Hostname)
+        .filter(Hostname.user_id == user.id, Hostname.hostname == payload.hostname, Hostname.id != pk)
+        .first()
+    )
+    if duplicate:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hostname already exists")
 
     hostname.hostname_type = payload.hostname_type
     hostname.hostname = payload.hostname
@@ -273,17 +297,24 @@ def update_hostname(
 
 
 @router.get("/{pk}/history/")
-def get_hostname_history(pk: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_hostname_history(
+    pk: int,
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
     if not hostname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
 
+    # Most recent *limit* checks, returned oldest-first for charting.
     checks = (
         db.query(CheckHistory)
         .filter(CheckHistory.hostname_id == pk)
-        .order_by(CheckHistory.created.asc())
+        .order_by(CheckHistory.created.desc(), CheckHistory.id.desc())
+        .limit(limit)
         .all()
-    )
+    )[::-1]
 
     history = []
     for check in checks:
@@ -291,7 +322,7 @@ def get_hostname_history(pk: int, db: Session = Depends(get_db), user: User = De
         bl = result.get("blacklist", result)  # backward compat: old results have flat structure
         history.append({
             "id": check.id,
-            "date": check.created.isoformat() if check.created else None,
+            "date": to_utc_iso(check.created),
             "status": check.status,
             "is_blacklisted": bool(bl.get("is_blacklisted", False)),
             "detected_count": len(bl.get("detected_on", [])),

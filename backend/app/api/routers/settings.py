@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_superuser
 from app.db.session import get_db
 from app.models import AppSettings, User
 from app.services.scheduler import restart_scheduler, stop_scheduler
@@ -51,7 +51,7 @@ def get_scheduler_settings(
 def update_scheduler_settings(
     payload: SchedulerSettingsUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_superuser),
 ):
     row = _get_or_create_settings(db)
     row.scheduler_enabled = payload.scheduler_enabled
