@@ -24,10 +24,13 @@ Default seeded admin user:
 Project structure:
 
 - `app/main.py`: app factory and startup lifecycle
-- `app/api/routers/`: route modules (`auth`, `blacklist`, `dmarc`, `hostname`, `settings`, `tools`)
+- `app/api/routers/`: route modules (`auth`, `blacklist`, `dmarc`, `events`, `hostname`, `settings`, `tools`)
 - `app/core/`: settings, JWT security, outbound-network (SSRF) guards, client IP helper
 - `app/db/`: SQLAlchemy engine/session/bootstrap seed
 - `app/models/`: ORM models
 - `app/schemas/`: request/response schemas
-- `app/services/`: DNSBL, AbuseIPDB, DNS, SSL, WHOIS, email security, server status, DMARC parsing, scheduler, notifications
+- `app/services/`: the checks (DNSBL, AbuseIPDB, DNS, SSL, WHOIS, email security, server status), DMARC parsing, and monitoring:
+  - `monitoring.py` saves results, records events and sends alerts (used by the scheduler, re-checks and asset creation)
+  - `health.py` turns results into a status and actionable issues; `events.py` detects changes between checks
+  - `scheduler.py`, `notifications.py`, `app_settings.py`
 - `tests/`: pytest suite (`network`-marked tests need live DNS)

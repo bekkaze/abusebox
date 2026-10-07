@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
 from app.db.session import get_db
-from app.models import CheckHistory, Hostname, User
+from app.models import AssetEvent, CheckHistory, Hostname, User
 from app.schemas import (
+    BulkActionRequest,
+    BulkActionResult,
     BulkCreateResult,
     BulkHostnameCreateRequest,
     CidrImportRequest,
@@ -18,7 +20,11 @@ from app.schemas import (
     HostnameUpdateRequest,
 )
 from app.core.timeutil import to_utc_iso
+from app.services.app_settings import get_app_settings
 from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
+from app.services.health import summarize
+from app.services.monitoring import queue_rechecks, record_check
+from app.api.routers.events import serialize_event
 
 router = APIRouter(prefix="/hostname", tags=["hostname"])
 
@@ -52,6 +58,7 @@ def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
         check_email_security=hostname.check_email_security,
         check_server_status=hostname.check_server_status,
         check_interval_minutes=hostname.check_interval_minutes,
+        last_checked=hostname.last_checked,
         created=hostname.created,
         updated=hostname.updated,
     )
@@ -91,23 +98,10 @@ def create_hostname(
     db.commit()
     db.refresh(hostname)
 
-    # Run all enabled checks
-    toggles = get_toggles_from_hostname(hostname)
-    check_result = run_enabled_checks(payload.hostname, toggles)
-
+    # Run all enabled checks. No alerts on creation: the user is looking at it.
+    check_result = run_enabled_checks(payload.hostname, get_toggles_from_hostname(hostname))
     if check_result:
-        # Update blacklist status from blacklist check
-        bl = check_result.get("blacklist", {})
-        if bl and not bl.get("error") and not bl.get("is_inconclusive"):
-            hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
-        hostname.last_checked = datetime.now(timezone.utc)
-
-        db.query(CheckHistory).filter(
-            CheckHistory.hostname_id == hostname.id,
-            CheckHistory.status == "current",
-        ).update({"status": "historical"})
-        db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
-        db.commit()
+        record_check(db, hostname, check_result, notify=False)
         db.refresh(hostname)
 
     return _to_hostname_response(hostname)
@@ -231,20 +225,42 @@ def _latest_checks(db: Session, hostname_ids: list[int]) -> dict[int, CheckHisto
     return {row.hostname_id: row for row in rows}
 
 
-def _to_list_item(hostname: Hostname, current_check: CheckHistory | None) -> HostnameListItem:
-    check_result = dict(current_check.result) if current_check and current_check.result else None
-    if check_result and current_check:
+def _health_options(db: Session) -> dict:
+    prefs = get_app_settings(db)
+    return {
+        "ssl_warning_days": prefs.ssl_expiry_warning_days,
+        "domain_warning_days": prefs.domain_expiry_warning_days,
+        "global_interval_minutes": prefs.scheduler_interval_minutes,
+        "scheduler_enabled": prefs.scheduler_enabled,
+    }
+
+
+def _to_list_item(
+    hostname: Hostname,
+    current_check: CheckHistory | None,
+    health_options: dict,
+    include_result: bool = True,
+) -> HostnameListItem:
+    raw = current_check.result if current_check and current_check.result else None
+    check_result = None
+    if raw and include_result:
+        check_result = dict(raw)
         # The check id lets the UI reference this result (e.g. for delist requests).
         check_result["id"] = current_check.id
     return HostnameListItem(
         **_to_hostname_response(hostname).model_dump(),
         result=check_result,
+        health=summarize(hostname, raw, **health_options) if raw or hostname.is_monitor_enabled else None,
         checked=current_check.created if current_check else "Not checked",
     )
 
 
 @router.get("/list/", response_model=list[HostnameListItem])
-def list_hostnames(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_hostnames(
+    include_result: bool = Query(True, description="Include each asset's full latest result. Set to false for a lighter list; `health` is always included."),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     hostnames = (
         db.query(Hostname)
         .filter(Hostname.user_id == user.id)
@@ -252,7 +268,35 @@ def list_hostnames(db: Session = Depends(get_db), user: User = Depends(get_curre
         .all()
     )
     latest = _latest_checks(db, [hostname.id for hostname in hostnames])
-    return [_to_list_item(hostname, latest.get(hostname.id)) for hostname in hostnames]
+    options = _health_options(db)
+    return [_to_list_item(hostname, latest.get(hostname.id), options, include_result) for hostname in hostnames]
+
+
+@router.post("/bulk-action/", response_model=BulkActionResult)
+def bulk_action(
+    payload: BulkActionRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Apply one action to many assets. Re-checks run in the background."""
+    hostnames = db.query(Hostname).filter(Hostname.user_id == user.id, Hostname.id.in_(payload.ids)).all()
+    if payload.action == "recheck":
+        queued = queue_rechecks([h.id for h in hostnames])
+        return BulkActionResult(affected=len(hostnames), queued=queued)
+    if payload.action == "delete":
+        for hostname in hostnames:
+            db.delete(hostname)  # ORM delete cascades to checks and events
+    else:
+        field, value = {
+            "enable_monitoring": ("is_monitor_enabled", True),
+            "disable_monitoring": ("is_monitor_enabled", False),
+            "enable_alerts": ("is_alert_enabled", True),
+            "disable_alerts": ("is_alert_enabled", False),
+        }[payload.action]
+        for hostname in hostnames:
+            setattr(hostname, field, value)
+    db.commit()
+    return BulkActionResult(affected=len(hostnames))
 
 
 @router.get("/{pk}", response_model=HostnameListItem)
@@ -260,7 +304,52 @@ def get_hostname(pk: int, db: Session = Depends(get_db), user: User = Depends(ge
     hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
     if not hostname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
-    return _to_list_item(hostname, _latest_checks(db, [hostname.id]).get(hostname.id))
+    return _to_list_item(hostname, _latest_checks(db, [hostname.id]).get(hostname.id), _health_options(db))
+
+
+@router.get("/{pk}/checks/{check_id}")
+def get_check(pk: int, check_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Full result of one past check, plus the id of the check before it (for diffs)."""
+    hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
+    if not hostname:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
+    check = db.query(CheckHistory).filter(CheckHistory.id == check_id, CheckHistory.hostname_id == pk).first()
+    if not check:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Check not found")
+    previous = (
+        db.query(CheckHistory.id)
+        .filter(CheckHistory.hostname_id == pk, CheckHistory.id < check.id)
+        .order_by(CheckHistory.id.desc())
+        .first()
+    )
+    return {
+        "id": check.id,
+        "hostname_id": pk,
+        "date": to_utc_iso(check.created),
+        "status": check.status,
+        "previous_id": previous[0] if previous else None,
+        "result": check.result or {},
+    }
+
+
+@router.get("/{pk}/events/")
+def get_hostname_events(
+    pk: int,
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
+    if not hostname:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
+    events = (
+        db.query(AssetEvent)
+        .filter(AssetEvent.hostname_id == pk)
+        .order_by(AssetEvent.created.desc(), AssetEvent.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [serialize_event(event, hostname) for event in events]
 
 
 @router.put("/{pk}", response_model=HostnameResponse)
@@ -343,23 +432,9 @@ def recheck_hostname(pk: int, db: Session = Depends(get_db), user: User = Depend
     if not hostname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
 
-    toggles = get_toggles_from_hostname(hostname)
-    check_result = run_enabled_checks(hostname.hostname, toggles)
-
+    check_result = run_enabled_checks(hostname.hostname, get_toggles_from_hostname(hostname))
     if check_result:
-        bl = check_result.get("blacklist", {})
-        if bl and not bl.get("error") and not bl.get("is_inconclusive"):
-            hostname.is_blacklisted = bool(bl.get("is_blacklisted", False))
-        hostname.last_checked = datetime.now(timezone.utc)
-
-        # Mark old checks as historical
-        db.query(CheckHistory).filter(
-            CheckHistory.hostname_id == hostname.id,
-            CheckHistory.status == "current",
-        ).update({"status": "historical"})
-
-        db.add(CheckHistory(hostname_id=hostname.id, result=check_result, status="current"))
-        db.commit()
+        record_check(db, hostname, check_result)
         db.refresh(hostname)
 
     return _to_hostname_response(hostname)

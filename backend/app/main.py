@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html
 from sqlalchemy import inspect, text
 
-from app.api.routers import auth_router, blacklist_router, dmarc_router, hostname_router, settings_router, tools_router
+from app.api.routers import auth_router, blacklist_router, dmarc_router, events_router, hostname_router, settings_router, tools_router
 from app.core.config import settings
 from app.db.init_data import seed_default_admin
 from app.db.session import Base, SessionLocal, engine
@@ -67,7 +67,7 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        version="1.1.3",
+        version="1.2.0",
         debug=settings.app_debug,
         docs_url="/swagger/",
         redoc_url=None,
@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(blacklist_router)
     app.include_router(dmarc_router)
+    app.include_router(events_router)
     app.include_router(hostname_router)
     app.include_router(settings_router)
     app.include_router(tools_router)

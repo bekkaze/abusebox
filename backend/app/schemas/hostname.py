@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
@@ -77,6 +77,7 @@ class HostnameResponse(BaseModel):
     check_email_security: bool
     check_server_status: bool
     check_interval_minutes: int | None
+    last_checked: UTCDateTime | None = None
 
     created: UTCDateTime
     updated: UTCDateTime
@@ -84,6 +85,8 @@ class HostnameResponse(BaseModel):
 
 class HostnameListItem(HostnameResponse):
     result: dict[str, Any] | None
+    # Compact status + actionable issues (see app/services/health.py).
+    health: dict[str, Any] | None = None
     checked: UTCDateTime | str
 
 
@@ -109,3 +112,13 @@ class BulkCreateResult(BaseModel):
     created: int
     skipped: int
     errors: list[str]
+
+
+class BulkActionRequest(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=1000)
+    action: Literal["recheck", "delete", "enable_monitoring", "disable_monitoring", "enable_alerts", "disable_alerts"]
+
+
+class BulkActionResult(BaseModel):
+    affected: int
+    queued: int = 0

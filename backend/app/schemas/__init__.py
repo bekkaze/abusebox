@@ -1,13 +1,18 @@
 from app.schemas.auth import (
+    AdminUserItem,
     ChangePasswordRequest,
     LoginRequest,
+    MeResponse,
     RefreshRequest,
     TokenResponse,
     UserCreateRequest,
     UserResponse,
+    UserUpdateRequest,
 )
 from app.schemas.blacklist import DelistRequest
 from app.schemas.hostname import (
+    BulkActionRequest,
+    BulkActionResult,
     BulkCreateResult,
     BulkHostnameCreateRequest,
     CidrImportRequest,
@@ -18,6 +23,9 @@ from app.schemas.hostname import (
 )
 
 __all__ = [
+    "AdminUserItem",
+    "MeResponse",
+    "UserUpdateRequest",
     "ChangePasswordRequest",
     "LoginRequest",
     "RefreshRequest",
@@ -32,4 +40,6 @@ __all__ = [
     "BulkHostnameCreateRequest",
     "CidrImportRequest",
     "BulkCreateResult",
+    "BulkActionRequest",
+    "BulkActionResult",
 ]
