@@ -6,7 +6,7 @@
 
 **Open-source threat monitoring toolkit for IPs, domains, and servers.**
 
-Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets, and verify server uptime — all from one dashboard.
+Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets and verify uptime, then get told when something changes. One self-hosted dashboard.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/bekkaze/abusebox)](https://github.com/bekkaze/abusebox/releases)
@@ -18,21 +18,32 @@ Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets, 
 
 ## Screenshots
 
-**Landing page**: instant blacklist check from the homepage
-
-![Landing page](files/landing.png)
-
-**Dashboard**: what needs attention across all assets, scheduler status, recent activity and listing history
+**Dashboard**: everything that needs attention across your assets, scheduler status, recent activity and listing history
 
 ![Dashboard](files/dashboard.png)
 
-**Assets**: health at a glance, filters, sorting, card/table views and bulk actions
+**Assets**: health at a glance, filters, sorting, card or table view, and bulk actions
 
 ![Assets](files/assets.png)
 
-**Asset detail**: tabbed results for every check, plus activity and a check-by-check history
+**Asset detail**: results for every check, plus the asset's activity and a check-by-check history
 
 ![Asset detail](files/asset_details.png)
+
+**Landing page**: anyone can run a quick blacklist check, no account needed
+
+![Landing page](files/landing.png)
+
+<table>
+  <tr>
+    <td width="50%"><b>Activity log</b>: every change, with severity filters<br><img src="files/activity.png" alt="Activity log"></td>
+    <td width="50%"><b>Alerts</b>: email, Slack, Discord or any webhook, with a test button<br><img src="files/notifications.png" alt="Notification settings"></td>
+  </tr>
+  <tr>
+    <td width="50%"><b>Dark mode</b><br><img src="files/dashboard_dark.png" alt="Dashboard in dark mode"></td>
+    <td width="50%"><b>Command palette</b> (Ctrl/Cmd + K): jump to any asset or page<br><img src="files/command_palette.png" alt="Command palette"></td>
+  </tr>
+</table>
 
 ---
 
@@ -81,11 +92,11 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 | **Bulk Actions** | Select many assets to re-check (in the background), toggle monitoring/alerts or delete; table view, sorting, CSV export | Yes |
 | **Check History** | Browse past checks and see which blacklists were added or removed | Yes |
 | **Asset Detail View** | Tabbed results for every check type with summary cards | Yes |
-| **Scheduled Monitoring** | Automatic periodic re-checks with email/webhook alerts | Yes |
+| **Scheduled Monitoring** | Automatic re-checks on a global or per-asset interval, with a "check due assets now" button | Yes |
 | **Historical Charts** | Visual blacklist history per monitored asset | Yes |
 | **Re-check Asset** | Re-run all enabled checks on any asset with one click | Yes |
 | **Delist Tracking** | Links to each provider's removal page and tracks requested removals | Yes |
-| **Search & Filter** | Search assets by hostname/type, filter by clean/listed status | Yes |
+| **Search & Filter** | Search assets by hostname, type or description; filter by needs attention, listed or clean | Yes |
 | **Auto-refresh** | Configurable auto-refresh (30s/1m/5m) on Dashboard and Assets | Yes |
 | **Copy to Clipboard** | One-click copy on IPs, DNS records, WHOIS data, SSL details | - |
 | **Relative Timestamps** | "2 hours ago" with full datetime tooltip on hover | - |
@@ -144,6 +155,25 @@ yarn dev
 Open `http://localhost:3000`.
 
 </details>
+
+### Upgrading from v1.1.x
+
+Back up your data first, then pull the new version. The database is migrated automatically on start.
+
+```bash
+# The volume is named <folder>_abusebox-data; `docker volume ls` shows it.
+docker run --rm -v abusebox_abusebox-data:/data -v "$PWD":/backup alpine tar czf /backup/abusebox-data.tgz -C /data .
+git pull
+docker compose up -d --build
+```
+
+Things that changed:
+
+- **Everyone is signed out once.** Older Docker setups used a published JWT secret; v1.2.0 generates a private one (or uses your `APP_SECRET_KEY`).
+- **Change the admin password.** Older Docker setups ignored `DEFAULT_ADMIN_PASSWORD` from `.env`, so the admin account probably still uses `password123`. A banner reminds you until you change it in **Settings → Security**.
+- **The `/tools/*` API needs a token.** Only `/blacklist/quick-check/` stays public. See [API Endpoints](#api-endpoints).
+- **No public sign-up.** Admins add users in **Settings → Users**.
+- **The scheduler is on by default** unless you turned it off in Settings before.
 
 ---
 
@@ -234,6 +264,7 @@ GET  /hostname/{id}/checks/{check_id}
 GET  /hostname/{id}/events/
 GET  /events/?severity=critical
 GET  /settings/scheduler/status/
+POST /settings/scheduler/run/            # admin only: check due assets now
 PUT  /settings/notifications/            # admin only
 POST /settings/notifications/test/       # admin only
 POST /user/change-password/
@@ -259,10 +290,11 @@ Full interactive docs available after startup:
 
 | Layer | Technology |
 |---|---|
-| Backend | FastAPI, SQLAlchemy, JWT (python-jose), dnspython |
-| Frontend | React 18, Vite 6, Tailwind CSS, Mantine, Recharts |
+| Backend | Python 3.11, FastAPI, SQLAlchemy 2, PyJWT, dnspython |
+| Frontend | React 18, React Router 7, Vite 6, Tailwind CSS 3, Headless UI, Recharts |
 | Database | SQLite (swappable via `DATABASE_URL`) |
-| Deployment | Docker + Docker Compose |
+| Deployment | Docker + Docker Compose; images published to GHCR |
+| CI | GitHub Actions: backend tests, frontend lint and build |
 
 ---
 
@@ -271,25 +303,28 @@ Full interactive docs available after startup:
 ```
 abusebox/
 ├── backend/
-│   └── app/
-│       ├── api/routers/       # auth, blacklist, hostname, tools
-│       ├── core/              # config, JWT security
-│       ├── db/                # SQLAlchemy session, seed data
-│       ├── models/            # ORM models
-│       ├── schemas/           # Pydantic schemas
-│       └── services/          # dnsbl, abuseipdb, whois, dns, ssl,
-│                              # email security, subnet, export,
-│                              # check runner, notifications, scheduler
+│   ├── app/
+│   │   ├── api/routers/       # auth, blacklist, dmarc, events, hostname, settings, tools
+│   │   ├── core/              # config, JWT security, SSRF guards, client IP, UTC helpers
+│   │   ├── db/                # SQLAlchemy session, seed data
+│   │   ├── models/            # users, assets, check history, events, DMARC, settings
+│   │   ├── schemas/           # Pydantic schemas
+│   │   └── services/          # checks: dnsbl, abuseipdb, dns, ssl, whois, email security,
+│   │                          #   server status, subnet, DMARC parser, export
+│   │                          # monitoring: monitoring (save + events + alerts), health,
+│   │                          #   events, scheduler, notifications
+│   └── tests/                 # pytest (offline suite + live DNSBL cross-checks)
 ├── frontend/
 │   └── src/
-│       ├── pages/             # Landing, Login, Assets, AssetDetail,
-│       │                      # Dashboard, Check & Lookup tools
-│       ├── components/        # Reusable UI (shared: Skeleton, CopyButton,
-│       │                      # TimeAgo, AutoRefresh, ErrorBoundary)
-│       ├── services/          # API client functions, auth, theme
+│       ├── pages/             # Landing, Login, Dashboard, Assets, Asset detail, Activity,
+│       │                      # Settings, Check & Lookup tools
+│       ├── components/        # shared UI (forms, alerts, activity feed, command palette),
+│       │                      # dashboard, blacklist tables, dialogs
+│       ├── services/          # API clients, auth, theme, current user
 │       └── routes/            # React Router config
+├── files/                     # logo and README screenshots
 ├── docker-compose.yml
-└── .env
+└── .env                       # your configuration (not committed)
 ```
 
 ---
@@ -298,7 +333,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
-| **v1.2.0** | October 2026 | Needs-attention dashboard, activity log, recovery/outage/expiry alerts (Slack, Discord, webhooks), bulk actions and table view, check history, user management, command palette; scheduler fix (#20), security hardening, dependency updates, accessibility and dark mode overhaul |
+| **v1.2.0** | October 7, 2026 | Needs-attention dashboard, activity log, recovery/outage/expiry alerts (Slack, Discord, webhooks), bulk actions and table view, check history, user management, command palette; scheduler fix (#20), security hardening, dependency updates, accessibility and dark mode overhaul |
 | **v1.1.2** | March 26, 2026 | Bulk asset import, CIDR import, auto-refresh auth, persistent DB, DNSBL false positive fix, community bug fixes |
 | **v1.1.1** | March 25, 2026 | UX polish, responsive mobile layout, asset re-check, code splitting, security fixes |
 | **v1.1.0** | March 23, 2026 | Asset management, DNS/SSL/DMARC tools, bulk & subnet check, scheduled monitoring, dark mode, 60+ DNSBL providers |

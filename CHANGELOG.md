@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 Monitoring that tells you what needs attention, plus a security and accessibility overhaul. (Supersedes the unreleased 1.1.3.)
 
+Upgrading from 1.1.x: everyone is signed out once, the `/tools/*` API now needs a token, and public sign-up is off. See [Upgrading from v1.1.x](README.md#upgrading-from-v11x).
+
 ### Highlights
 
 - **"Needs attention" dashboard**: one list of everything that's wrong across your assets (listed on blacklists, SSL certificate invalid or expiring, domain registration expiring, server down or returning 5xx, weak SPF/DKIM/DMARC grade, high AbuseIPDB score, overdue scheduled checks), plus scheduler status with a "Check due assets now" button.
@@ -46,6 +48,8 @@ Monitoring that tells you what needs attention, plus a security and accessibilit
 - Asset detail: the Server Status tab showed blanks and the WHOIS tab showed only raw output (field-name mismatches with the API).
 - Dashboard "Currently listed" was always 0, so the favicon alert never showed.
 - Delist requests from the asset page always failed (missing check id), and the backend updated the wrong part of the stored result. Requests are now saved reliably.
+- SPF check ignored `redirect=` (e.g. Google's `v=spf1 redirect=_spf.google.com`), grading those domains as having no SPF policy. The redirected record is now followed.
+- Long TXT records (split into several strings by DNS) were parsed with stray quotes, which could break SPF and DMARC parsing.
 - Spamhaus/CBL "refused" answers (`127.255.255.x`, e.g. when queried through public resolvers) were counted as clean. They are now reported as "no answer".
 - Results where many providers don't answer are marked inconclusive and don't flip an asset's listed/clean status.
 - Timestamps from the API now carry a UTC offset, so "x minutes ago" is correct outside UTC.
@@ -73,6 +77,8 @@ Monitoring that tells you what needs attention, plus a security and accessibilit
 - UI pass across all pages: consistent dark mode (tool pages, tables and dialogs were light-only), labelled form fields, visible keyboard focus, skip link, ARIA tabs on the asset page, `prefers-reduced-motion` support, real API health indicator, and keyboard-accessible asset cards.
 - Removed unused pages/components and the unused `@mantine/*`, `@heroicons/react` and `jwt-decode` dependencies.
 - Docker frontend image uses Node 22 (react-router 7 needs Node 20+).
+- The sidebar and top bar stay in place while scrolling long pages.
+- A server whose certificate is rejected is reported as "HTTPS requests fail" instead of "down".
 
 ### Known issues
 
