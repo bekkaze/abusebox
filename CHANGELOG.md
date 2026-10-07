@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2026-10-07
+
+### Security
+
+- **Docker: `.env` values were silently ignored.** `docker-compose.yml` hard-coded `APP_SECRET_KEY`, `DEFAULT_ADMIN_PASSWORD` and `APP_DEBUG=true`, overriding `.env`. Every default Docker deployment shared the public JWT secret `change-me-in-production`, so anyone could forge an admin token. Compose now uses `${VAR:-default}`, and `APP_DEBUG` defaults to `false`.
+- When `APP_SECRET_KEY` is unset (or set to a documented placeholder), a random secret is generated and saved as `.secret_key` next to the database, in the Docker volume.
+- Public sign-up is disabled: `POST /user/create/` now requires an admin. Changing scheduler settings is admin-only.
+- New `POST /user/change-password/` and a Settings form. Changing the password revokes all previously issued tokens.
+- `/tools/*` endpoints now require sign-in (they make outbound connections and use the AbuseIPDB quota). Only `/blacklist/quick-check/` stays public, rate limited to 10 requests per minute per client.
+- SSRF guards: Server Status and SSL checks refuse private, loopback, link-local and cloud-metadata addresses, including through redirects (every hop is re-validated).
+- Login lockout after 5 failed attempts per client and username for 15 minutes. Rate limits key on the real client IP behind the bundled proxy, so one client can't lock out everyone.
+- DMARC uploads: decompressed size is capped at 10 MB (gzip/zip bomb protection).
+- Replaced `python-jose` (unpatched CVE, plus `ecdsa`/`pyasn1`) with `PyJWT`. Existing sessions remain valid.
+- Dependency updates for all open advisories: FastAPI 0.142 / Starlette 1.7, python-multipart 0.0.32, requests 2.34, axios 1.20, Vite 6.4.4, react-router 7.18, PostCSS 8.5.29, and refreshed transitive packages. Test tools moved to `requirements-dev.txt` so they no longer ship in the image.
+- Added `.dockerignore` files so local databases, secrets and `node_modules` aren't copied into images.
+
+### Fixed
+
+- Scheduled monitoring stopped after its first run with `can't subtract offset-naive and offset-aware datetimes` (#20).
+- Creating an asset could be checked twice at once by the scheduler, leaving two "current" results.
+- Asset detail: the Server Status tab showed blanks and the WHOIS tab showed only raw output (field-name mismatches with the API).
+- Dashboard "Currently listed" was always 0, so the favicon alert never showed.
+- Delist requests from the asset page always failed (missing check id), and the backend updated the wrong part of the stored result. Requests are now saved reliably.
+- Spamhaus/CBL "refused" answers (`127.255.255.x`, e.g. when queried through public resolvers) were counted as clean. They are now reported as "no answer".
+- Results where many providers don't answer are marked inconclusive and don't flip an asset's listed/clean status.
+- Timestamps from the API now carry a UTC offset, so "x minutes ago" is correct outside UTC.
+- CSV export didn't work for the public quick check and re-ran the whole DNSBL check; it's now generated in the browser from the results on screen.
+- Bulk asset creation ignored `check_interval_minutes`.
+- Automatic schema migration could fail when adding a non-nullable column to a SQLite table with rows.
+- Asset list loaded every historical check result for every asset; it now loads only the latest one.
+- Toasts were shown twice on pages with nested toast containers.
+
+### Added
+
+- Edit an asset's checks, monitoring, alerts and interval from its detail page.
+- Bulk monitoring list (up to 300 targets, paste or upload TXT/CSV/XLSX) and bulk check uploads, thanks to @lokiee0 (#22).
+- Custom DKIM selectors for the SPF/DKIM/DMARC check (#22).
+- DMARC reports keep every DKIM/SPF result per record (#22).
+- Delist flow links to each provider's removal page and tracks "removal requested" for any listed provider.
+- `GET /user/me/`, `POST /tools/bulk-check/` (JSON body for long lists).
+- CI workflow running the backend tests and frontend lint/build on every PR.
+- 404 page.
+
+### Changed
+
+- The scheduler is enabled by default (`SCHEDULER_ENABLED=true`). New assets have scheduled monitoring on by default.
+- UI pass across all pages: consistent dark mode (tool pages, tables and dialogs were light-only), labelled form fields, visible keyboard focus, skip link, ARIA tabs on the asset page, `prefers-reduced-motion` support, real API health indicator, and keyboard-accessible asset cards.
+- Removed unused pages/components and the unused `@mantine/*`, `@heroicons/react` and `jwt-decode` dependencies.
+- Docker frontend image uses Node 22 (react-router 7 needs Node 20+).
+
+### Known issues
+
+- `braces` (pulled in by Tailwind CSS 3's file watcher) has an advisory with no patched release; it only affects the build tooling.
+
 ## [1.1.2] - 2026-03-26
 
 ### Added
