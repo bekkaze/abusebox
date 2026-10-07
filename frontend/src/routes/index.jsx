@@ -1,4 +1,4 @@
-import { RouterProvider, createBrowserRouter } from "react-router-dom";
+import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
 import { useAuth } from "../services/auth/authProvider";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -24,6 +24,7 @@ const SubnetCheck = lazy(() => import("../pages/dashboard/SubnetCheck"));
 const BulkCheck = lazy(() => import("../pages/dashboard/BulkCheck"));
 const DmarcReports = lazy(() => import("../pages/dashboard/DmarcReports"));
 const Settings = lazy(() => import("../pages/dashboard/Settings"));
+const Activity = lazy(() => import("../pages/dashboard/Activity"));
 
 function LazyPage({ children }) {
   return (
@@ -62,6 +63,7 @@ const Routes = () => {
             { index: true, element: <LazyPage><Home /></LazyPage> },
             { path: 'blacklist-check', element: <LazyPage><BlacklistCheck /></LazyPage> },
             { path: 'assets', element: <LazyPage><Assets /></LazyPage> },
+            { path: 'activity', element: <LazyPage><Activity /></LazyPage> },
             { path: 'assets/:id', element: <LazyPage><AssetDetail /></LazyPage> },
             // Old URL from v1.0; kept so bookmarks still work.
             { path: 'blacklist-monitor', element: <LazyPage><Assets /></LazyPage> },
@@ -90,7 +92,8 @@ const Routes = () => {
 
   const router = useMemo(() => createBrowserRouter([
     ...routesForPublic,
-    ...(!token ? routesForNotAuthenticatedOnly : []),
+    // Signed-in users opening /login go straight to the dashboard.
+    ...(!token ? routesForNotAuthenticatedOnly : [{ path: '/login', element: <Navigate to="/dashboard" replace /> }]),
     ...routesForAuthenticatedOnly,
     { path: '*', element: <NotFound /> },
   // Only the signed-in state changes which routes exist.

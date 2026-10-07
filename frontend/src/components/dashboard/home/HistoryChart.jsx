@@ -5,9 +5,17 @@ import axios from 'axios';
 import { useTheme } from '../../../services/theme/themeProvider';
 import { SkeletonLine } from '../../shared/Skeleton';
 
-const formatTick = (iso) => {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+// Within ~2 days the date alone repeats on every tick, so show the time instead.
+const tickFormatter = (points) => {
+  const times = points.map((p) => new Date(p.date).getTime()).filter((t) => !Number.isNaN(t));
+  const short = times.length > 1 && Math.max(...times) - Math.min(...times) < 2 * 86400000;
+  return (iso) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return short
+      ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+      : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
 };
 
 const formatFull = (iso) => {
@@ -52,7 +60,7 @@ export default function HistoryChart({ hostnameId, hostname }) {
           Listings over time{' '}
           <Link to={`/dashboard/assets/${hostnameId}`} className="text-cyan-700 dark:text-cyan-400 hover:underline">{hostname}</Link>
         </span>
-        {latest && <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">Last {data.length} checks</span>}
+        {latest && <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{data.length === 1 ? 'First check' : `Last ${data.length} checks`}</span>}
       </figcaption>
 
       {loading ? (
@@ -72,7 +80,7 @@ export default function HistoryChart({ hostnameId, hostname }) {
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={dark ? '#334155' : '#e2e8f0'} />
-                <XAxis dataKey="date" tickFormatter={formatTick} tick={{ fontSize: 11 }} stroke={dark ? '#64748b' : '#94a3b8'} minTickGap={24} />
+                <XAxis dataKey="date" tickFormatter={tickFormatter(data)} tick={{ fontSize: 11 }} stroke={dark ? '#64748b' : '#94a3b8'} minTickGap={24} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke={dark ? '#64748b' : '#94a3b8'} />
                 <Tooltip
                   labelFormatter={formatFull}

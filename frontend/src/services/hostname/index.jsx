@@ -21,9 +21,10 @@ const HostnameService = () => {
     }
   };
 
-  const listHostname = async () => {
+  // includeResult=false returns only the compact `health` summary per asset.
+  const listHostname = async (includeResult = true) => {
     try {
-      const response = await axios.get('/api/hostname/list/', {
+      const response = await axios.get(`/api/hostname/list/${includeResult ? '' : '?include_result=false'}`, {
         headers: { 'Accept': 'application/json' },
       });
       return response.data;
@@ -90,7 +91,28 @@ const HostnameService = () => {
     return response.data;
   };
 
+  // action: recheck | delete | enable_monitoring | disable_monitoring | enable_alerts | disable_alerts
+  const bulkAction = async (ids, action) => {
+    const response = await axios.post('/api/hostname/bulk-action/', { ids, action }, {
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    });
+    return response.data;
+  };
+
+  const getCheck = async (id, checkId) => {
+    const response = await axios.get(`/api/hostname/${id}/checks/${checkId}`);
+    return response.data;
+  };
+
+  const getHistory = async (id, limit = 100) => {
+    const response = await axios.get(`/api/hostname/${id}/history/?limit=${limit}`);
+    return response.data;
+  };
+
   return {
+    bulkAction,
+    getCheck,
+    getHistory,
     createHostname,
     getHostname,
     updateHostname,

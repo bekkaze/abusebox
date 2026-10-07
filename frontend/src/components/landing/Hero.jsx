@@ -105,7 +105,7 @@ const Hero = () => {
 
         {report ? (
           <div className='mt-10 rounded-2xl border border-white/10 bg-slate-900/70 backdrop-blur-md p-5'>
-            <h3 className='text-lg font-semibold text-slate-100'>Blacklist Report: <span className='text-cyan-300'>{checkedTarget}</span></h3>
+            <h3 className='text-lg font-semibold text-slate-100'>Blacklist report: <span className='text-cyan-300'>{checkedTarget}</span></h3>
             {/* The hero is always dark, so scope Tailwind's dark variants to the report. */}
             <div className='dark mt-4 rounded-xl border border-slate-700 bg-slate-950/60 p-4'>
               <ResultTableQuick data={report} />

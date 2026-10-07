@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { HiOutlineLogout, HiMoon, HiSun, HiMenu } from 'react-icons/hi';
+import { HiOutlineLogout, HiMoon, HiSun, HiMenu, HiSearch } from 'react-icons/hi';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../services/auth/authProvider';
 import { useTheme } from '../../services/theme/themeProvider';
@@ -31,7 +31,9 @@ const STATUS_STYLES = {
   checking: { label: 'Checking API', dot: 'bg-slate-400', box: 'text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600' },
 };
 
-export default function Header({ onMenuToggle }) {
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+export default function Header({ onMenuToggle, onSearch }) {
   const navigate = useNavigate();
   const { setToken } = useAuth();
   const { dark, toggleTheme } = useTheme();
@@ -54,6 +56,17 @@ export default function Header({ onMenuToggle }) {
         </div>
       </div>
       <div className='flex items-center gap-2 sm:gap-3'>
+        <button
+          type='button'
+          onClick={onSearch}
+          className='inline-flex items-center gap-2 h-10 rounded-lg border border-slate-300 dark:border-slate-600 px-3 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors'
+          aria-label='Search assets and pages'
+          aria-keyshortcuts={isMac ? 'Meta+K' : 'Control+K'}
+        >
+          <HiSearch aria-hidden='true' />
+          <span className='hidden lg:inline'>Search</span>
+          <kbd className='hidden lg:inline rounded border border-slate-300 dark:border-slate-600 px-1.5 text-[11px] font-sans font-semibold'>{isMac ? '⌘K' : 'Ctrl K'}</kbd>
+        </button>
         <div role='status' className={`hidden md:flex items-center gap-2 border rounded-full px-3 py-1.5 text-xs font-semibold ${apiStatus.box}`}>
           <span className={`h-2 w-2 rounded-full ${apiStatus.dot}`} aria-hidden='true' /> {apiStatus.label}
         </div>

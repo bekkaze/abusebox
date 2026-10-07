@@ -154,7 +154,7 @@ const csvCell = (value) => {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
-const downloadCsv = (rows, filename) => {
+export const downloadCsv = (rows, filename) => {
   const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');

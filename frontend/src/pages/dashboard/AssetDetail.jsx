@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import {
-  HiArrowLeft, HiDocumentReport, HiGlobe, HiLockClosed, HiMail, HiPencil, HiRefresh,
+  HiArrowLeft, HiClock, HiCollection, HiDocumentReport, HiGlobe, HiLockClosed, HiMail, HiPencil, HiRefresh,
   HiServer, HiShieldCheck, HiShieldExclamation, HiStatusOnline,
 } from 'react-icons/hi';
 import HistoryChart from '../../components/dashboard/home/HistoryChart';
@@ -13,8 +13,12 @@ import { DetailSkeleton } from '../../components/shared/Skeleton';
 import CopyButton from '../../components/shared/CopyButton';
 import TimeAgo from '../../components/shared/TimeAgo';
 import { Alert, InfoTile, Spinner, cardClass, primaryButtonClass, secondaryButtonClass } from '../../components/shared/ui';
+import { blacklistDiff, checksRun } from './assetHistory';
 import HostnameService from '../../services/hostname';
 import WhoisTable from '../../components/shared/WhoisTable';
+import { EventList, IssueRow } from '../../components/shared/activity';
+import ProviderStatusBadge from '../../components/blacklist/ProviderStatusBadge';
+import { listAssetEvents } from '../../services/events';
 
 const CHECK_TABS = {
   blacklist: { label: 'Blacklist', icon: HiShieldExclamation },
@@ -25,7 +29,11 @@ const CHECK_TABS = {
   email_security: { label: 'SPF / DKIM / DMARC', icon: HiMail },
   server_status: { label: 'Server status', icon: HiStatusOnline },
   dmarc_reports: { label: 'DMARC reports', icon: HiDocumentReport },
+  activity: { label: 'Activity', icon: HiClock },
+  history: { label: 'History', icon: HiCollection },
 };
+
+const EXTRA_TABS = ['dmarc_reports', 'activity', 'history'];
 
 const CHECK_BADGES = [
   ['check_blacklist', 'BL'],
@@ -91,8 +99,10 @@ export default function AssetDetail() {
   const results = splitResult(asset?.result);
   const checkId = asset?.result?.id;
   const tabs = [
-    ...Object.keys(CHECK_TABS).filter((key) => key !== 'dmarc_reports' && key in results),
+    ...Object.keys(CHECK_TABS).filter((key) => !EXTRA_TABS.includes(key) && key in results),
     ...(asset?.hostname_type === 'domain' ? ['dmarc_reports'] : []),
+    'activity',
+    'history',
   ];
   const currentTab = tabs.includes(activeTab) ? activeTab : tabs[0];
 
@@ -146,6 +156,8 @@ export default function AssetDetail() {
   }
 
   const enabledChecks = CHECK_BADGES.filter(([key]) => asset[key]).map(([, label]) => label);
+  // The blacklist status already has its own summary card and table.
+  const issues = (asset.health?.issues || []).filter((issue) => issue.kind !== 'blacklist');
   const blacklist = results.blacklist;
   const inconclusive = Boolean(blacklist?.is_inconclusive);
   const statusCard = !blacklist
@@ -214,6 +226,15 @@ export default function AssetDetail() {
         <SummaryCard label="Alerts" value={asset.is_alert_enabled ? 'On' : 'Off'} tone={asset.is_alert_enabled ? 'amber' : 'slate'} />
       </div>
 
+      {issues.length > 0 && (
+        <section className={`${cardClass} p-5`} aria-labelledby="asset-issues-title">
+          <h2 id="asset-issues-title" className="text-base font-semibold text-slate-900 dark:text-white">Needs attention</h2>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+            {issues.map((issue) => <IssueRow key={`${issue.kind}-${issue.message}`} issue={issue} />)}
+          </ul>
+        </section>
+      )}
+
       {inconclusive && (
         <Alert tone="warning">
           {blacklist.failed_providers?.length} providers did not answer during the last check, so the clean result is not reliable.
@@ -221,7 +242,9 @@ export default function AssetDetail() {
         </Alert>
       )}
 
-      <HistoryChart key={historyKey} hostnameId={asset.id} hostname={asset.hostname} />
+      {(asset.check_blacklist || results.blacklist) && (
+        <HistoryChart key={historyKey} hostnameId={asset.id} hostname={asset.hostname} />
+      )}
 
       {/* Tabbed results */}
       {tabs.length > 0 ? (
@@ -234,6 +257,8 @@ export default function AssetDetail() {
           {currentTab === 'email_security' && <EmailSecurityPanel data={results.email_security} />}
           {currentTab === 'server_status' && <ServerStatusPanel data={results.server_status} />}
           {currentTab === 'dmarc_reports' && <DmarcReportsPanel summary={dmarcSummary} />}
+          {currentTab === 'activity' && <ActivityPanel hostnameId={asset.id} refreshKey={historyKey} />}
+          {currentTab === 'history' && <HistoryPanel hostnameId={asset.id} refreshKey={historyKey} />}
         </ResultTabs>
       ) : (
         <div className={`${cardClass} p-8 text-center`}>
@@ -585,3 +610,140 @@ function DmarcReportsPanel({ summary }) {
   );
 }
 
+
+/* ---------- Activity & history ---------- */
+function ProviderList({ rows }) {
+  return (
+    <ul className="rounded-lg border border-slate-200 dark:border-slate-600 divide-y divide-slate-100 dark:divide-slate-700">
+      {rows.map(([provider, change]) => (
+        <li key={`${provider}-${change}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+          <span className="font-medium text-slate-800 dark:text-slate-200 break-all">{provider}</span>
+          <span className="flex items-center gap-2">
+            {change === 'new' && <span className="text-xs font-semibold text-rose-700 dark:text-rose-300">New</span>}
+            {change === 'removed' && <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Removed</span>}
+            <ProviderStatusBadge status={change === 'removed' ? 'clear' : 'listed'} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ActivityPanel({ hostnameId, refreshKey }) {
+  const [events, setEvents] = useState(null);
+  useEffect(() => {
+    let active = true;
+    listAssetEvents(hostnameId, 100).then((data) => active && setEvents(data)).catch(() => active && setEvents([]));
+    return () => { active = false; };
+  }, [hostnameId, refreshKey]);
+  if (events === null) return <div className="flex justify-center py-8" aria-busy="true"><Spinner className="h-5 w-5 text-cyan-600" /></div>;
+  return <EventList events={events} showHostname={false} emptyText="No changes recorded for this asset yet." />;
+}
+
+function HistoryPanel({ hostnameId, refreshKey }) {
+  const [checks, setChecks] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    HostnameService().getHistory(hostnameId, 100)
+      .then((data) => {
+        if (!active) return;
+        const list = [...(data.history || [])].reverse();
+        setChecks(list);
+        setSelectedId((current) => current ?? list[0]?.id ?? null);
+      })
+      .catch(() => active && setChecks([]));
+    return () => { active = false; };
+  }, [hostnameId, refreshKey]);
+
+  useEffect(() => {
+    if (!selectedId) return undefined;
+    let active = true;
+    setLoadingDetail(true);
+    const service = HostnameService();
+    service.getCheck(hostnameId, selectedId)
+      .then(async (current) => {
+        const previous = current.previous_id ? await service.getCheck(hostnameId, current.previous_id).catch(() => null) : null;
+        if (active) setDetail({ current, previous });
+      })
+      .catch(() => active && setDetail(null))
+      .finally(() => active && setLoadingDetail(false));
+    return () => { active = false; };
+  }, [hostnameId, selectedId]);
+
+  if (checks === null) return <div className="flex justify-center py-8" aria-busy="true"><Spinner className="h-5 w-5 text-cyan-600" /></div>;
+  if (checks.length === 0) return <p className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center">No checks have run yet.</p>;
+
+  const diff = detail ? blacklistDiff(detail.previous?.result, detail.current.result) : null;
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div>
+        <h3 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Checks (newest first)</h3>
+        <ul className="max-h-[28rem] overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-600 divide-y divide-slate-100 dark:divide-slate-700" aria-label="Past checks">
+          {checks.map((check) => (
+            <li key={check.id}>
+              <button
+                type="button"
+                aria-current={check.id === selectedId ? 'true' : undefined}
+                onClick={() => setSelectedId(check.id)}
+                className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${check.id === selectedId ? 'bg-cyan-50 dark:bg-cyan-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}
+              >
+                <span className="block font-medium text-slate-800 dark:text-slate-100">{new Date(check.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                <span className={`text-xs ${check.detected_count ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                  {check.total_providers ? (check.detected_count ? `Listed on ${check.detected_count}` : 'Not listed') : 'No blacklist check'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div aria-live="polite">
+        {loadingDetail || !detail ? (
+          <div className="flex justify-center py-8" aria-busy="true"><Spinner className="h-5 w-5 text-cyan-600" /></div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                Check from {new Date(detail.current.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Ran: {checksRun(detail.current.result).join(', ') || 'nothing'}</p>
+            </div>
+            {!diff ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">The blacklist check didn&apos;t run or failed in this check.</p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  {!detail.previous
+                    ? 'First check for this asset: '
+                    : diff.added.length || diff.removed.length ? 'Changes since the check before it: ' : 'No change since the check before it: '}
+                  <span className="font-medium">listed on {diff.listed.length} of {diff.total}</span>
+                  {diff.added.length > 0 && <span className="text-rose-700 dark:text-rose-400">, {diff.added.length} new</span>}
+                  {diff.removed.length > 0 && <span className="text-emerald-700 dark:text-emerald-400">, {diff.removed.length} removed</span>}.
+                </p>
+                {(detail.previous ? [...diff.added, ...diff.removed] : diff.listed).length > 0 && (
+                  <ProviderList rows={[
+                    ...(detail.previous ? diff.added : diff.listed).map((p) => [p, detail.previous ? 'new' : 'listed']),
+                    ...diff.removed.map((p) => [p, 'removed']),
+                  ]} />
+                )}
+                {detail.previous && diff.kept.length > 0 && (
+                  <details>
+                    <summary className="text-sm font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline">
+                      Still listed on {diff.kept.length} provider{diff.kept.length === 1 ? '' : 's'}
+                    </summary>
+                    <div className="mt-2"><ProviderList rows={diff.kept.map((p) => [p, 'listed'])} /></div>
+                  </details>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

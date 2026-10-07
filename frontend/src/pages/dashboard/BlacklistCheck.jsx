@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { HiDownload, HiShieldCheck } from 'react-icons/hi';
 import { checkBlacklist } from '../../services/blacklist/checkService';
 import { downloadBlacklistCsv } from '../../services/tools';
@@ -6,14 +7,16 @@ import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
 import { EmptyState, LookupForm, cardClass, secondaryButtonClass } from '../../components/shared/ui';
 
 export default function BlacklistCheck() {
-  const [hostname, setHostname] = useState('');
+  const [searchParams] = useSearchParams();
+  const [hostname, setHostname] = useState(searchParams.get('hostname') || '');
   const [checked, setChecked] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
-  const handleCheck = async () => {
-    const target = hostname.trim();
+  const handleCheck = async (value = hostname) => {
+    const target = value.trim();
+    if (!target) return;
     setLoading(true);
     setError('');
     try {
@@ -27,6 +30,18 @@ export default function BlacklistCheck() {
     }
   };
 
+  // Run straight away when opened with ?hostname= (e.g. from the command palette).
+  const requested = searchParams.get('hostname');
+  const lastRun = useRef(null);
+  useEffect(() => {
+    if (requested && lastRun.current !== requested) {
+      lastRun.current = requested;
+      setHostname(requested);
+      handleCheck(requested);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requested]);
+
   return (
     <section className="space-y-5">
       <div className={`${cardClass} p-5`}>
@@ -36,7 +51,7 @@ export default function BlacklistCheck() {
           label="IPv4 address or domain"
           value={hostname}
           onChange={setHostname}
-          onSubmit={handleCheck}
+          onSubmit={() => handleCheck()}
           placeholder="203.0.113.10 or mail.example.com"
           loading={loading}
           buttonLabel="Run check"
