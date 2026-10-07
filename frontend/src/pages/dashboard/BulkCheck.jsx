@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { bulkCheck, bulkCheckFile } from '../../services/tools';
 
 export default function BulkCheck() {
@@ -52,7 +52,9 @@ export default function BulkCheck() {
         <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Check up to 300 IPs or domains. Paste a list or upload TXT, CSV, or Excel (.xlsx).</p>
       </div>
 
+      <label htmlFor="bulk-check-input" className="block text-sm font-medium text-slate-700 dark:text-slate-300 -mb-3">Targets, one per line or comma-separated</label>
       <textarea
+        id="bulk-check-input"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder={"example.com\n8.8.8.8\n1.1.1.1"}
@@ -60,7 +62,7 @@ export default function BulkCheck() {
         className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none font-mono text-sm dark:bg-slate-700 dark:text-white"
       />
 
-      <label className="inline-flex text-sm font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer">Upload TXT, CSV, or Excel<input type="file" accept=".txt,.csv,.xlsx" onChange={handleFile} disabled={loading} className="hidden" /></label>
+      <label className="inline-flex text-sm font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline focus-within:ring-2 focus-within:ring-cyan-500 rounded">Upload TXT, CSV, or Excel<input type="file" accept=".txt,.csv,.xlsx" onChange={handleFile} disabled={loading} className="sr-only" /></label>
 
       <div className="flex items-center gap-3">
         <button

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Typed from 'react-typed';
 import { HiSparkles, HiStatusOnline, HiLightningBolt } from 'react-icons/hi';
 import { checkBlacklist } from '../../services/blacklist/checkService';
@@ -51,24 +51,31 @@ const Hero = () => {
               AbuseBox continuously checks DNSBL providers and gives operators a clear, actionable view of blacklist status.
             </p>
 
-            <div className='mt-8 flex flex-col sm:flex-row gap-3'>
+            <form
+              className='mt-8 flex flex-col sm:flex-row gap-3'
+              onSubmit={(e) => { e.preventDefault(); handleCheck(); }}
+            >
+              <label htmlFor='hero-target' className='sr-only'>Domain or IPv4 address to check</label>
               <input
+                id='hero-target'
                 className='w-full rounded-xl bg-white/95 text-slate-900 px-4 py-3.5 outline-none ring-2 ring-transparent focus:ring-cyan-400'
                 type='text'
+                autoComplete='off'
+                autoCapitalize='off'
+                spellCheck='false'
                 placeholder='example.com or 8.8.8.8'
                 value={hostname}
                 onChange={(e) => setHostname(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
               />
               <button
-                className='rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-semibold px-6 py-3.5 hover:opacity-90 disabled:opacity-50 transition-opacity'
-                onClick={handleCheck}
+                type='submit'
+                className='rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-semibold px-6 py-3.5 hover:opacity-90 active:translate-y-px disabled:opacity-50 transition whitespace-nowrap'
                 disabled={!hostname.trim() || loading}
               >
-                {loading ? 'Checking...' : 'Run Quick Check'}
+                {loading ? 'Checking…' : 'Run quick check'}
               </button>
-            </div>
-            {error ? <p className='mt-3 text-sm text-rose-300'>{error}</p> : null}
+            </form>
+            {error ? <p role='alert' className='mt-3 text-sm text-rose-300'>{error}</p> : null}
           </div>
 
           <div className='rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-md p-6 shadow-2xl shadow-black/30'>
@@ -89,8 +96,8 @@ const Hero = () => {
                 </div>
               </div>
               <div className='rounded-xl border border-slate-700 bg-slate-950/60 p-4'>
-                <p className='text-xs text-slate-400'>Tip</p>
-                <p className='mt-1 text-sm text-slate-200'>Use <span className='text-cyan-300 font-semibold'>admin / password123</span> to access the dashboard quickly in local environments.</p>
+                <p className='text-xs text-slate-400'>Self-hosted</p>
+                <p className='mt-1 text-sm text-slate-200'>Runs on your own server. Monitored assets, check history and API keys never leave it.</p>
               </div>
             </div>
           </div>
@@ -99,7 +106,8 @@ const Hero = () => {
         {report ? (
           <div className='mt-10 rounded-2xl border border-white/10 bg-slate-900/70 backdrop-blur-md p-5'>
             <h3 className='text-lg font-semibold text-slate-100'>Blacklist Report: <span className='text-cyan-300'>{checkedTarget}</span></h3>
-            <div className='mt-4 overflow-hidden rounded-xl border border-slate-700 bg-slate-950/60'>
+            {/* The hero is always dark, so scope Tailwind's dark variants to the report. */}
+            <div className='dark mt-4 rounded-xl border border-slate-700 bg-slate-950/60 p-4'>
               <ResultTableQuick data={report} />
             </div>
           </div>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { checkSsl } from '../../services/tools';
+import { LookupForm } from '../../components/shared/ui';
 
 export default function SslChecker() {
   const [hostname, setHostname] = useState('');
@@ -38,29 +39,22 @@ export default function SslChecker() {
     <section className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
       <div>
         <p className="text-sm text-slate-500 dark:text-slate-400">Tools</p>
-        <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">SSL Certificate Checker</h2>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">SSL Certificate Checker</h1>
         <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Check certificate validity, expiry date, issuer, and cipher details.</p>
       </div>
 
-      <div className="flex gap-3">
-        <input
-          type="text"
-          value={hostname}
-          onChange={(e) => setHostname(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
-          placeholder="example.com"
-          className="flex-1 p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white"
-        />
-        <button
-          onClick={handleCheck}
-          disabled={loading || !hostname.trim()}
-          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {loading ? 'Checking...' : 'Check SSL'}
-        </button>
-      </div>
+      <LookupForm
+        label="Hostname"
+        value={hostname}
+        onChange={setHostname}
+        onSubmit={handleCheck}
+        placeholder="example.com"
+        loading={loading}
+        buttonLabel="Check SSL"
+        loadingLabel="Checking"
+        error={error}
+      />
 
-      {error && <div className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl p-4 text-sm text-rose-700 dark:text-rose-300">{error}</div>}
 
       {data && (
         <div className="space-y-4">

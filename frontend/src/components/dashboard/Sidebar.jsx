@@ -1,4 +1,4 @@
-import React from 'react'
+import { useEffect } from 'react'
 import { DASHBOARD_SIDEBAR_BOTTOM_LINKS, DASHBOARD_SIDEBAR_SECTIONS } from './constants'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { HiOutlineLogout, HiX } from 'react-icons/hi'
@@ -17,6 +17,14 @@ export default function Sidebar({ open, onClose }) {
     navigate('/', { replace: true });
   }
 
+  // Escape closes the mobile drawer.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   return (
     <>
       {/* Mobile overlay */}
@@ -24,10 +32,11 @@ export default function Sidebar({ open, onClose }) {
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onClose}
+          aria-hidden="true"
         />
       )}
 
-      <aside className={classNames(
+      <aside aria-label='Main navigation' className={classNames(
         'bg-slate-900 w-64 p-4 flex flex-col text-white border-r border-slate-800 overflow-y-auto',
         'fixed inset-y-0 left-0 z-50 lg:static lg:z-auto',
         'transition-transform duration-200 ease-in-out',
@@ -42,10 +51,12 @@ export default function Sidebar({ open, onClose }) {
             </div>
           </div>
           <button
+            type='button'
             onClick={onClose}
             className='lg:hidden p-2 rounded-lg hover:bg-slate-800 text-slate-400'
+            aria-label='Close navigation'
           >
-            <HiX className='text-lg' />
+            <HiX className='text-lg' aria-hidden='true' />
           </button>
         </div>
 
@@ -68,12 +79,13 @@ export default function Sidebar({ open, onClose }) {
           {DASHBOARD_SIDEBAR_BOTTOM_LINKS.map(item => (
             <SidebarLink key={item.key} item={item} onClose={onClose}/>
           ))}
-          <div
-            className={classNames('text-rose-400 cursor-pointer', linkClass)}
+          <button
+            type='button'
+            className={classNames('text-rose-400 w-full text-left', linkClass)}
             onClick={handleLogout}>
-            <span className='text-xl'><HiOutlineLogout /></span>
-            Logout
-          </div>
+            <span className='text-xl' aria-hidden='true'><HiOutlineLogout /></span>
+            Sign out
+          </button>
         </div>
       </aside>
     </>
@@ -83,8 +95,9 @@ export default function Sidebar({ open, onClose }) {
 function SidebarLink({ item, onClose }) {
   const { pathname } = useLocation()
   const isExternal = item.path.startsWith('http') || item.path.includes('/swagger/')
+  const isActive = !isExternal && (pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(`${item.path}/`)))
   const classes = classNames(
-    !isExternal && pathname === item.path ? 'bg-slate-800 text-white' : 'text-slate-300',
+    isActive ? 'bg-slate-800 text-white' : 'text-slate-300',
     linkClass
   )
 
@@ -98,8 +111,8 @@ function SidebarLink({ item, onClose }) {
   }
 
   return (
-    <Link to={item.path} className={classes} onClick={onClose}>
-      <span className='text-lg'>{item.icon}</span>
+    <Link to={item.path} className={classes} onClick={onClose} aria-current={isActive ? 'page' : undefined}>
+      <span className='text-lg' aria-hidden='true'>{item.icon}</span>
       {item.label}
     </Link>
   )

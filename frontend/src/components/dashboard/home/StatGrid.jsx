@@ -1,4 +1,3 @@
-import React from "react";
 import { IoBagHandle } from "react-icons/io5";
 
 const StatGrid = ({ title, bodyText, icon = <IoBagHandle />, tone = "sky" }) => {
@@ -13,12 +12,12 @@ const StatGrid = ({ title, bodyText, icon = <IoBagHandle />, tone = "sky" }) => 
     <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 flex items-center shadow-sm">
       <div className="flex items-center">
         <div className={`rounded-xl h-12 w-12 flex items-center justify-center bg-gradient-to-br ${toneClass}`}>
-          <span className="text-2xl text-white">{icon}</span>
+          <span className="text-2xl text-white" aria-hidden="true">{icon}</span>
         </div>
         <div className="pl-4">
           <span className="text-sm text-slate-500 dark:text-slate-400">{title}</span>
           <div className="flex items-center">
-            <strong className="text-2xl text-slate-900 dark:text-white font-semibold">{bodyText}</strong>
+            <strong className="text-2xl text-slate-900 dark:text-white font-semibold tabular-nums">{bodyText}</strong>
           </div>
         </div>
       </div>

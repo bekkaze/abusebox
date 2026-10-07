@@ -19,8 +19,10 @@ Create `.env` from `.env.example`:
 cp .env.example .env
 ```
 
-Required variable:
+Requires Node.js 20.19 or newer.
 
-- `VITE_BASE_URL=http://localhost:8000`
+Variables:
 
-The Vite dev server proxies `/api/*` requests to this backend URL.
+- `VITE_BASE_URL=http://localhost:8100` (required): the Vite dev server proxies `/api/*` requests to this backend URL.
+- `VITE_ALLOWED_HOSTS=localhost,127.0.0.1`: hostnames the dev server answers to. Add your server's domain or IP to reach it from another machine.
+- `VITE_API_DOCS_URL`: link target for "API Docs" in the sidebar (default `http://localhost:8100/swagger/`).

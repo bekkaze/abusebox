@@ -32,6 +32,9 @@ export default ({ mode }) => {
           target: process.env.VITE_BASE_URL,
           secure: false,
           changeOrigin: true,
+          // Pass the browser's IP so the API can rate-limit per client
+          // instead of treating every user as the frontend container.
+          xfwd: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { checkEmailSecurity } from '../../services/tools';
 
 const GRADE_COLORS = {
@@ -39,7 +39,9 @@ export default function EmailSecurity() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
+        <label htmlFor="email-security-domain" className="sr-only">Domain</label>
         <input
+          id="email-security-domain"
           type="text"
           value={hostname}
           onChange={(e) => setHostname(e.target.value)}
@@ -47,7 +49,9 @@ export default function EmailSecurity() {
           placeholder="example.com"
           className="flex-1 p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white"
         />
+        <label htmlFor="email-security-selectors" className="sr-only">DKIM selectors (optional, comma-separated)</label>
         <input
+          id="email-security-selectors"
           type="text"
           value={dkimSelectors}
           onChange={(e) => setDkimSelectors(e.target.value)}

@@ -1,117 +1,98 @@
-import React, { useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import FormFieldRender from './FormFieldRender';
+import { HiExternalLink } from 'react-icons/hi';
+import { toast } from 'react-toastify';
 import DelistService from '../../../services/blacklist/delist';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { useNavigate } from "react-router-dom";
+import { hasOfficialRemovalPage, removalPageFor } from './constant';
+import { inputClass, primaryButtonClass, secondaryButtonClass, Spinner } from '../../shared/ui';
 
-const DelistModal = ({ isOpen, onClose, provider, data, fields }) => {
-  const [formData, setFormData] = useState({});
-  const delistService = DelistService();
+const DelistModal = ({ isOpen, onClose, provider, target, checkId, onRecorded }) => {
+  const id = useId();
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const official = hasOfficialRemovalPage(provider);
 
-  const safeFields = Array.isArray(fields) ? fields : [];
-  const isUnsupportedProvider = safeFields.length === 0;
-  const unsupportedProviderMessage = `No automatic delist workflow is available for ${provider || 'this provider'}. Please check the blacklist provider manually.`;
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
-
-  const handleInputChange = (event) => {
-    setFormData({
-      ...formData,
-      [event.target.name]: event.target.value,
-    });
+  const close = () => {
+    if (saving) return;
+    setNote('');
+    onClose();
   };
-   
 
-  const handleSubmit = async () => {
-    
-    if (isUnsupportedProvider) {
-      if (typeof toast !== 'undefined' && toast.info) {
-        toast.info(unsupportedProviderMessage);
-      }
+  const markRequested = async () => {
+    if (!checkId) {
+      toast.error('Re-check this asset first, then try again.');
       return;
     }
-    setIsLoading(true);
-    const body = {
-      'provider': provider,
-      'delist_required_data': {
-        'id': data.id,
-        ...formData,
-      }
-    };
-    
+    setSaving(true);
     try {
-      const response = await delistService.delistRequest(body);
-
-      if (response.msg === 'success') {
-        toast.success('Delist request sent successfully');
-        navigate('/dashboard/blacklist-monitor/', { replace: true });
-      } else if (response.msg === 'Not implemented') {
-        toast.error(`Not implemented auto list feature on ${provider}`);
-      }
+      await DelistService().delistRequest({
+        provider,
+        delist_required_data: { id: checkId, comment: note.trim() },
+      });
+      toast.success(`Removal request for ${provider} recorded`);
+      setNote('');
+      onRecorded?.();
+      onClose();
     } catch (error) {
-      console.error('Error during delist request:', error);
-      toast.error('An error occurred while processing your request.');
+      toast.error(error.message || 'Could not record the request.');
     } finally {
-      setIsLoading(false);
+      setSaving(false);
     }
-    onClose(); 
   };
 
   return (
-    <div>
-      <Transition show={isOpen} as={React.Fragment}>
-        <Dialog
-          as="div"
-          className="fixed inset-0 z-10 overflow-y-auto"
-          onClose={onClose}
-        >
-          <div className="min-h-screen px-4 text-center">
-            <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
-            <div className="inline-block align-middle my-20 w-full max-w-md p-6 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-md">
-              <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
-                Delist Provider: {provider}
+    <Transition show={isOpen} as={Fragment}>
+      <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={close}>
+        <div className="min-h-screen px-4 text-center">
+          <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
+            <Dialog.Overlay className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" />
+          </Transition.Child>
+          <span className="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
+          <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 translate-y-4" enterTo="opacity-100 translate-y-0" leave="ease-in duration-150" leaveFrom="opacity-100 translate-y-0" leaveTo="opacity-0 translate-y-4">
+            <div className="inline-block w-full max-w-lg p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-slate-800 shadow-xl rounded-xl border border-slate-200 dark:border-slate-700">
+              <Dialog.Title as="h2" className="text-xl font-semibold text-slate-900 dark:text-white break-words">
+                Request removal from {provider}
               </Dialog.Title>
-              <div className="mt-4">
-                {isUnsupportedProvider && (
-                <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-                  {unsupportedProviderMessage}
-                </div>
-                )}
-                {safeFields.map((field, index) => (
-                  <FormFieldRender 
-                    key={index} 
-                    label={field.label} 
-                    name={field.name} 
-                    value={formData[field.name]}
-                    onChange={handleInputChange}
-                  />
-                ))}
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 break-all">Listed target: {target}</p>
+
+              <ol className="mt-5 space-y-3 text-sm text-slate-700 dark:text-slate-300 list-decimal pl-5">
+                <li>Fix what caused the listing first: a compromised mailbox, an open relay, or missing reverse DNS. Most lists re-add addresses that keep sending spam.</li>
+                <li>
+                  Submit the request on the provider&apos;s site.{' '}
+                  <a href={removalPageFor(provider)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-cyan-700 dark:text-cyan-400 hover:underline">
+                    {official ? 'Open removal page' : 'Search for the removal page'} <HiExternalLink aria-hidden="true" />
+                  </a>
+                </li>
+                <li>Mark it as requested here so the listing shows as in progress until the next check clears it.</li>
+              </ol>
+
+              <div className="mt-5">
+                <label htmlFor={`${id}-note`} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  Note <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <input
+                  id={`${id}-note`}
+                  type="text"
+                  maxLength={500}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Ticket number or what was fixed"
+                  className={inputClass}
+                />
               </div>
 
-              <div className="mt-4 flex justify-between">
-                <button
-                  onClick={handleSubmit}
-                  className={`py-2 px-4 rounded ${isLoading ? 'opacity-50 cursor-not-allowed' : 'inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500'}`}
-                  disabled={isLoading || isUnsupportedProvider}
-                  >
-                  {isLoading ? 'Loading...' : 'Send delist request'}
-                </button>
-                <button
-                  onClick={onClose}
-                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-md hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
-                >
-                  Close
+              <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <button type="button" onClick={close} disabled={saving} className={secondaryButtonClass}>Cancel</button>
+                <button type="button" onClick={markRequested} disabled={saving} className={primaryButtonClass}>
+                  {saving && <Spinner />}
+                  {saving ? 'Saving' : 'Mark as requested'}
                 </button>
               </div>
             </div>
-          </div>
-        </Dialog>
-      </Transition>
-
-      <ToastContainer position="top-center" autoClose={5000} />
-    </div>
+          </Transition.Child>
+        </div>
+      </Dialog>
+    </Transition>
   );
 };
 

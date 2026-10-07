@@ -1,6 +1,9 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
-import { HiOutlinePlusCircle, HiShieldCheck, HiShieldExclamation, HiExternalLink, HiTrash, HiSearch, HiCloudUpload } from 'react-icons/hi';
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  HiCollection, HiOutlinePlusCircle, HiSearch, HiShieldCheck, HiShieldExclamation, HiTrash, HiViewGridAdd,
+} from "react-icons/hi";
+import { toast } from "react-toastify";
 import HostnameService from "../../services/hostname";
 import { useAuth } from "../../services/auth/authProvider";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
@@ -9,8 +12,7 @@ import BulkMonitorDialog from "../../components/dashboard/blacklistMonitor/BulkM
 import { AssetCardSkeleton } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Alert, EmptyState, PageHeader, cardClass, primaryButtonClass, secondaryButtonClass } from "../../components/shared/ui";
 
 const CHECK_BADGE_MAP = {
   check_blacklist: 'BL',
@@ -27,7 +29,7 @@ const initialFormData = {
   hostname: "",
   description: "",
   is_alert_enabled: false,
-  is_monitor_enabled: false,
+  is_monitor_enabled: true,
   check_blacklist: true,
   check_abuseipdb: false,
   check_dns: false,
@@ -38,20 +40,65 @@ const initialFormData = {
   check_interval_minutes: null,
 };
 
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'listed', label: 'Listed' },
+  { key: 'clean', label: 'Clean' },
+];
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+function importSummary(result, verb) {
+  const parts = [`${verb} ${plural(result.created, 'asset')}`];
+  if (result.skipped > 0) parts.push(`${result.skipped} already existed`);
+  return parts.join(', ');
+}
+
+/** Blacklist summary line for an asset card. */
+function blacklistSummary(item) {
+  const bl = item.result?.blacklist || (item.result?.detected_on ? item.result : null);
+  if (!item.result) return { text: 'Not checked yet', className: 'text-slate-500 dark:text-slate-400' };
+  if (!bl) return { text: 'Checked', className: 'text-slate-600 dark:text-slate-300' };
+  const detected = bl.detected_on?.length ?? 0;
+  const total = bl.providers?.length ?? 0;
+  if (detected > 0) return { text: `Listed on ${detected} of ${total}`, className: 'text-rose-700 dark:text-rose-400' };
+  if (bl.is_inconclusive) return { text: `Inconclusive: ${bl.failed_providers?.length ?? 0} providers did not answer`, className: 'text-amber-700 dark:text-amber-400' };
+  const failed = bl.failed_providers?.length ?? 0;
+  return { text: failed ? `Clear on ${total - failed} of ${total} providers` : `Clear on ${total} providers`, className: 'text-emerald-700 dark:text-emerald-400' };
+}
+
 export default function Assets() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [cidrModalOpen, setCidrModalOpen] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all"); // all | clean | listed
-  const navigate = useNavigate();
+  const [filterStatus, setFilterStatus] = useState("all");
   const { token } = useAuth();
   const [formData, setFormData] = useState({ ...initialFormData });
+  const [assets, setAssets] = useState([]);
   const hostnameService = HostnameService();
-  const [hostnameListData, setHostnameListData] = useState([]);
+
+  const fetchAssets = useCallback(async ({ quiet = false } = {}) => {
+    // Background refreshes keep the current cards on screen instead of
+    // flashing skeletons.
+    if (quiet) setRefreshing(true); else setIsLoading(true);
+    setErrorMessage("");
+    try {
+      setAssets(await HostnameService().listHostname());
+    } catch {
+      setErrorMessage("Could not load assets. Check your connection and try again.");
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { if (token) fetchAssets(); }, [token, fetchAssets]);
+  const refresh = useCallback(() => fetchAssets({ quiet: true }), [fetchAssets]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -61,62 +108,39 @@ export default function Assets() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const result = await hostnameService.createHostname(formData);
-      if (result.status === 'active') {
-        toast.success(`Added ${formData.hostname}`);
-        setFormData({ ...initialFormData });
-        setAddModalOpen(false);
-        fetchHostnameList();
-      }
-    } catch {
-      toast.error("Failed to create asset. Please try again.");
+      await hostnameService.createHostname({ ...formData, hostname: formData.hostname.trim(), description: formData.description || null });
+      toast.success(`Added ${formData.hostname.trim()}`);
+      setFormData({ ...initialFormData });
+      setAddModalOpen(false);
+      refresh();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Could not add the asset. Try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const fetchHostnameList = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage("");
+  const handleDelete = async (id, hostname) => {
+    if (!window.confirm(`Delete ${hostname} and its check history?`)) return;
     try {
-      const listData = await hostnameService.listHostname();
-      setHostnameListData(listData);
+      await hostnameService.deleteHostname(id);
+      toast.success(`Deleted ${hostname}`);
+      setAssets((prev) => prev.filter((item) => item.id !== id));
     } catch {
-      setErrorMessage("Failed to retrieve assets.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => { if (token) fetchHostnameList(); }, [token, fetchHostnameList]);
-
-  const handleDelete = async (e, id, hostname) => {
-    e.stopPropagation();
-    if (!window.confirm(`Delete "${hostname}"?`)) return;
-    try {
-      const result = await hostnameService.deleteHostname(id);
-      if (result.status === 204) {
-        toast.success(`Deleted ${hostname}`);
-        fetchHostnameList();
-      }
-    } catch {
-      toast.error('Failed to delete asset.');
+      toast.error('Could not delete the asset.');
     }
   };
 
   const handleCidrImport = async (cidrData) => {
     try {
       const result = await hostnameService.importCidr(cidrData);
-      toast.success(`Imported ${result.created} asset${result.created !== 1 ? 's' : ''}${result.skipped > 0 ? `, ${result.skipped} skipped (already exist)` : ''}`);
-      if (result.errors?.length > 0) {
-        toast.warn(`${result.errors.length} error(s) during import`);
-      }
+      toast.success(`${importSummary(result, 'Imported')}. They are checked on the next scheduler run.`);
+      if (result.errors?.length > 0) toast.warn(`${plural(result.errors.length, 'address')} could not be imported`);
       setCidrModalOpen(false);
-      fetchHostnameList();
+      refresh();
       return result;
     } catch (error) {
-      const detail = error.response?.data?.detail || "Failed to import CIDR range.";
-      toast.error(detail);
+      toast.error(error.response?.data?.detail || "Could not import the CIDR range.");
       throw error;
     }
   };
@@ -124,83 +148,76 @@ export default function Assets() {
   const handleBulkImport = async (hostnames) => {
     try {
       const result = await hostnameService.createBulk(hostnames);
-      toast.success(`Added ${result.created} asset${result.created !== 1 ? 's' : ''}${result.skipped > 0 ? `, ${result.skipped} skipped (already exist)` : ''}`);
-      if (result.errors?.length > 0) toast.warn(`${result.errors.length} target(s) could not be added`);
+      toast.success(`${importSummary(result, 'Added')}. They are checked on the next scheduler run.`);
+      if (result.errors?.length > 0) toast.warn(`${plural(result.errors.length, 'target')} could not be added`);
       setBulkModalOpen(false);
-      fetchHostnameList();
+      refresh();
       return result;
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to add the bulk monitoring list.');
+      toast.error(error.response?.data?.detail || 'Could not add the list.');
       throw error;
     }
   };
 
-  // Filter & search
-  const filtered = hostnameListData.filter((item) => {
-    const matchSearch = !search || item.hostname.toLowerCase().includes(search.toLowerCase()) || item.hostname_type.toLowerCase().includes(search.toLowerCase());
+  const query = search.trim().toLowerCase();
+  const filtered = assets.filter((item) => {
+    const matchSearch = !query
+      || item.hostname.toLowerCase().includes(query)
+      || item.hostname_type.toLowerCase().includes(query)
+      || (item.description || '').toLowerCase().includes(query);
     if (!matchSearch) return false;
     if (filterStatus === 'listed') return item.is_blacklisted;
     if (filterStatus === 'clean') return !item.is_blacklisted;
     return true;
   });
+  const listedCount = assets.filter((item) => item.is_blacklisted).length;
 
   return (
     <section className="space-y-5">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Monitor</p>
-          <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Assets</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {hostnameListData.length} asset{hostnameListData.length !== 1 ? 's' : ''} tracked
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <AutoRefresh onRefresh={fetchHostnameList} loading={isLoading} />
-          <button
-            className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 py-2.5 px-4 flex items-center gap-2 rounded-xl transition-colors font-medium text-sm"
-            onClick={() => setCidrModalOpen(true)}
-          >
-            <HiCloudUpload className="text-lg" /> CIDR Import
-          </button>
-          <button
-            className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 py-2.5 px-4 flex items-center gap-2 rounded-xl transition-colors font-medium text-sm"
-            onClick={() => setBulkModalOpen(true)}
-          >
-            <HiCloudUpload className="text-lg" /> Bulk List
-          </button>
-          <button
-            className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-5 flex items-center gap-2 rounded-xl transition-colors font-medium"
-            onClick={() => setAddModalOpen(true)}
-          >
-            <HiOutlinePlusCircle className="text-lg" /> Add Asset
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Monitor"
+        title="Assets"
+        description={assets.length
+          ? `${plural(assets.length, 'asset')} tracked${listedCount ? `, ${listedCount} currently listed` : ''}.`
+          : 'Domains and IPs you want checked on a schedule.'}
+        actions={(
+          <>
+            <AutoRefresh onRefresh={refresh} loading={refreshing || isLoading} />
+            <button type="button" className={secondaryButtonClass} onClick={() => setCidrModalOpen(true)}>
+              <HiViewGridAdd className="text-lg" aria-hidden="true" /> CIDR import
+            </button>
+            <button type="button" className={secondaryButtonClass} onClick={() => setBulkModalOpen(true)}>
+              <HiCollection className="text-lg" aria-hidden="true" /> Bulk list
+            </button>
+            <button type="button" className={primaryButtonClass} onClick={() => setAddModalOpen(true)}>
+              <HiOutlinePlusCircle className="text-lg" aria-hidden="true" /> Add asset
+            </button>
+          </>
+        )}
+      />
 
-      {/* Search & Filter */}
-      {hostnameListData.length > 0 && (
+      {assets.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <label htmlFor="asset-search" className="sr-only">Search assets</label>
+            <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input
-              type="text"
-              placeholder="Search assets..."
+              id="asset-search"
+              type="search"
+              placeholder="Search by hostname, type or description"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="w-full h-11 pl-9 pr-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
           </div>
-          <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700">
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'clean', label: 'Clean' },
-              { key: 'listed', label: 'Listed' },
-            ].map((f) => (
+          <div role="group" aria-label="Filter by status" className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
+            {FILTERS.map((f) => (
               <button
                 key={f.key}
+                type="button"
                 onClick={() => setFilterStatus(f.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterStatus === f.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                aria-pressed={filterStatus === f.key}
+                className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${filterStatus === f.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
               >
                 {f.label}
               </button>
@@ -209,104 +226,93 @@ export default function Assets() {
         </div>
       )}
 
-      {/* Content */}
       {isLoading ? (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading assets">
           {[...Array(6)].map((_, i) => <AssetCardSkeleton key={i} />)}
         </div>
       ) : errorMessage ? (
-        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl p-4 text-sm text-rose-700 dark:text-rose-300">{errorMessage}</div>
-      ) : hostnameListData.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-12 text-center shadow-sm">
-          <div className="text-slate-400 dark:text-slate-500 text-5xl mb-4">
-            <HiShieldCheck className="mx-auto" />
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 font-medium">No assets yet</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Add a domain or IP to start monitoring.</p>
-          <button
-            className="mt-4 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-5 rounded-xl text-sm font-medium transition-colors"
-            onClick={() => setAddModalOpen(true)}
+        <Alert tone="error">
+          {errorMessage}{' '}
+          <button type="button" className="font-medium underline" onClick={() => fetchAssets()}>Retry</button>
+        </Alert>
+      ) : assets.length === 0 ? (
+        <div className={cardClass}>
+          <EmptyState
+            icon={HiShieldCheck}
+            title="No assets yet"
+            action={<button type="button" className={primaryButtonClass} onClick={() => setAddModalOpen(true)}>Add your first asset</button>}
           >
-            Add Your First Asset
-          </button>
+            Add a mail server IP or a domain. AbuseBox checks it against 60 blacklists now, then again on a schedule, and alerts you when it gets listed.
+          </EmptyState>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center shadow-sm">
-          <HiSearch className="text-4xl text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-500 dark:text-slate-400 text-sm">No assets match your search.</p>
+        <div className={cardClass}>
+          <EmptyState icon={HiSearch} title="No matching assets">
+            Try a different search or filter.
+          </EmptyState>
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((item) => {
-            const bl = item.result?.blacklist || (item.result?.detected_on ? item.result : null);
-            const detectedCount = bl?.detected_on?.length ?? 0;
-            const totalProviders = bl?.providers?.length ?? 0;
-            const failedProviders = bl?.failed_providers?.length ?? 0;
-            const isInconclusive = Boolean(bl?.is_inconclusive);
+            const summary = blacklistSummary(item);
             const enabledChecks = Object.entries(CHECK_BADGE_MAP).filter(([key]) => item[key]).map(([, label]) => label);
-
             return (
-              <div
+              <li
                 key={item.id}
-                onClick={() => navigate(`/dashboard/assets/${item.id}`)}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-cyan-300 dark:hover:border-cyan-700 transition-all cursor-pointer group"
+                className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-cyan-300 dark:hover:border-cyan-700 focus-within:border-cyan-400 transition-all"
               >
-                {/* Top row */}
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${item.is_blacklisted ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400' : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'}`}>
-                      {item.is_blacklisted ? <HiShieldExclamation className="text-xl" /> : <HiShieldCheck className="text-xl" />}
+                      {item.is_blacklisted
+                        ? <HiShieldExclamation className="text-xl" role="img" aria-label="Listed" />
+                        : <HiShieldCheck className="text-xl" role="img" aria-label="Not listed" />}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-base font-semibold text-slate-900 dark:text-white truncate">{item.hostname}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-slate-400 dark:text-slate-500">{item.hostname_type}</span>
-                        <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${item.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-slate-100 text-slate-500'}`}>
-                          {item.status}
-                        </span>
+                      {/* The link's ::after covers the card so the whole card is clickable. */}
+                      <Link
+                        to={`/dashboard/assets/${item.id}`}
+                        className="block text-base font-semibold text-slate-900 dark:text-white truncate after:absolute after:inset-0 after:rounded-xl focus:outline-none"
+                        title={item.hostname}
+                      >
+                        {item.hostname}
+                      </Link>
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{item.hostname_type === 'ipv4' ? 'IPv4' : 'Domain'}</span>
+                        {item.is_monitor_enabled && <span aria-hidden="true">&middot;</span>}
+                        {item.is_monitor_enabled && <span>Monitored</span>}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => handleDelete(e, item.id, item.hostname)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors"
-                      title="Delete"
-                    >
-                      <HiTrash />
-                    </button>
-                    <HiExternalLink className="text-slate-400" />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item.id, item.hostname)}
+                    className="relative z-10 p-2 -m-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors"
+                    aria-label={`Delete ${item.hostname}`}
+                    title="Delete"
+                  >
+                    <HiTrash aria-hidden="true" />
+                  </button>
                 </div>
 
                 {item.description && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 truncate">{item.description}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 truncate" title={item.description}>{item.description}</p>
                 )}
 
-                {/* Blacklist status */}
-                <div className="mt-4">
-                  {!item.result ? (
-                    <p className="text-xs text-slate-400">Not checked yet</p>
-                  ) : (
-                    <span className={`text-sm font-semibold ${detectedCount > 0 ? 'text-rose-600 dark:text-rose-400' : isInconclusive ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      {detectedCount > 0 ? `Listed on ${detectedCount} of ${totalProviders}` : isInconclusive ? `Inconclusive — ${failedProviders} providers unavailable` : totalProviders > 0 ? `Clear on ${totalProviders} providers` : 'Checked'}
-                    </span>
-                  )}
-                </div>
+                <p className={`mt-4 text-sm font-semibold ${summary.className}`}>{summary.text}</p>
 
-                {/* Bottom row: badges + timestamp */}
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                  <div className="flex flex-wrap gap-1">
+                <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                  <div className="flex flex-wrap gap-1" aria-label="Enabled checks">
                     {enabledChecks.map((label) => (
-                      <span key={label} className="inline-flex rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 text-[10px] font-bold">{label}</span>
+                      <span key={label} className="inline-flex rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 text-[11px] font-semibold">{label}</span>
                     ))}
                   </div>
-                  <TimeAgo date={item.checked} className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0 ml-2" />
+                  <TimeAgo date={item.checked} className="text-xs text-slate-500 dark:text-slate-400 flex-shrink-0" />
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       <AddNewMonitorDialog
@@ -317,20 +323,8 @@ export default function Assets() {
         setIsOpen={setAddModalOpen}
         submitting={submitting}
       />
-
-      <CidrImportDialog
-        isOpen={cidrModalOpen}
-        setIsOpen={setCidrModalOpen}
-        onImport={handleCidrImport}
-      />
-
-      <BulkMonitorDialog
-        isOpen={bulkModalOpen}
-        setIsOpen={setBulkModalOpen}
-        onImport={handleBulkImport}
-      />
-
-      <ToastContainer position="top-center" autoClose={3000} />
+      <CidrImportDialog isOpen={cidrModalOpen} setIsOpen={setCidrModalOpen} onImport={handleCidrImport} />
+      <BulkMonitorDialog isOpen={bulkModalOpen} setIsOpen={setBulkModalOpen} onImport={handleBulkImport} />
     </section>
   );
 }

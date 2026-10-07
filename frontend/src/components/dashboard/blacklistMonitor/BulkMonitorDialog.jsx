@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import { toast } from 'react-toastify';
 import { parseTargetFile } from '../../../services/tools';
 
 const CHECK_TOGGLES = [
@@ -59,6 +60,8 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
     try {
       const uploadedTargets = await parseTargetFile(file);
       setForm((previous) => ({ ...previous, targets: uploadedTargets.join('\n') }));
+    } catch (error) {
+      toast.error(error.message || 'Could not read the file.');
     } finally {
       setUploading(false);
       event.target.value = '';
@@ -91,7 +94,7 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
 
   return (
     <Transition show={isOpen} as={React.Fragment}>
-      <Dialog as="div" className="fixed inset-0 z-10 overflow-y-auto" onClose={() => !submitting && setIsOpen(false)}>
+      <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={() => !submitting && setIsOpen(false)}>
         <div className="min-h-screen px-4 text-center">
           <Transition.Child as={React.Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
             <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
@@ -103,23 +106,24 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Paste or upload up to 300 domains/IPs. TXT, CSV, and Excel (.xlsx) files are supported.</p>
 
               <div className="mt-4 space-y-4">
-                <textarea name="targets" value={form.targets} onChange={handleChange} rows={8} placeholder={'mail.example.com\n203.0.113.10\nexample.org'} className="w-full p-3 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white" />
-                <label className="inline-flex items-center text-sm font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer">{uploading ? 'Reading file…' : 'Upload TXT, CSV, or Excel'}<input type="file" accept=".txt,.csv,.xlsx" onChange={handleFile} disabled={uploading} className="hidden" /></label>
+                <label htmlFor="bulk-targets" className="block text-sm font-medium text-slate-700 dark:text-slate-300 -mb-2">Targets, one per line or comma-separated</label>
+                <textarea id="bulk-targets" name="targets" value={form.targets} onChange={handleChange} rows={8} placeholder={'mail.example.com\n203.0.113.10\nexample.org'} className="w-full p-3 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white" />
+                <label className="inline-flex items-center text-sm font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline focus-within:ring-2 focus-within:ring-cyan-500 rounded">{uploading ? 'Reading file…' : 'Upload TXT, CSV, or Excel'}<input type="file" accept=".txt,.csv,.xlsx" onChange={handleFile} disabled={uploading} className="sr-only" /></label>
                 <p className={`text-xs ${invalidTargets.length || targets.length > 300 ? 'text-rose-600' : 'text-slate-500 dark:text-slate-400'}`}>
                   {targets.length} unique target{targets.length !== 1 ? 's' : ''} {targets.length > 300 && '(maximum is 300)'}
                   {invalidTargets.length > 0 && ` — invalid: ${invalidTargets.slice(0, 3).join(', ')}${invalidTargets.length > 3 ? '…' : ''}`}
                 </p>
-                <input name="description" value={form.description} onChange={handleChange} placeholder="Optional description for every target" className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white" />
+                <input name="description" aria-label="Description for every target" value={form.description} onChange={handleChange} placeholder="Optional description for every target" className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white" />
 
                 <div>
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Checks to Run</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {CHECK_TOGGLES.map((toggle) => <label key={toggle.name} className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer"><input type="checkbox" name={toggle.name} checked={form[toggle.name]} onChange={handleChange} className="rounded border-slate-300" /><span className="text-sm text-slate-700 dark:text-slate-300">{toggle.label}</span></label>)}
+                    {CHECK_TOGGLES.map((toggle) => <label key={toggle.name} className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer"><input type="checkbox" name={toggle.name} checked={form[toggle.name]} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" /><span className="text-sm text-slate-700 dark:text-slate-300">{toggle.label}</span></label>)}
                   </div>
                 </div>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2"><input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className="rounded border-slate-300" /><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Monitoring</span></label>
-                  <label className="flex items-center gap-2"><input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className="rounded border-slate-300" /><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Alerts</span></label>
+                  <label className="flex items-center gap-2"><input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" /><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Monitoring</span></label>
+                  <label className="flex items-center gap-2"><input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" /><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Alerts</span></label>
                 </div>
                 <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setIsOpen(false)} disabled={submitting} className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 px-4 rounded-lg disabled:opacity-50">Cancel</button><button type="button" onClick={handleSubmit} disabled={!canSubmit} className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-5 rounded-lg disabled:opacity-50">{submitting ? 'Adding…' : `Add ${targets.length || ''} Target${targets.length === 1 ? '' : 's'}`}</button></div>
               </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AiOutlineClose, AiOutlineMenu } from 'react-icons/ai';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../services/auth/authProvider';
@@ -26,9 +26,9 @@ const Navbar = () => {
           </div>
         </button>
 
-        <nav className='hidden md:flex items-center gap-2'>
+        <nav aria-label='Main' className='hidden md:flex items-center gap-2'>
           <button className={itemClass} onClick={() => go('/')}>Home</button>
-          <button className={itemClass} onClick={() => go('/quick-check')}>Quick Check</button>
+          <button className={itemClass} onClick={() => go('/quick-check')}>Quick check</button>
           {!token ? (
             <button
               className='px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 hover:opacity-90 transition-opacity'
@@ -46,8 +46,14 @@ const Navbar = () => {
           )}
         </nav>
 
-        <button onClick={() => setNav((prev) => !prev)} className='md:hidden text-slate-200'>
-          {nav ? <AiOutlineClose size={22} /> : <AiOutlineMenu size={22} />}
+        <button
+          type='button'
+          onClick={() => setNav((prev) => !prev)}
+          className='md:hidden p-2 -mr-2 text-slate-200'
+          aria-label={nav ? 'Close menu' : 'Open menu'}
+          aria-expanded={nav}
+        >
+          {nav ? <AiOutlineClose size={22} aria-hidden='true' /> : <AiOutlineMenu size={22} aria-hidden='true' />}
         </button>
       </div>
 
@@ -55,7 +61,7 @@ const Navbar = () => {
         <div className='md:hidden border-t border-white/10 px-4 py-3 bg-slate-950/95'>
           <div className='flex flex-col gap-2'>
             <button className={itemClass} onClick={() => go('/')}>Home</button>
-            <button className={itemClass} onClick={() => go('/quick-check')}>Quick Check</button>
+            <button className={itemClass} onClick={() => go('/quick-check')}>Quick check</button>
             {!token ? (
               <button className='px-4 py-2 rounded-lg text-sm font-semibold bg-cyan-400 text-slate-950' onClick={() => go('/login')}>
                 Sign in

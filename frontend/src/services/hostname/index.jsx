@@ -69,8 +69,32 @@ const HostnameService = () => {
     }
   };
 
+  const getHostname = async (id) => {
+    const response = await axios.get(`/api/hostname/${id}`, { headers: { 'Accept': 'application/json' } });
+    return response.data;
+  };
+
+  const updateHostname = async (id, payload) => {
+    const response = await axios.put(`/api/hostname/${id}`, payload, {
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    });
+    return response.data;
+  };
+
+  // Runs every enabled check synchronously; resolves once results are saved.
+  const recheckHostname = async (id) => {
+    const response = await axios.post(`/api/hostname/${id}/recheck/`, {}, {
+      headers: { 'Accept': 'application/json' },
+      timeout: 180000,
+    });
+    return response.data;
+  };
+
   return {
     createHostname,
+    getHostname,
+    updateHostname,
+    recheckHostname,
     listHostname,
     deleteHostname,
     createBulk,

@@ -1,5 +1,5 @@
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { useAuth } from "../services/auth/authProvider";
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -7,13 +7,13 @@ import Login from '../pages/Login';
 import LandingPage from "../pages/Landing";
 import QuickCheck from "../pages/blacklist/QuickCheck";
 import DashboardLayout from "../layouts/dashboard/layout";
+import NotFound from "../pages/NotFound";
 
 // Lazy-loaded dashboard pages — code splitting
 const Home = lazy(() => import("../pages/dashboard/Home"));
 const BlacklistCheck = lazy(() => import("../pages/dashboard/BlacklistCheck"));
 const Assets = lazy(() => import("../pages/dashboard/Assets"));
 const AssetDetail = lazy(() => import("../pages/dashboard/AssetDetail"));
-const ViewReport = lazy(() => import("../pages/dashboard/ViewReport"));
 const AbuseIPDB = lazy(() => import("../pages/dashboard/AbuseIPDB"));
 const Whois = lazy(() => import("../pages/dashboard/Whois"));
 const ServerStatus = lazy(() => import("../pages/dashboard/ServerStatus"));
@@ -63,8 +63,8 @@ const Routes = () => {
             { path: 'blacklist-check', element: <LazyPage><BlacklistCheck /></LazyPage> },
             { path: 'assets', element: <LazyPage><Assets /></LazyPage> },
             { path: 'assets/:id', element: <LazyPage><AssetDetail /></LazyPage> },
+            // Old URL from v1.0; kept so bookmarks still work.
             { path: 'blacklist-monitor', element: <LazyPage><Assets /></LazyPage> },
-            { path: 'blacklist-monitor/report', element: <LazyPage><ViewReport /></LazyPage> },
             { path: 'abuseipdb', element: <LazyPage><AbuseIPDB /></LazyPage> },
             { path: 'whois', element: <LazyPage><Whois /></LazyPage> },
             { path: 'server-status', element: <LazyPage><ServerStatus /></LazyPage> },
@@ -88,11 +88,14 @@ const Routes = () => {
     },
   ];
 
-  const router = createBrowserRouter([
+  const router = useMemo(() => createBrowserRouter([
     ...routesForPublic,
     ...(!token ? routesForNotAuthenticatedOnly : []),
     ...routesForAuthenticatedOnly,
-  ]);
+    { path: '*', element: <NotFound /> },
+  // Only the signed-in state changes which routes exist.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ]), [Boolean(token)]);
 
   return <RouterProvider router={router} />;
 }

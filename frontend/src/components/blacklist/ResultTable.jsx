@@ -1,89 +1,58 @@
-import React, { useState } from 'react';
-import providerFields from './delist/constant';
+import { useState } from 'react';
 import DelistModal from './delist/DelistModal';
+import ProviderStatusBadge from './ProviderStatusBadge';
+import { providerStatus, sortProviders } from './providerStatus';
 
-const ResultTable = ({ data }) => {
-  const providerList = data?.providers || [];
-  const detectedList = data?.detected_on || [];
-
-  const providers = [...providerList].sort((a, b) => {
-    const isBlacklistedA = detectedList.some((item) => item.provider === a);
-    const isBlacklistedB = detectedList.some((item) => item.provider === b);
-
-    return isBlacklistedB - isBlacklistedA;
-  });
-
-  const isBlacklisted = (provider) => {
-    return detectedList.some((item) => item.provider === provider);
-  };
-
-  const getProviderStatus = (provider) => {
-    const detectedProvider = detectedList.find((item) => item.provider === provider);
-    return detectedProvider ? detectedProvider.status : 'unknown';
-  };
-
+const ResultTable = ({ data, checkId, onDelistRecorded }) => {
   const [selectedProvider, setSelectedProvider] = useState(null);
-  const handleDelist = (provider) => {
-    setSelectedProvider(provider);
-    setIsModalOpen(true);
-  };
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const handleCloseModal = () => {
-    setSelectedProvider(null);
-    setIsModalOpen(false);
-  };
-
-  const modalFields = selectedProvider ? providerFields[selectedProvider] : [];
+  const providers = sortProviders(data);
+  const detectedOn = data?.detected_on || [];
 
   return (
-    <div className="scrollable-table overflow-auto max-h-[70vh] rounded-lg border border-slate-200">
-      <table className="w-full text-slate-700 border-collapse">
-        <thead className="sticky top-0 bg-slate-50">
-          <tr className="text-left border-b border-slate-200">
-            <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Provider</th>
-            <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Status</th>
-            <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500">Action</th>
+    <div className="overflow-auto max-h-[70vh] rounded-lg border border-slate-200 dark:border-slate-600">
+      <table className="w-full text-sm text-slate-700 dark:text-slate-300 border-collapse">
+        <thead className="sticky top-0 bg-slate-50 dark:bg-slate-700 z-[1]">
+          <tr className="text-left border-b border-slate-200 dark:border-slate-600">
+            <th scope="col" className="px-4 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Provider</th>
+            <th scope="col" className="px-4 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Status</th>
+            <th scope="col" className="px-4 py-3 text-xs font-medium text-slate-500 dark:text-slate-400"><span className="sr-only">Action</span></th>
           </tr>
         </thead>
-        <tbody>
-          {providers.map((provider, index) => (
-            <tr key={index} className="border-b border-slate-200 hover:bg-slate-50/60">
-              <td className="px-4 py-2.5 font-medium">{provider}</td>
-              <td className="px-4 py-2.5">
-                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${isBlacklisted(provider) ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {isBlacklisted(provider) ? 'Blacklisted' : 'Clear'}
-                </span>
-              </td>
-              <td className="px-4 py-2.5">
-                {isBlacklisted(provider) ? (
-                  getProviderStatus(provider) === 'open' ? (
+        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+          {providers.map((provider) => {
+            const status = providerStatus(data, provider);
+            const entry = detectedOn.find((item) => item.provider === provider);
+            return (
+              <tr key={provider} className="hover:bg-slate-50/60 dark:hover:bg-slate-700/40">
+                <td className="px-4 py-2.5 font-medium break-all">{provider}</td>
+                <td className="px-4 py-2.5"><ProviderStatusBadge status={status} /></td>
+                <td className="px-4 py-2.5 text-right">
+                  {status === 'listed' && (
                     <button
-                      className="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-1 px-4 rounded-lg transition-colors"
-                      onClick={() => handleDelist(provider)}
+                      type="button"
+                      className="text-sm font-medium text-rose-700 dark:text-rose-300 hover:underline"
+                      onClick={() => setSelectedProvider(provider)}
                     >
-                      Delist
+                      Request removal
                     </button>
-                  ) : (
-                    <button className="text-gray-500 cursor-not-allowed py-0.5 px-4 rounded" disabled>
-                      Delist request sent
-                    </button>
-                  )
-                ) : (
-                  ''
-                )}
-              </td>
-            </tr>
-          ))}
+                  )}
+                  {status === 'requested' && entry?.requested_at && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">since {new Date(entry.requested_at).toLocaleDateString()}</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
       <DelistModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        isOpen={Boolean(selectedProvider)}
+        onClose={() => setSelectedProvider(null)}
         provider={selectedProvider}
-        data={data}
-        fields={modalFields}
+        target={data?.hostname}
+        checkId={checkId}
+        onRecorded={onDelistRecorded}
       />
     </div>
   );

@@ -60,7 +60,7 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
 
   return (
     <Transition show={isOpen} as={React.Fragment}>
-      <Dialog as="div" className="fixed inset-0 z-10 overflow-y-auto" onClose={() => setIsOpen(false)}>
+      <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={() => setIsOpen(false)}>
         <div className="min-h-screen px-4 text-center">
           <Transition.Child
             as={React.Fragment}
@@ -82,14 +82,15 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
                 CIDR Import
               </Dialog.Title>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Import an IP range as monitored assets. Max /24 (254 hosts).
+                Import an IP range as monitored assets (up to /24, 254 hosts). The scheduler checks them on its next run.
               </p>
 
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">CIDR Range</label>
+                  <label htmlFor="cidr-import-range" className="block text-sm font-medium text-slate-700 dark:text-slate-300">CIDR range</label>
                   <input
                     type="text"
+                    id="cidr-import-range"
                     name="cidr"
                     value={form.cidr}
                     onChange={handleChange}
@@ -98,15 +99,16 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
                   />
                   {hostCount > 0 && (
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      This will create <span className="font-semibold text-cyan-600">{hostCount}</span> asset{hostCount !== 1 ? 's' : ''}
+                      This will create <span className="font-semibold text-cyan-700 dark:text-cyan-400">{hostCount}</span> asset{hostCount !== 1 ? 's' : ''}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
+                  <label htmlFor="cidr-import-description" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description <span className="font-normal text-slate-400">(optional)</span></label>
                   <input
                     type="text"
+                    id="cidr-import-description"
                     name="description"
                     value={form.description}
                     onChange={handleChange}
@@ -126,7 +128,7 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
                           name={toggle.name}
                           checked={form[toggle.name] || false}
                           onChange={handleChange}
-                          className="rounded border-slate-300"
+                          className="h-4 w-4 rounded border-slate-300 accent-cyan-600"
                         />
                         <span className="text-sm text-slate-700 dark:text-slate-300">{toggle.label}</span>
                       </label>
@@ -137,11 +139,11 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
                 {/* Monitor & Alert */}
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className="rounded border-slate-300" />
+                    <input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" />
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Monitoring</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className="rounded border-slate-300" />
+                    <input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" />
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Alerts</span>
                   </label>
                 </div>

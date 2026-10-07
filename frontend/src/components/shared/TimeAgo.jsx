@@ -1,4 +1,3 @@
-import React from 'react';
 
 const UNITS = [
   { label: 'year', seconds: 31536000 },
