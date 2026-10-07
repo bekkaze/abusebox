@@ -18,19 +18,19 @@ Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets, 
 
 ## Screenshots
 
-**Landing Page** — instant blacklist check from the homepage
+**Landing page**: instant blacklist check from the homepage
 
 ![Landing page](files/landing.png)
 
-**Dashboard** — monitoring summary with stats and history charts
+**Dashboard**: what needs attention across all assets, scheduler status, recent activity and listing history
 
 ![Dashboard](files/dashboard.png)
 
-**Assets** — card-based view of all monitored hostnames with check badges
+**Assets**: health at a glance, filters, sorting, card/table views and bulk actions
 
 ![Assets](files/assets.png)
 
-**Asset Detail** — tabbed results for every enabled check (Blacklist, AbuseIPDB, DNS, SSL, WHOIS, DMARC, Server Status)
+**Asset detail**: tabbed results for every check, plus activity and a check-by-check history
 
 ![Asset detail](files/asset_details.png)
 
@@ -40,7 +40,8 @@ Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets, 
 
 Most blacklist tools check one thing at a time. AbuseBox gives you a **single pane of glass** to:
 
-- Scan **60+ DNSBL providers** in seconds
+- See **what needs attention** in one list: blacklist listings, expiring certificates and domains, servers down, weak email security
+- Scan **60 DNSBL providers** in seconds
 - Get **AbuseIPDB reputation scores** alongside blacklist results
 - Run **bulk checks** on up to 300 IPs/domains at once (paste or upload TXT/CSV/XLSX)
 - Scan entire **subnets (CIDR /24)** for blacklisted IPs
@@ -48,7 +49,8 @@ Most blacklist tools check one thing at a time. AbuseBox gives you a **single pa
 - Validate **SPF / DKIM / DMARC** email authentication
 - Check if a server is **up or down** with DNS, port, and HTTP checks
 - **Register assets** and run all checks with configurable toggles
-- **Schedule periodic checks** with email and webhook alerts
+- **Schedule periodic checks** with email, Slack, Discord or webhook alerts for listings, recoveries, outages and expiry
+- Keep an **activity log** of every change and compare any two checks
 - Export results to **CSV** and track history with **charts**
 - Switch between **light and dark mode**
 
@@ -60,6 +62,9 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 
 | Feature | Description | Auth required |
 |---|---|---|
+| **Needs-attention dashboard** | Listings, invalid/expiring SSL, expiring domains, servers down, weak email security, overdue checks, scheduler status | Yes |
+| **Activity log** | Every detected change (listed, delisted, down, recovered, expiring) with severity filters | Yes |
+| **Alerts** | Email and webhook (Slack/Discord formatted) for new listings, removals, outages and expiry warnings, with a test button | Yes |
 | **Blacklist Quick Check** | Scan hostname/IP against 60 DNSBL providers (rate limited for anonymous use) | No |
 | **Bulk Check** | Check up to 300 IPs/domains at once, from a list or a TXT/CSV/XLSX file | Yes |
 | **Subnet / CIDR Check** | Scan an entire IP range (max /24) against key DNSBL providers | Yes |
@@ -73,6 +78,8 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 | **Bulk Asset Import** | Add up to 300 assets at once from a pasted list or TXT/CSV/XLSX file | Yes |
 | **CIDR Import** | Import an IP range (max /24) as monitored assets from the UI | Yes |
 | **Assets** | Register domains/IPs, run all checks with per-asset toggles, edit them later | Yes |
+| **Bulk Actions** | Select many assets to re-check (in the background), toggle monitoring/alerts or delete; table view, sorting, CSV export | Yes |
+| **Check History** | Browse past checks and see which blacklists were added or removed | Yes |
 | **Asset Detail View** | Tabbed results for every check type with summary cards | Yes |
 | **Scheduled Monitoring** | Automatic periodic re-checks with email/webhook alerts | Yes |
 | **Historical Charts** | Visual blacklist history per monitored asset | Yes |
@@ -85,7 +92,9 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 | **Dark Mode** | Toggle between light and dark themes, persisted to localStorage | - |
 | **Responsive Layout** | Collapsible sidebar with hamburger menu on mobile | - |
 | **Favicon Alert** | Red badge on favicon when any asset is blacklisted | - |
-| **Accounts** | Change your password in Settings; admins can add users via `POST /user/create/` | Yes |
+| **Users** | Admins add users, grant admin, deactivate and reset passwords; everyone can change their own password | Yes |
+| **Data Retention** | Optionally delete history older than 30–365 days | Yes |
+| **Command Palette** | Ctrl/Cmd + K to jump to any asset, page or setting, or check a domain/IP | Yes |
 | **API Documentation** | Swagger UI & ReDoc for all endpoints | No |
 
 ---
@@ -185,7 +194,7 @@ WEBHOOK_URL=
 | `SCHEDULER_ENABLED` | Run periodic background checks (default: `true`; can also be changed in Settings) | No |
 | `SCHEDULER_INTERVAL_MINUTES` | Check interval in minutes (default: 360) | No |
 | `SMTP_HOST` | SMTP server for email alerts | No |
-| `WEBHOOK_URL` | Webhook URL for blacklist alert POSTs | No |
+| `WEBHOOK_URL` | Webhook URL for alerts (Slack and Discord URLs get chat messages). A URL set in Settings → Notifications takes precedence | No |
 | `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers for blacklist lookups. Spamhaus and some others refuse public resolvers; point this at your own recursive resolver for complete results | No |
 
 > DNS Records, SSL Checker, WHOIS, SPF/DKIM/DMARC, and Server Status work out of the box with no API keys.
@@ -219,8 +228,18 @@ GET  /tools/export/subnet/?cidr=203.0.113.0/24
 POST /hostname/bulk/                     # up to 300 assets
 POST /hostname/cidr-import/
 POST /hostname/{id}/recheck/
+POST /hostname/bulk-action/             # {"ids": [1, 2], "action": "recheck"}
+GET  /hostname/list/?include_result=false
+GET  /hostname/{id}/checks/{check_id}
+GET  /hostname/{id}/events/
+GET  /events/?severity=critical
+GET  /settings/scheduler/status/
+PUT  /settings/notifications/            # admin only
+POST /settings/notifications/test/       # admin only
 POST /user/change-password/
 POST /user/create/                       # admin only
+GET  /user/list/                         # admin only
+PATCH /user/{id}/                        # admin only
 ```
 
 ```bash
@@ -279,7 +298,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
-| **v1.1.3** | October 2026 | Scheduler fix (#20), security hardening (generated JWT secret, SSRF guards, login rate limiting, password change), dependency updates, bulk lists up to 300, asset editing, accessible UI and dark mode fixes |
+| **v1.2.0** | October 2026 | Needs-attention dashboard, activity log, recovery/outage/expiry alerts (Slack, Discord, webhooks), bulk actions and table view, check history, user management, command palette; scheduler fix (#20), security hardening, dependency updates, accessibility and dark mode overhaul |
 | **v1.1.2** | March 26, 2026 | Bulk asset import, CIDR import, auto-refresh auth, persistent DB, DNSBL false positive fix, community bug fixes |
 | **v1.1.1** | March 25, 2026 | UX polish, responsive mobile layout, asset re-check, code splitting, security fixes |
 | **v1.1.0** | March 23, 2026 | Asset management, DNS/SSL/DMARC tools, bulk & subnet check, scheduled monitoring, dark mode, 60+ DNSBL providers |

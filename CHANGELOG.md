@@ -2,7 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.3] - 2026-10-07
+## [1.2.0] - 2026-10-07
+
+Monitoring that tells you what needs attention, plus a security and accessibility overhaul. (Supersedes the unreleased 1.1.3.)
+
+### Highlights
+
+- **"Needs attention" dashboard**: one list of everything that's wrong across your assets (listed on blacklists, SSL certificate invalid or expiring, domain registration expiring, server down or returning 5xx, weak SPF/DKIM/DMARC grade, high AbuseIPDB score, overdue scheduled checks), plus scheduler status with a "Check due assets now" button.
+- **Activity log**: every check is compared with the previous one and changes are recorded as events (newly listed / delisted / provider changes, server down / recovered, certificate expiring / invalid / renewed, domain expiring). See them on the dashboard, on each asset, and on the new Activity page with severity filters.
+- **Smarter alerts**: alerts for recoveries, outages and expiry warnings, not only new listings. A new Notifications settings tab shows which channels are configured, lets admins set a webhook URL (overrides `WEBHOOK_URL`), choose which events alert, and send a test. Slack and Discord webhooks receive formatted chat messages; other webhooks get JSON (the v1.1 `blacklist_detected` fields are kept).
+- **Assets at scale**: card or table view, sort by urgency/name/last checked/added, a "Needs attention" filter, per-asset health hints, multi-select with bulk re-check (runs in the background), monitoring/alerts on-off and delete, CSV export, and paging for large CIDR imports.
+- **Check history**: browse past checks of an asset and see which blacklists were added or removed compared with the check before.
+- **User management**: admins can add users, grant or revoke admin, deactivate accounts and reset passwords from Settings. A banner warns while the default admin password is still in use.
+- **Data retention**: optionally delete check history and activity older than 30/90/180/365 days (latest results are always kept).
+- **Command palette** (Ctrl/Cmd + K): jump to any asset, page or setting, or type a domain/IP to run a blacklist check.
+
+### Added (API)
+
+- `GET /events/` (filters: `severity`, `before_id`), `GET /hostname/{id}/events/`, `GET /hostname/{id}/checks/{check_id}`.
+- `POST /hostname/bulk-action/` (`recheck`, `delete`, `enable_monitoring`, `disable_monitoring`, `enable_alerts`, `disable_alerts`).
+- `GET /hostname/list/?include_result=false` for a lighter list; list and detail responses now include `health` (status + issues) and `last_checked`.
+- `GET /settings/scheduler/status/`, `POST /settings/scheduler/run/`, `GET|PUT /settings/notifications/`, `POST /settings/notifications/test/`; `history_retention_days` in scheduler settings.
+- `GET /user/list/`, `PATCH /user/{id}/` (admin); `/user/me/` reports `using_default_password`. `phone_number` is now optional when creating users.
 
 ### Security
 
@@ -38,11 +59,12 @@ All notable changes to this project will be documented in this file.
 
 - Edit an asset's checks, monitoring, alerts and interval from its detail page.
 - Bulk monitoring list (up to 300 targets, paste or upload TXT/CSV/XLSX) and bulk check uploads, thanks to @lokiee0 (#22).
+- Signed-in users opening `/login` are sent to the dashboard instead of a 404.
 - Custom DKIM selectors for the SPF/DKIM/DMARC check (#22).
 - DMARC reports keep every DKIM/SPF result per record (#22).
 - Delist flow links to each provider's removal page and tracks "removal requested" for any listed provider.
 - `GET /user/me/`, `POST /tools/bulk-check/` (JSON body for long lists).
-- CI workflow running the backend tests and frontend lint/build on every PR.
+- CI workflow running the backend tests (71 offline tests) and frontend lint/build on every PR.
 - 404 page.
 
 ### Changed
