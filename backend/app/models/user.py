@@ -15,5 +15,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_staff: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Embedded in issued JWTs; bumping it (on password change) revokes all of them.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     hostnames = relationship("Hostname", back_populates="user", cascade="all, delete-orphan")

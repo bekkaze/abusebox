@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { checkSubnet, exportSubnetCsv } from '../../services/tools';
+import { useState } from 'react';
+import { checkSubnet, downloadSubnetCsv } from '../../services/tools';
+import { LookupForm } from '../../components/shared/ui';
 
 export default function SubnetCheck() {
   const [cidr, setCidr] = useState('');
@@ -26,29 +27,23 @@ export default function SubnetCheck() {
     <section className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
       <div>
         <p className="text-sm text-slate-500 dark:text-slate-400">Tools</p>
-        <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Subnet / CIDR Check</h2>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Subnet / CIDR Check</h1>
         <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Scan an entire IP range against DNSBL providers. Max /24 (256 IPs).</p>
       </div>
 
-      <div className="flex gap-3">
-        <input
-          type="text"
-          value={cidr}
-          onChange={(e) => setCidr(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
-          placeholder="192.168.1.0/24"
-          className="flex-1 p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white"
-        />
-        <button
-          onClick={handleCheck}
-          disabled={loading || !cidr.trim()}
-          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {loading ? 'Scanning...' : 'Scan'}
-        </button>
-      </div>
+      <LookupForm
+        label="CIDR range"
+        value={cidr}
+        onChange={setCidr}
+        onSubmit={handleCheck}
+        placeholder="203.0.113.0/24"
+        loading={loading}
+        buttonLabel="Scan"
+        loadingLabel="Scanning"
+        error={error}
+        hint="Up to /24 (256 addresses) against 8 major DNSBL providers."
+      />
 
-      {error && <div className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl p-4 text-sm text-rose-700 dark:text-rose-300">{error}</div>}
 
       {data && (
         <div className="space-y-4">
@@ -59,7 +54,7 @@ export default function SubnetCheck() {
               <Stat label="Clean" value={data.clean_count} tone="emerald" />
             </div>
             <button
-              onClick={() => exportSubnetCsv(cidr.trim())}
+              onClick={() => downloadSubnetCsv(data)}
               className="text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:text-cyan-800"
             >
               Export CSV

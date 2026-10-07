@@ -19,6 +19,42 @@ body {
   background: var(--surface-bg);
   color: #111827;
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dark theme: page background (visible on overscroll) and native controls. */
+.dark {
+  color-scheme: dark;
+  --surface-bg: #0f172a;
+}
+
+.dark body {
+  color: #e2e8f0;
+}
+
+/* One consistent, visible keyboard focus indicator everywhere. */
+:focus-visible {
+  outline: 2px solid #06b6d4;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Inputs already show a focus ring via Tailwind utilities. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .landing {

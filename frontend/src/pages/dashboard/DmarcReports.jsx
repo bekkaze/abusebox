@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { HiUpload, HiTrash, HiChevronDown, HiChevronUp } from 'react-icons/hi';
 import axios from 'axios';
 import CopyButton from '../../components/shared/CopyButton';
 import TimeAgo from '../../components/shared/TimeAgo';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from 'react-toastify';
 
 export default function DmarcReports() {
   const [reports, setReports] = useState([]);
@@ -100,10 +99,12 @@ export default function DmarcReports() {
         <p className="text-sm text-slate-500 dark:text-slate-400">Email Security</p>
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">DMARC Aggregate Reports</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-          Upload DMARC aggregate XML reports to see what's actually passing and failing across all senders.
+          Upload DMARC aggregate XML reports to see what&apos;s actually passing and failing across all senders.
         </p>
         <div className="mt-4 flex flex-col sm:flex-row gap-3">
+          <label htmlFor="dmarc-domain-filter" className="sr-only">Filter by domain</label>
           <input
+            id="dmarc-domain-filter"
             type="text"
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
@@ -114,10 +115,10 @@ export default function DmarcReports() {
           <button onClick={handleFilter} className="bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 px-5 rounded-lg transition-colors font-medium">
             Filter
           </button>
-          <label className={`inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-5 rounded-lg transition-colors font-medium cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+          <label className={`inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-5 rounded-lg transition-colors font-medium cursor-pointer focus-within:ring-2 focus-within:ring-cyan-500 focus-within:ring-offset-2 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
             <HiUpload />
             {uploading ? 'Uploading...' : 'Upload Report'}
-            <input type="file" accept=".xml,.gz,.zip" onChange={handleUpload} className="hidden" />
+            <input type="file" accept=".xml,.gz,.zip" onChange={handleUpload} className="sr-only" />
           </label>
         </div>
       </div>
@@ -176,8 +177,6 @@ export default function DmarcReports() {
           </div>
         )}
       </div>
-
-      <ToastContainer position="top-center" autoClose={3000} />
     </section>
   );
 }
@@ -185,7 +184,6 @@ export default function DmarcReports() {
 /* ---------- Summary ---------- */
 function SummaryPanel({ data }) {
   const { pass_rate, total_messages, disposition_breakdown, top_senders, report_count, date_range, policy } = data;
-  const alignedColor = pass_rate.aligned >= 90 ? 'text-emerald-600' : pass_rate.aligned >= 70 ? 'text-amber-600' : 'text-rose-600';
 
   return (
     <div className="space-y-4">
@@ -293,8 +291,8 @@ function RecordTable({ records }) {
                 <td className="px-3 py-2">
                   <span className={r.spf_aligned === 'pass' ? 'text-emerald-600' : 'text-rose-600'}>{r.spf_aligned}</span>
                 </td>
-                <td className="px-3 py-2 text-xs">{r.dkim_domain || '—'}</td>
-                <td className="px-3 py-2 text-xs">{r.spf_domain || '—'}</td>
+                <td className="px-3 py-2 text-xs">{formatAuthResults(r.dkim_results, r.dkim_domain, r.dkim_result)}</td>
+                <td className="px-3 py-2 text-xs">{formatAuthResults(r.spf_results, r.spf_domain, r.spf_result)}</td>
               </tr>
             ))}
           </tbody>
@@ -302,6 +300,13 @@ function RecordTable({ records }) {
       </div>
     </div>
   );
+}
+
+function formatAuthResults(results, domain, result) {
+  if (results?.length) {
+    return results.map((item) => `${item.domain || '—'} (${item.result || 'unknown'})`).join(', ');
+  }
+  return domain ? `${domain} (${result || 'unknown'})` : '—';
 }
 
 function StatCard({ label, value, tone }) {

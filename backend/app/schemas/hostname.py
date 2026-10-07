@@ -1,7 +1,13 @@
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+
+from app.core.timeutil import as_utc
+
+# Stored timestamps are UTC but SQLite hands them back naive; mark them as UTC so
+# the JSON carries an offset and browsers don't shift them into local time.
+UTCDateTime = Annotated[datetime, AfterValidator(as_utc)]
 
 
 CHECK_TOGGLE_DEFAULTS = {
@@ -71,18 +77,21 @@ class HostnameResponse(BaseModel):
     check_email_security: bool
     check_server_status: bool
     check_interval_minutes: int | None
+    last_checked: UTCDateTime | None = None
 
-    created: datetime
-    updated: datetime
+    created: UTCDateTime
+    updated: UTCDateTime
 
 
 class HostnameListItem(HostnameResponse):
     result: dict[str, Any] | None
-    checked: datetime | str
+    # Compact status + actionable issues (see app/services/health.py).
+    health: dict[str, Any] | None = None
+    checked: UTCDateTime | str
 
 
 class BulkHostnameCreateRequest(BaseModel):
-    hostnames: list[HostnameCreateRequest] = Field(min_length=1, max_length=50)
+    hostnames: list[HostnameCreateRequest] = Field(min_length=1, max_length=300)
 
 
 class CidrImportRequest(BaseModel):
@@ -103,3 +112,13 @@ class BulkCreateResult(BaseModel):
     created: int
     skipped: int
     errors: list[str]
+
+
+class BulkActionRequest(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=1000)
+    action: Literal["recheck", "delete", "enable_monitoring", "disable_monitoring", "enable_alerts", "disable_alerts"]
+
+
+class BulkActionResult(BaseModel):
+    affected: int
+    queued: int = 0

@@ -1,73 +1,80 @@
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { HiDownload, HiShieldCheck } from 'react-icons/hi';
 import { checkBlacklist } from '../../services/blacklist/checkService';
+import { downloadBlacklistCsv } from '../../services/tools';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
+import { EmptyState, LookupForm, cardClass, secondaryButtonClass } from '../../components/shared/ui';
 
 export default function BlacklistCheck() {
-  const [hostname, setHostname] = useState('');
+  const [searchParams] = useSearchParams();
+  const [hostname, setHostname] = useState(searchParams.get('hostname') || '');
+  const [checked, setChecked] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
-  const fetchData = async () => {
+  const handleCheck = async (value = hostname) => {
+    const target = value.trim();
+    if (!target) return;
+    setLoading(true);
+    setError('');
     try {
-      setError('');
-      if (hostname) {
-        const result = await checkBlacklist(hostname);
-        setData(result);
-      }
-    } catch (error) {
+      setData(await checkBlacklist(target));
+      setChecked(target);
+    } catch (err) {
       setData(null);
-      setError(error.message || 'Failed to run blacklist check.');
-      console.log('Failed to check blacklist: ', error);
+      setError(err.message || 'Blacklist check failed. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBlacklistCheck = async () => {
-    if (!hostname.trim()) {
-      setError('Enter a hostname or IPv4 address.');
-      return;
+  // Run straight away when opened with ?hostname= (e.g. from the command palette).
+  const requested = searchParams.get('hostname');
+  const lastRun = useRef(null);
+  useEffect(() => {
+    if (requested && lastRun.current !== requested) {
+      lastRun.current = requested;
+      setHostname(requested);
+      handleCheck(requested);
     }
-    setLoading(true);
-    fetchData();
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requested]);
 
   return (
-    <section className='space-y-5'>
-      <div className='bg-white border border-slate-200 rounded-xl p-5 shadow-sm'>
-        <p className='text-sm text-slate-500'>Quick Probe</p>
-        <h2 className='text-2xl font-semibold text-slate-900 mt-1'>Blacklist Check</h2>
-        <div className="mt-4 flex flex-col md:flex-row gap-3">
-          <input
-            type="text"
-            className="h-11 w-full px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
-            placeholder="IP address or domain name"
-            value={hostname}
-            onChange={(e) => setHostname(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleBlacklistCheck()}
-          />
-          <button
-            className={`h-11 px-6 rounded-xl font-medium ${loading ? 'bg-slate-300 text-slate-500' : 'bg-cyan-600 hover:bg-cyan-700 text-white'} transition-colors`}
-            onClick={handleBlacklistCheck}
-            disabled={loading}
-          >
-            {loading ? 'Checking...' : 'Run Check'}
-          </button>
-        </div>
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+    <section className="space-y-5">
+      <div className={`${cardClass} p-5`}>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Quick probe</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Blacklist check</h1>
+        <LookupForm
+          label="IPv4 address or domain"
+          value={hostname}
+          onChange={setHostname}
+          onSubmit={() => handleCheck()}
+          placeholder="203.0.113.10 or mail.example.com"
+          loading={loading}
+          buttonLabel="Run check"
+          loadingLabel="Checking"
+          error={error}
+        />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div className={`${cardClass} p-5`}>
         {!data ? (
-          <p className="text-slate-500 text-sm">Run a check to view provider-level status.</p>
+          <EmptyState icon={HiShieldCheck} title="No check yet">
+            Run a check to see the status on every DNS blacklist provider.
+          </EmptyState>
         ) : (
-          <>
-            <h3 className="text-xl font-semibold text-slate-900">Report for {hostname}</h3>
-            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-              <ResultTableQuick data={data} />
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white break-all">Report for {checked}</h2>
+              <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
+                <HiDownload aria-hidden="true" /> Export CSV
+              </button>
             </div>
-          </>
+            <ResultTableQuick data={data} />
+          </div>
         )}
       </div>
     </section>

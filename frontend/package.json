@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
@@ -11,47 +11,47 @@
   },
   "dependencies": {
     "@headlessui/react": "^1.7.18",
-    "@heroicons/react": "v1",
-    "@mantine/core": "^7.4.2",
-    "@mantine/hooks": "^7.4.2",
-    "@mantine/notifications": "^7.4.2",
-    "autoprefixer": "^10.4.17",
-    "axios": "^1.13.6",
+    "autoprefixer": "^10.6.1",
+    "axios": "^1.20.0",
     "classnames": "^2.5.1",
-    "jwt-decode": "^4.0.0",
-    "postcss": "^8.4.33",
+    "postcss": "^8.5.29",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.0.1",
-    "react-router-dom": "^6.30.3",
+    "react-router-dom": "^7.18.4",
     "react-toastify": "^10.0.4",
     "react-typed": "^1.2.0",
     "recharts": "^3.8.0",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.5.2",
+    "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "vite": "^6.4.1"
+    "vite": "^6.4.4"
   },
   "resolutions": {
     "rollup": "^4.59.0",
-    "follow-redirects": "^1.15.11",
-    "form-data": "^4.0.4",
-    "glob": "^10.4.5",
+    "follow-redirects": "^1.16.0",
+    "form-data": "^4.0.6",
     "cross-spawn": "^7.0.6",
-    "braces": "^3.0.3",
-    "minimatch": "^10.2.3",
-    "@remix-run/router": "^1.23.1",
-    "@babel/runtime": "^7.29.2",
-    "flatted": "^3.3.3",
     "micromatch": "^4.0.8",
-    "js-yaml": "^4.1.0",
-    "nanoid": "^3.3.11"
+    "js-yaml": "^4.3.2",
+    "nanoid": "^3.3.18",
+    "ajv": "^6.14.0",
+    "postcss": "^8.5.29",
+    "browserslist": "^4.28.7",
+    "source-map-js": "^1.2.2",
+    "@babel/core": "^7.29.6",
+    "baseline-browser-mapping": "^2.11.0",
+    "yaml": "^2.8.3",
+    "flatted": "^3.3.3",
+    "@babel/runtime": "^7.29.2",
+    "postcss-selector-parser": "^7.1.6"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }

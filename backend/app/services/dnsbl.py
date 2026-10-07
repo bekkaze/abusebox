@@ -73,6 +73,7 @@ BASE_PROVIDERS = [
 ]
 
 _DNSBL_TIMEOUT = 5.0
+_INCONCLUSIVE_FAILURE_RATIO = 0.20
 
 
 def _make_resolver() -> dns.resolver.Resolver:
@@ -133,16 +134,20 @@ def _check_provider(
     query = f"{reversed_ip}.{provider}"
     try:
         answers = resolver.resolve(query, "A")
+        refused = False
         for rdata in answers:
             result = rdata.to_text()
             parts = result.split(".")
             # Only 127.0.0.x responses indicate a real listing.
-            # 127.255.255.x are error/informational codes (e.g. Spamhaus
-            # returns 127.255.255.252 when queried via unsupported public
-            # DNS resolvers, CBL returns similar codes for rate limits).
             if parts[0] == "127" and parts[1] == "0" and parts[2] == "0":
                 return provider, True, False
-        return provider, False, False
+            # 127.255.255.x are error codes (e.g. Spamhaus returns
+            # 127.255.255.254 when queried via public DNS resolvers, and
+            # .255 when rate limited). The provider refused to answer, so
+            # report it as failed rather than silently counting it as clear.
+            if parts[:3] == ["127", "255", "255"]:
+                refused = True
+        return provider, False, refused
     except dns.resolver.NXDOMAIN:
         # NXDOMAIN = not listed on this provider
         return provider, False, False
@@ -214,6 +219,9 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
         "detected_on": detected_on,
         "providers": BASE_PROVIDERS,
         "failed_providers": sorted(failed_providers),
+        # When too many providers fail (resolver blocked, network outage) a
+        # "clean" result can't be trusted, so callers keep the previous status.
+        "is_inconclusive": len(failed_providers) >= max(3, int(len(BASE_PROVIDERS) * _INCONCLUSIVE_FAILURE_RATIO)),
         "is_blacklisted": bool(detected_on),
         "hostname": hostname_or_ip,
         "categories": ["unknown"] if detected_on else [],

@@ -1,90 +1,78 @@
-import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { HiArrowLeft, HiDownload } from 'react-icons/hi';
 import { checkBlacklist } from '../../services/blacklist/checkService';
-import { exportBlacklistCsv } from '../../services/tools';
+import { downloadBlacklistCsv } from '../../services/tools';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
+import { LookupForm, Spinner, cardClass, secondaryButtonClass } from '../../components/shared/ui';
 
 const QuickCheck = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const hostname = location.state?.hostname || searchParams.get('hostname');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The target lives in the URL so a check can be shared or bookmarked.
+  const hostname = (searchParams.get('hostname') || location.state?.hostname || '').trim();
+  const [input, setInput] = useState(hostname);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchData = async () => {
-      try {
-        if (hostname && isMounted) {
-          const result = await checkBlacklist(hostname);
-          setData(result);
-        } else if (isMounted) {
-          setError('No hostname was provided. Go back and submit a hostname.');
-        }
-      } catch (error) {
-        setError(error.message || 'Failed to check blacklist.');
-        console.error('Failed to check blacklist:', error);
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      isMounted = false;
-    };
+    if (!hostname) return undefined;
+    let active = true;
+    setLoading(true);
+    setError('');
+    setData(null);
+    checkBlacklist(hostname)
+      .then((result) => active && setData(result))
+      .catch((err) => active && setError(err.message || 'Blacklist check failed. Try again.'))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
   }, [hostname]);
 
-  const LoadingSpinner = () => {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-900"></div>
-      </div>
-    );
-  };
-
-  if (!data && !error) {
-    return <LoadingSpinner />;
-  }
-
   return (
-    <section className="min-h-screen bg-slate-100 px-4 py-8">
-      <div className="max-w-5xl mx-auto bg-white px-5 py-5 rounded-xl border border-slate-200 shadow-sm">
-        <div className='flex items-center justify-between'>
-          <div>
-            <p className='text-sm text-slate-500'>Public Check</p>
-            <h2 className='text-2xl font-semibold text-slate-900'>Blacklist Report</h2>
-          </div>
-          <div className="flex gap-3">
-            {data && hostname && (
-              <button
-                className='text-sm font-medium text-cyan-700 hover:text-cyan-800'
-                onClick={() => exportBlacklistCsv(hostname)}
-              >
-                Export CSV
-              </button>
-            )}
-            <button
-              className='text-sm font-medium text-cyan-700 hover:text-cyan-800'
-              onClick={() => navigate('/')}
-            >
-              Back to Home
-            </button>
-          </div>
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 px-4 py-8">
+      <main className="max-w-5xl mx-auto space-y-5">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline">
+          <HiArrowLeft aria-hidden="true" /> Back to home
+        </Link>
+
+        <div className={`${cardClass} p-5`}>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Public check</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Blacklist report</h1>
+          <LookupForm
+            label="Domain or IPv4 address"
+            value={input}
+            onChange={setInput}
+            onSubmit={() => setSearchParams({ hostname: input.trim() })}
+            placeholder="example.com or 8.8.8.8"
+            loading={loading}
+            buttonLabel="Check"
+            loadingLabel="Checking"
+            error={error}
+          />
         </div>
-        {error ? (
-          <p className="text-red-600 text-center py-6">{error}</p>
-        ) : (
-          <>
-            <h1 className="text-lg font-semibold mt-5 mb-4 text-slate-800">Target: <span className='text-cyan-700'>{hostname}</span></h1>
-            <div className="overflow-hidden rounded-lg border border-slate-200">
+
+        {(loading || data) && (
+          <div className={`${cardClass} p-5`}>
+            {loading ? (
+              <div className="flex items-center gap-3 text-slate-600 dark:text-slate-300 py-6" role="status">
+                <Spinner className="h-5 w-5 text-cyan-600" /> Querying blacklist providers for {hostname}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white break-all">Target: {hostname}</h2>
+                  <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
+                    <HiDownload aria-hidden="true" /> Export CSV
+                  </button>
+                </div>
                 <ResultTableQuick data={data} />
-            </div>
-          </>
+              </div>
+            )}
+          </div>
         )}
-      </div>
-    </section>
+      </main>
+    </div>
   );
 };
 

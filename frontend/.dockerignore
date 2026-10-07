@@ -1,0 +1,6 @@
+# node_modules must be installed inside the image (native binaries differ per OS).
+node_modules/
+dist/
+.env
+.env.*
+!.env.example

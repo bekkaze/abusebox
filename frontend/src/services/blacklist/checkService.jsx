@@ -12,15 +12,20 @@ publicRequest.interceptors.request.use((config) => {
 export const checkBlacklist = async (hostname) => {
   try {
     const query = new URLSearchParams({ hostname }).toString();
+    // AbuseIPDB lookups use the instance's API quota, so they're only made for
+    // signed-in users (the endpoint requires auth); anonymous checks skip it.
+    const signedIn = Boolean(axios.defaults.headers.common['Authorization']);
     const [blacklistRes, abuseipdbRes] = await Promise.allSettled([
       publicRequest.get(`/api/blacklist/quick-check/?${query}`, {
         headers: { 'Accept': 'application/json' },
         timeout: 30000,
       }),
-      publicRequest.get(`/api/tools/abuseipdb/?${query}`, {
-        headers: { 'Accept': 'application/json' },
-        timeout: 30000,
-      }),
+      signedIn
+        ? axios.get(`/api/tools/abuseipdb/?${query}`, {
+          headers: { 'Accept': 'application/json' },
+          timeout: 30000,
+        })
+        : Promise.reject(new Error('Sign in to include AbuseIPDB data')),
     ]);
 
     if (blacklistRes.status === 'rejected') {

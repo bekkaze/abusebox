@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html
 from sqlalchemy import inspect, text
 
-from app.api.routers import auth_router, blacklist_router, dmarc_router, hostname_router, settings_router, tools_router
+from app.api.routers import auth_router, blacklist_router, dmarc_router, events_router, hostname_router, settings_router, tools_router
 from app.core.config import settings
 from app.db.init_data import seed_default_admin
 from app.db.session import Base, SessionLocal, engine
@@ -35,8 +35,12 @@ def _apply_schema_migrations(eng) -> None:
                 col_type = col.type.compile(dialect=eng.dialect)
                 default = ""
                 if col.default is not None and col.default.is_scalar:
-                    default = f" DEFAULT {col.default.arg!r}"
-                nullable = " NOT NULL" if not col.nullable and not default else ""
+                    arg = col.default.arg
+                    literal = int(arg) if isinstance(arg, bool) else arg
+                    default = f" DEFAULT {literal!r}"
+                # SQLite can only add a NOT NULL column when it has a default
+                # to fill existing rows with; otherwise add it as nullable.
+                nullable = " NOT NULL" if not col.nullable and default else ""
                 stmt = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}{default}{nullable}"
                 logger.info("Schema migration: %s", stmt)
                 conn.execute(text(stmt))
@@ -61,11 +65,9 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
-    if not settings.app_debug and settings.app_secret_key == "insecure-dev-secret-key-change-me":
-        raise RuntimeError("APP_SECRET_KEY must be set in non-debug environments")
-
     app = FastAPI(
         title=settings.app_name,
+        version="1.2.0",
         debug=settings.app_debug,
         docs_url="/swagger/",
         redoc_url=None,
@@ -83,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(blacklist_router)
     app.include_router(dmarc_router)
+    app.include_router(events_router)
     app.include_router(hostname_router)
     app.include_router(settings_router)
     app.include_router(tools_router)

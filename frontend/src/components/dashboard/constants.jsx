@@ -13,6 +13,7 @@ import {
 	HiCollection,
 	HiDocumentReport,
 	HiCog,
+	HiClock,
 } from 'react-icons/hi'
 
 export const DASHBOARD_SIDEBAR_SECTIONS = [
@@ -30,6 +31,12 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 				label: 'Assets',
 				path: '/dashboard/assets',
 				icon: <HiDesktopComputer />
+			},
+			{
+				key: 'activity',
+				label: 'Activity',
+				path: '/dashboard/activity',
+				icon: <HiClock />
 			},
 			{
 				key: 'settings',

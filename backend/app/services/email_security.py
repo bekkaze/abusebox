@@ -7,34 +7,82 @@ def _dns_txt_records(domain: str) -> list[str]:
         import dns.resolver
 
         answers = dns.resolver.resolve(domain, "TXT", lifetime=5)
-        return [rdata.to_text().strip('"') for rdata in answers]
+        # Long TXT records are split into several 255-byte strings; a record's
+        # value is their concatenation (RFC 7208 §3.3).
+        return [b"".join(rdata.strings).decode("utf-8", errors="replace") for rdata in answers]
     except Exception:
         return []
 
 
+def _is_spf(record: str) -> bool:
+    lowered = record.lower()
+    return lowered == "v=spf1" or lowered.startswith("v=spf1 ")
+
+
+def _all_mechanism(record: str) -> str | None:
+    for token in record.split():
+        token = token.lower()
+        if token in {"-all", "~all", "?all", "+all"}:
+            return token
+        if token == "all":  # a bare "all" means "+all"
+            return "+all"
+    return None
+
+
+def _redirect_target(record: str) -> str | None:
+    for token in record.split():
+        if token.lower().startswith("redirect="):
+            return token.split("=", 1)[1].strip() or None
+    return None
+
+
+def _effective_all_mechanism(record: str, depth: int = 0) -> str | None:
+    """The record's "all" policy, following redirect= (RFC 7208 §6.1) up to 3 hops.
+
+    Providers such as Google publish ``v=spf1 redirect=_spf.google.com``, where
+    the "all" mechanism lives in the redirected record.
+    """
+    mechanism = _all_mechanism(record)
+    if mechanism or depth >= 3:
+        return mechanism
+    target = _redirect_target(record)
+    if not target:
+        return None
+    target_records = [r for r in _dns_txt_records(target) if _is_spf(r)]
+    if len(target_records) != 1:
+        return None
+    return _effective_all_mechanism(target_records[0], depth + 1)
+
+
 def _check_spf(domain: str) -> dict[str, Any]:
     txt_records = _dns_txt_records(domain)
-    spf_records = [r for r in txt_records if r.startswith("v=spf1")]
+    spf_records = [r for r in txt_records if _is_spf(r)]
 
     if not spf_records:
         return {"found": False, "record": None, "valid": False, "details": "No SPF record found."}
 
     record = spf_records[0]
-    has_all = any(token in record for token in ["-all", "~all", "?all", "+all"])
+    redirect = None if _all_mechanism(record) else _redirect_target(record)
+    all_mechanism = _effective_all_mechanism(record)
 
     warnings = []
-    if "+all" in record:
+    if all_mechanism == "+all":
         warnings.append("SPF uses +all which allows any sender — effectively no protection.")
-    elif "?all" in record:
+    elif all_mechanism == "?all":
         warnings.append("SPF uses ?all (neutral) — provides weak protection.")
+    elif not all_mechanism and redirect:
+        warnings.append(f"Could not resolve the SPF policy from redirect={redirect}.")
+    elif not all_mechanism:
+        warnings.append("SPF record has no all mechanism, so unmatched senders are not handled explicitly.")
     if len(spf_records) > 1:
         warnings.append(f"Multiple SPF records found ({len(spf_records)}). Only one is allowed per RFC 7208.")
 
     return {
         "found": True,
         "record": record,
-        "valid": has_all,
-        "mechanism_all": next((t for t in ["-all", "~all", "?all", "+all"] if t in record), None),
+        "valid": len(spf_records) == 1 and all_mechanism in {"-all", "~all"},
+        "mechanism_all": all_mechanism,
+        "redirect": redirect,
         "warnings": warnings,
     }
 
@@ -67,7 +115,7 @@ def _check_dkim(domain: str, selectors: list[str] | None = None) -> dict[str, An
         "found": bool(found_selectors),
         "selectors_checked": selectors,
         "selectors_found": found_selectors,
-        "details": "DKIM selectors found." if found_selectors else "No DKIM selectors found in common selector names.",
+        "details": "DKIM selectors found." if found_selectors else "No DKIM selectors found. Provide selectors used by your mail provider to check custom names.",
     }
 
 
@@ -106,7 +154,7 @@ def _check_dmarc(domain: str) -> dict[str, Any]:
     }
 
 
-def check_email_security(domain: str) -> dict[str, Any]:
+def check_email_security(domain: str, selectors: list[str] | None = None) -> dict[str, Any]:
     domain = (domain or "").strip().lower()
     if not domain:
         return {"error": "Please provide a domain name."}
@@ -116,7 +164,7 @@ def check_email_security(domain: str) -> dict[str, Any]:
     domain = domain.split("/")[0].split(":")[0]
 
     spf = _check_spf(domain)
-    dkim = _check_dkim(domain)
+    dkim = _check_dkim(domain, selectors)
     dmarc = _check_dmarc(domain)
 
     score = 0

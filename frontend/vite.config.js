@@ -11,6 +11,7 @@ export default ({ mode }) => {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+  const corsOrigins = allowedHosts.map((allowedHost) => new RegExp(`^https?://${allowedHost.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?::\\d+)?$`));
 
   const config = {
     plugins: [react()],
@@ -20,7 +21,7 @@ export default ({ mode }) => {
       strictPort: true,
       allowedHosts,
       cors: {
-        origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+        origin: corsOrigins,
       },
       fs: {
         strict: true,
@@ -31,6 +32,9 @@ export default ({ mode }) => {
           target: process.env.VITE_BASE_URL,
           secure: false,
           changeOrigin: true,
+          // Pass the browser's IP so the API can rate-limit per client
+          // instead of treating every user as the frontend container.
+          xfwd: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },

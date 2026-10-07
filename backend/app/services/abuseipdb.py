@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import requests
 
 from app.core.config import settings
+from app.core.network_safety import resolve_public_ipv4
 
 
 def _extract_ip(value: str) -> str | None:
@@ -30,13 +31,14 @@ def _extract_ip(value: str) -> str | None:
         return None
 
     try:
-        return str(ipaddress.IPv4Address(target))
+        ip = ipaddress.IPv4Address(target)
+        return str(ip) if ip.is_global else None
     except ipaddress.AddressValueError:
         pass
 
     try:
-        return socket.gethostbyname(target)
-    except (socket.gaierror, socket.timeout):
+        return resolve_public_ipv4(target)
+    except ValueError:
         return None
 
 

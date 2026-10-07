@@ -23,7 +23,7 @@ Thanks for your interest in contributing! Here's how to get started.
 ```bash
 cd backend
 cp .env.example .env
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
 
@@ -38,12 +38,14 @@ yarn dev
 
 ### Before Submitting
 
-- **Backend:** Ensure all Python files compile without errors:
+- **Backend:** Run the test suite (CI runs the same command):
   ```bash
   cd backend
-  python -m py_compile $(find app -name '*.py')
+  python -m pytest -m "not network"
   ```
-- **Frontend:** Ensure the project builds and passes linting:
+  If you touch DNSBL logic, also run the live tests, which cross-check results
+  against independent DNS queries: `python -m pytest -m network`.
+- **Frontend:** Ensure the project builds and passes linting with zero warnings:
   ```bash
   cd frontend
   yarn build
@@ -60,6 +62,8 @@ yarn dev
 ## Guidelines
 
 - Keep PRs focused — one feature or fix per PR
+- Don't delete or skip existing tests; fix the code or update the test with an explanation
+- Don't commit environment-specific values (IPs, hostnames, secrets) to `docker-compose.yml` or examples
 - Follow existing code style and patterns
 - Update documentation if your change affects user-facing behavior
 - Add yourself to [CONTRIBUTORS.txt](CONTRIBUTORS.txt) in your first PR

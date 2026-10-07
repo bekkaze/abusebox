@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
+from app.core.timeutil import to_utc_iso
 from app.db.session import get_db
 from app.models import User
 from app.models.dmarc_report import DmarcReport, DmarcReportRecord
@@ -22,7 +23,8 @@ async def upload_dmarc_report(
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file provided.")
 
-    data = await file.read()
+    # Read at most one byte past the limit instead of the whole upload.
+    data = await file.read(MAX_UPLOAD_SIZE + 1)
     if len(data) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File exceeds 10 MB limit.")
 
@@ -75,8 +77,10 @@ async def upload_dmarc_report(
             dkim_domain=rec.get("dkim_domain"),
             dkim_result=rec.get("dkim_result"),
             dkim_selector=rec.get("dkim_selector"),
+            dkim_results=rec.get("dkim_results", []),
             spf_domain=rec.get("spf_domain"),
             spf_result=rec.get("spf_result"),
+            spf_results=rec.get("spf_results", []),
             dkim_aligned=rec.get("dkim_aligned"),
             spf_aligned=rec.get("spf_aligned"),
         ))
@@ -89,8 +93,8 @@ async def upload_dmarc_report(
         "domain": report.domain,
         "org_name": report.org_name,
         "report_id": report.report_id,
-        "date_begin": report.date_begin.isoformat() if report.date_begin else None,
-        "date_end": report.date_end.isoformat() if report.date_end else None,
+        "date_begin": to_utc_iso(report.date_begin),
+        "date_end": to_utc_iso(report.date_end),
         "records_count": len(parsed["records"]),
         "total_messages": sum(r["count"] for r in parsed["records"]),
     }
@@ -114,12 +118,12 @@ def list_reports(
             "domain": r.domain,
             "org_name": r.org_name,
             "report_id": r.report_id,
-            "date_begin": r.date_begin.isoformat() if r.date_begin else None,
-            "date_end": r.date_end.isoformat() if r.date_end else None,
+            "date_begin": to_utc_iso(r.date_begin),
+            "date_end": to_utc_iso(r.date_end),
             "policy_p": r.policy_p,
             "records_count": len(r.records),
             "total_messages": sum(rec.count for rec in r.records),
-            "created": r.created.isoformat(),
+            "created": to_utc_iso(r.created),
         }
         for r in reports
     ]
@@ -170,8 +174,8 @@ def report_summary(
     begins = [r.date_begin for r in reports if r.date_begin]
     ends = [r.date_end for r in reports if r.date_end]
     summary["date_range"] = {
-        "earliest": min(begins).isoformat() if begins else None,
-        "latest": max(ends).isoformat() if ends else None,
+        "earliest": to_utc_iso(min(begins)) if begins else None,
+        "latest": to_utc_iso(max(ends)) if ends else None,
     }
 
     # Latest policy
@@ -203,8 +207,8 @@ def get_report_detail(
         "org_name": report.org_name,
         "report_id": report.report_id,
         "email": report.email,
-        "date_begin": report.date_begin.isoformat() if report.date_begin else None,
-        "date_end": report.date_end.isoformat() if report.date_end else None,
+        "date_begin": to_utc_iso(report.date_begin),
+        "date_end": to_utc_iso(report.date_end),
         "policy": {
             "p": report.policy_p,
             "adkim": report.policy_adkim,
@@ -219,8 +223,10 @@ def get_report_detail(
                 "dkim_domain": rec.dkim_domain,
                 "dkim_result": rec.dkim_result,
                 "dkim_selector": rec.dkim_selector,
+                "dkim_results": rec.dkim_results or [],
                 "spf_domain": rec.spf_domain,
                 "spf_result": rec.spf_result,
+                "spf_results": rec.spf_results or [],
                 "dkim_aligned": rec.dkim_aligned,
                 "spf_aligned": rec.spf_aligned,
             }

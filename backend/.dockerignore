@@ -1,0 +1,11 @@
+# Keep local state and secrets out of the image.
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.sqlite3
+.secret_key
+.env
+tests/

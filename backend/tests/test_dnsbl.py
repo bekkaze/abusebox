@@ -62,11 +62,14 @@ def _raw_dnsbl_query(ip: str, provider: str, timeout: float = 5.0) -> tuple[bool
     resolver.timeout = timeout
     try:
         answers = resolver.resolve(query, "A")
+        refused = False
         for rdata in answers:
             parts = rdata.to_text().split(".")
             if parts[0] == "127" and parts[1] == "0" and parts[2] == "0":
                 return True, False
-        return False, False
+            if parts[:3] == ["127", "255", "255"]:
+                refused = True
+        return False, refused
     except dns.resolver.NXDOMAIN:
         return False, False
     except dns.resolver.NoAnswer:
@@ -114,6 +117,7 @@ class TestResolveIpv4:
         assert _resolve_ipv4("this-will-never-resolve.invalid") is None
 
 
+@pytest.mark.network
 class TestCheckProvider:
     """Test _check_provider against the Spamhaus test addresses."""
 
@@ -147,6 +151,7 @@ class TestCheckProvider:
         # Either fails or returns NXDOMAIN — both are acceptable for invalid zone
 
 
+@pytest.mark.network
 class TestCheckDnsblProviders:
     @pytest.mark.timeout(30)
     def test_result_structure(self):
@@ -177,6 +182,7 @@ class TestCheckDnsblProviders:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.network
 class TestCrossValidation:
     """Compare abusebox DNSBL results against independent raw DNS queries.
 
@@ -299,6 +305,7 @@ class TestCrossValidation:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.network
 class TestRealBannedIP:
     """Cross-validate abusebox against independent DNS queries for a real
     banned IP (66.132.195.108), the same way MXToolbox checks work.

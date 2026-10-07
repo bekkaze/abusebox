@@ -1,7 +1,6 @@
-import React from 'react';
 
-export function SkeletonLine({ className = '' }) {
-  return <div className={`animate-pulse rounded bg-slate-200 dark:bg-slate-700 ${className}`} />;
+export function SkeletonLine({ className = '', style }) {
+  return <div className={`animate-pulse rounded bg-slate-200 dark:bg-slate-700 ${className}`} style={style} />;
 }
 
 export function SkeletonCard() {

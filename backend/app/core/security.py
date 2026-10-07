@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
@@ -30,30 +30,39 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def _build_token(subject: str, token_type: str, expires_delta: timedelta) -> str:
+def _build_token(subject: str, token_type: str, expires_delta: timedelta, version: int) -> str:
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "sub": subject,
         "type": token_type,
+        "ver": version,
         "iat": int(now.timestamp()),
         "exp": int((now + expires_delta).timestamp()),
     }
     return jwt.encode(payload, settings.app_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(subject: str) -> str:
-    return _build_token(subject, "access", timedelta(minutes=settings.access_token_minutes))
+def create_access_token(subject: str, version: int = 0) -> str:
+    return _build_token(subject, "access", timedelta(minutes=settings.access_token_minutes), version)
 
 
-def create_refresh_token(subject: str) -> str:
-    return _build_token(subject, "refresh", timedelta(days=settings.refresh_token_days))
+def create_refresh_token(subject: str, version: int = 0) -> str:
+    return _build_token(subject, "refresh", timedelta(days=settings.refresh_token_days), version)
 
 
 def decode_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(token, settings.app_secret_key, algorithms=[settings.jwt_algorithm])
-    except JWTError as exc:
+    except jwt.PyJWTError as exc:
         raise AuthError("Invalid token") from exc
+
+
+def is_token_revoked(payload: dict[str, Any], user: User) -> bool:
+    """Tokens minted before the user's last password change carry an old version.
+
+    Tokens issued by earlier releases have no "ver" claim and count as version 0.
+    """
+    return payload.get("ver", 0) != (user.token_version or 0)
 
 
 def get_current_user(
@@ -76,5 +85,13 @@ def get_current_user(
         raise AuthError("User not found")
     if not user.is_active:
         raise AuthError("User is inactive")
+    if is_token_revoked(payload, user):
+        raise AuthError("Token has been revoked")
 
+    return user
+
+
+def require_superuser(user: User = Depends(get_current_user)) -> User:
+    if not user.is_superuser:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required.")
     return user

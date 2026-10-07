@@ -113,10 +113,21 @@ const AuthProvider = ({ children }) => {
   const [refreshToken, setRefreshToken_] = useState(isSafeToken(initRefresh) ? initRefresh : null);
 
   const setToken = (newAccess, newRefresh) => {
-    setToken_(newAccess);
+    // Apply the header and storage synchronously: child components' effects
+    // run before this provider's effects and must not send the old token.
+    if (isSafeToken(newAccess)) {
+      axios.defaults.headers.common['Authorization'] = 'Bearer ' + newAccess;
+      localStorage.setItem('token', newAccess);
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+      localStorage.removeItem('token');
+    }
     if (newRefresh !== undefined) {
+      if (isSafeToken(newRefresh)) localStorage.setItem('refreshToken', newRefresh);
+      else localStorage.removeItem('refreshToken');
       setRefreshToken_(newRefresh);
     }
+    setToken_(newAccess);
   };
 
   // Listen for background token refresh events from the interceptor
@@ -175,6 +186,7 @@ const AuthProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook lives next to its provider
 export const useAuth = () => {
   return useContext(AuthContext);
 }
