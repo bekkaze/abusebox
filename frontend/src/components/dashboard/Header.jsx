@@ -45,7 +45,7 @@ export default function Header({ onMenuToggle, onSearch }) {
   };
 
   return (
-    <header className='h-16 px-4 sm:px-6 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'>
+    <header className='sticky top-0 z-30 h-16 px-4 sm:px-6 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 backdrop-blur'>
       <div className='flex items-center gap-3 min-w-0'>
         <button type='button' onClick={onMenuToggle} className={`lg:hidden ${iconButton} border-transparent`} aria-label='Open navigation'>
           <HiMenu className='text-xl' aria-hidden='true' />

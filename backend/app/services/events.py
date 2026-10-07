@@ -87,7 +87,9 @@ def detect_events(
     if new_server is not None:
         was_up = old_server["up"] if old_server else True
         if not new_server["up"] and (was_up or first_check):
-            events.append(_event("server.down", "critical", "Server is down", reason=new_server.get("reason")))
+            reason = new_server.get("reason") or ""
+            title = "HTTPS requests fail (certificate error)" if "SSL" in reason else "Server is down"
+            events.append(_event("server.down", "critical", title, reason=reason or None))
         elif new_server["up"] and old_server is not None and not old_server["up"]:
             events.append(_event("server.up", "success", "Server is up again",
                                  status_code=new_server.get("status_code"), response_time_ms=new_server.get("response_time_ms")))

@@ -167,3 +167,47 @@ def test_dmarc_zip_with_multiple_reports_is_rejected():
 def test_requests_is_patched_module():
     # Guard: server_status must use the shared requests module so the stubs above apply.
     assert server_status.requests is requests
+
+
+# --- email security: SPF ------------------------------------------------------------
+
+def _txt(mapping):
+    return lambda domain: mapping.get(domain, [])
+
+
+def test_spf_follows_redirect_to_find_all_policy():
+    from app.services import email_security
+    records = {
+        "gmail.example": ["v=spf1 redirect=_spf.gmail.example"],
+        "_spf.gmail.example": ["v=spf1 include:_netblocks.gmail.example ~all"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        spf = email_security._check_spf("gmail.example")
+    assert spf["valid"] is True
+    assert spf["mechanism_all"] == "~all"
+    assert spf["redirect"] == "_spf.gmail.example"
+    assert spf["warnings"] == []
+
+
+def test_spf_all_mechanism_wins_over_redirect_and_bare_all_is_pass():
+    from app.services import email_security
+    records = {"a.example": ["v=spf1 -all redirect=b.example"], "c.example": ["v=spf1 all"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        assert email_security._check_spf("a.example")["mechanism_all"] == "-all"
+        bare = email_security._check_spf("c.example")
+    assert bare["mechanism_all"] == "+all" and bare["valid"] is False
+
+
+def test_spf_redirect_loop_is_bounded():
+    from app.services import email_security
+    records = {"loop.example": ["v=spf1 redirect=loop.example"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        spf = email_security._check_spf("loop.example")
+    assert spf["valid"] is False and spf["warnings"]
+
+
+def test_long_txt_records_are_joined_without_quotes():
+    from app.services import email_security
+    answer = [mock.Mock(strings=[b"v=spf1 include:a.example include:b.example", b" include:c.example -all"])]
+    with mock.patch("dns.resolver.resolve", return_value=answer):
+        assert email_security._dns_txt_records("x.example") == ["v=spf1 include:a.example include:b.example include:c.example -all"]

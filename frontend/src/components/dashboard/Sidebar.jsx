@@ -38,7 +38,7 @@ export default function Sidebar({ open, onClose }) {
 
       <aside aria-label='Main navigation' className={classNames(
         'bg-slate-900 w-64 p-4 flex flex-col text-white border-r border-slate-800 overflow-y-auto',
-        'fixed inset-y-0 left-0 z-50 lg:static lg:z-auto',
+        'fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:flex-shrink-0',
         'transition-transform duration-200 ease-in-out',
         open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}>

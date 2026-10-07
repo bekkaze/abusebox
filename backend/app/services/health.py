@@ -145,7 +145,10 @@ def summarize(
     server = server_state(result)
     if server is not None:
         health["server"] = server
-        if not server["up"]:
+        if not server["up"] and "SSL" in (server.get("reason") or ""):
+            # The host answers, but browsers reject its certificate.
+            issue("server", "critical", "HTTPS requests fail because of the certificate")
+        elif not server["up"]:
             issue("server", "critical", f"Server is down{': ' + server['reason'] if server.get('reason') else ''}")
         elif isinstance(server.get("status_code"), int) and server["status_code"] >= 500:
             issue("server", "warning", f"Server responds with HTTP {server['status_code']}")
