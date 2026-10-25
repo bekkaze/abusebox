@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Base images. The frontend image is pinned by digest, so without this it
+  # would never pick up Node.js or Alpine security fixes.
+  - package-ecosystem: docker
+    directories: ["/frontend", "/backend"]
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]
+    # Patch releases only; moving to a new Node.js or Python line is done by hand.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      - dependency-name: python
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
