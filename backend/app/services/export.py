@@ -11,7 +11,7 @@ def export_blacklist_csv(data: dict[str, Any]) -> str:
     writer.writerow(["Blacklisted", "Yes" if data.get("is_blacklisted") else "No"])
     writer.writerow([])
 
-    writer.writerow(["Provider", "Status", "Categories"])
+    writer.writerow(["Provider", "Status", "Severity", "Meaning"])
 
     providers = data.get("providers", [])
     detected_map = {item["provider"]: item for item in data.get("detected_on", [])}
@@ -20,11 +20,12 @@ def export_blacklist_csv(data: dict[str, Any]) -> str:
         if provider in detected_map:
             item = detected_map[provider]
             status = item.get("status", "open")
-            categories = ", ".join(item.get("categories", []))
+            severity = item.get("severity", "")
+            meaning = "; ".join(c for c in item.get("categories", []) if c != "unknown")
         else:
             status = "clear"
-            categories = ""
-        writer.writerow([provider, status, categories])
+            severity = meaning = ""
+        writer.writerow([provider, status, severity, meaning])
 
     if data.get("failed_providers"):
         writer.writerow([])

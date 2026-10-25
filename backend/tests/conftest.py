@@ -31,6 +31,8 @@ def client():
 
     # Fresh database and rate-limit state for every test.
     Base.metadata.drop_all(bind=engine)
+    with engine.begin() as conn:
+        conn.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
     auth_routes._login_attempts.clear()
     auth_routes._login_locked_until.clear()
     blacklist_routes._public_check_requests.clear()

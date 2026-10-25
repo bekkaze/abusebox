@@ -10,6 +10,7 @@ import pytest
 
 from app.services.dnsbl import (
     BASE_PROVIDERS,
+    LISTS_BY_ZONE,
     _check_provider,
     _make_resolver,
     _resolve_ipv4,
@@ -36,7 +37,7 @@ MXTOOLBOX_SHARED_PROVIDERS = [
     "spam.spamrats.com",
     "rbl.interserver.net",
     "bl.nordspam.com",
-    "z.mailspike.net",
+    "bl.mailspike.net",
     "ips.backscatterer.org",
     "dnsbl.spfbl.net",
     "all.s5h.net",
@@ -50,6 +51,7 @@ def _raw_dnsbl_query(ip: str, provider: str, timeout: float = 5.0) -> tuple[bool
     """
     reversed_ip = ".".join(reversed(ip.split(".")))
     query = f"{reversed_ip}.{provider}"
+    ignored = LISTS_BY_ZONE[provider].ignored if provider in LISTS_BY_ZONE else frozenset()
     resolver = dns.resolver.Resolver()
     resolver.lifetime = timeout
     resolver.timeout = timeout
@@ -59,6 +61,8 @@ def _raw_dnsbl_query(ip: str, provider: str, timeout: float = 5.0) -> tuple[bool
         for rdata in answers:
             parts = rdata.to_text().split(".")
             if parts[0] == "127" and parts[1] == "0" and parts[2] == "0":
+                if rdata.to_text() in ignored:
+                    continue
                 return True, False
             if parts[:3] == ["127", "255", "255"]:
                 refused = True

@@ -1,55 +1,48 @@
 import logging
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html
-from sqlalchemy import inspect, text
 
 from app.api.routers import auth_router, blacklist_router, dmarc_router, events_router, hostname_router, settings_router, tools_router
 from app.core.config import settings
 from app.db.init_data import seed_default_admin
-from app.db.session import Base, SessionLocal, engine
+from app.db.migrate import run_migrations
+from app.db.session import SessionLocal, engine
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
 
+_FORWARDED_PREFIX = re.compile(r"/[A-Za-z0-9_-]+")
 
-def _apply_schema_migrations(eng) -> None:
-    """Add columns that exist in the models but are missing from the database.
 
-    SQLAlchemy's create_all() creates missing tables but won't alter existing
-    ones.  This lightweight migration fills that gap for SQLite deployments
-    that don't use Alembic.
+class ForwardedPrefixMiddleware:
+    """Honour X-Forwarded-Prefix from the bundled proxy, which serves the API at /api.
+
+    Only the API docs use it: their links and "Try it out" requests then go
+    through the proxy. Routing is unchanged, since the proxy strips the prefix.
     """
-    inspector = inspect(eng)
-    with eng.begin() as conn:
-        for table_name, table in Base.metadata.tables.items():
-            if not inspector.has_table(table_name):
-                continue
-            existing = {col["name"] for col in inspector.get_columns(table_name)}
-            for col in table.columns:
-                if col.name in existing:
-                    continue
-                col_type = col.type.compile(dialect=eng.dialect)
-                default = ""
-                if col.default is not None and col.default.is_scalar:
-                    arg = col.default.arg
-                    literal = int(arg) if isinstance(arg, bool) else arg
-                    default = f" DEFAULT {literal!r}"
-                # SQLite can only add a NOT NULL column when it has a default
-                # to fill existing rows with; otherwise add it as nullable.
-                nullable = " NOT NULL" if not col.nullable and default else ""
-                stmt = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}{default}{nullable}"
-                logger.info("Schema migration: %s", stmt)
-                conn.execute(text(stmt))
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            for name, value in scope["headers"]:
+                if name == b"x-forwarded-prefix":
+                    prefix = value.decode("latin-1").rstrip("/")
+                    if _FORWARDED_PREFIX.fullmatch(prefix):
+                        scope = dict(scope, root_path=prefix)
+                    break
+        await self.app(scope, receive, send)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    _apply_schema_migrations(engine)
+    run_migrations(engine)
 
     db = SessionLocal()
     try:
@@ -67,13 +60,14 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        version="1.2.2",
+        version="1.3.0",
         debug=settings.app_debug,
         docs_url="/swagger/",
         redoc_url=None,
         lifespan=lifespan,
     )
 
+    app.add_middleware(ForwardedPrefixMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
@@ -91,9 +85,9 @@ def create_app() -> FastAPI:
     app.include_router(tools_router)
 
     @app.get("/redoc/", include_in_schema=False)
-    def redoc():
+    def redoc(request: Request):
         return get_redoc_html(
-            openapi_url=app.openapi_url,
+            openapi_url=request.scope.get("root_path", "") + app.openapi_url,
             title=f"{settings.app_name} - ReDoc",
             redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@2.1.5/bundles/redoc.standalone.js",
         )

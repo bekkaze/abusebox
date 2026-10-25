@@ -8,3 +8,4 @@ pydantic==2.13.5
 requests==2.34.2
 dnspython==2.8.0
 python-multipart==0.0.32
+alembic==1.20.1

@@ -202,3 +202,13 @@ def test_delist_rejects_provider_not_listed(client, admin_headers):
         "provider": "bl.spamcop.net", "delist_required_data": {"id": check_id},
     }, headers=admin_headers)
     assert response.status_code == 400
+
+
+def test_api_docs_follow_the_proxy_prefix(client):
+    headers = {"X-Forwarded-Prefix": "/api"}
+    assert "/api/openapi.json" in client.get("/swagger/", headers=headers).text
+    assert "/api/openapi.json" in client.get("/redoc/", headers=headers).text
+    assert client.get("/openapi.json", headers=headers).json()["servers"] == [{"url": "/api"}]
+    # Direct access to the backend, and junk prefixes, are unaffected.
+    assert "servers" not in client.get("/openapi.json").json()
+    assert "servers" not in client.get("/openapi.json", headers={"X-Forwarded-Prefix": "/a\"<x>"}).json()

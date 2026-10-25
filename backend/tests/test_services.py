@@ -85,6 +85,16 @@ def _answers(*addresses):
     return [mock.Mock(to_text=mock.Mock(return_value=a)) for a in addresses]
 
 
+def as_lookup(fake_check):
+    """Adapt a (provider, listed, failure) fake to dnsbl._lookup's (codes, failure)."""
+    def lookup(reversed_ip, provider, resolver=None):
+        _, listed, failure = fake_check(reversed_ip, provider)
+        if failure is True:
+            failure = dnsbl.UNREACHABLE
+        return (["127.0.0.2"] if listed else []), (failure or None)
+    return lookup
+
+
 def test_dnsbl_listing_code_counts_as_listed():
     resolver = mock.Mock(resolve=mock.Mock(return_value=_answers("127.0.0.2")))
     assert dnsbl._check_provider("4.3.2.1", "zen.spamhaus.org", resolver) == ("zen.spamhaus.org", True, None)
@@ -113,7 +123,7 @@ def test_dnsbl_retries_timeouts_but_not_refusals():
                 return provider, False, dnsbl.UNREACHABLE
         return provider, reversed_ip == "2.0.0.127", None
     dnsbl._test_point_ok_until.clear()
-    with mock.patch.object(dnsbl, "_check_provider", fake_check):
+    with mock.patch.object(dnsbl, "_lookup", as_lookup(fake_check)):
         result = dnsbl.check_dnsbl_providers("203.0.113.10")
     assert calls.count("zen.spamhaus.org") == 1
     assert calls.count("bl.spamcop.net") == 2
@@ -123,7 +133,7 @@ def test_dnsbl_retries_timeouts_but_not_refusals():
 def test_dnsbl_marks_result_inconclusive_when_many_providers_fail():
     def fake_check(reversed_ip, provider, resolver=None):
         return provider, False, True
-    with mock.patch.object(dnsbl, "_check_provider", fake_check):
+    with mock.patch.object(dnsbl, "_lookup", as_lookup(fake_check)):
         result = dnsbl.check_dnsbl_providers("203.0.113.10")
     assert result["is_inconclusive"] is True
     assert result["is_blacklisted"] is False
@@ -136,7 +146,7 @@ def test_dnsbl_clean_answer_from_provider_ignoring_test_point_counts_as_failed()
         refusing = provider == "zen.spamhaus.org"
         return provider, reversed_ip == "2.0.0.127" and not refusing, False
     dnsbl._test_point_ok_until.clear()
-    with mock.patch.object(dnsbl, "_check_provider", fake_check):
+    with mock.patch.object(dnsbl, "_lookup", as_lookup(fake_check)):
         result = dnsbl.check_dnsbl_providers("203.0.113.10")
     assert result["failed_providers"] == ["zen.spamhaus.org"]
     assert result["is_blacklisted"] is False
@@ -149,7 +159,7 @@ def test_dnsbl_test_point_success_is_cached():
         calls.append(reversed_ip)
         return provider, reversed_ip == "2.0.0.127", False
     dnsbl._test_point_ok_until.clear()
-    with mock.patch.object(dnsbl, "_check_provider", fake_check):
+    with mock.patch.object(dnsbl, "_lookup", as_lookup(fake_check)):
         dnsbl.check_dnsbl_providers("203.0.113.10")
         dnsbl.check_dnsbl_providers("203.0.113.11")
     assert calls.count("2.0.0.127") == len(dnsbl.BASE_PROVIDERS)
@@ -162,7 +172,7 @@ def test_dnsbl_listing_from_provider_that_lists_everything_counts_as_failed():
         lists_everything = provider == "bl.spamcop.net"
         return provider, reversed_ip == "2.0.0.127" or lists_everything, False
     dnsbl._test_point_ok_until.clear()
-    with mock.patch.object(dnsbl, "_check_provider", fake_check):
+    with mock.patch.object(dnsbl, "_lookup", as_lookup(fake_check)):
         result = dnsbl.check_dnsbl_providers("203.0.113.10")
     assert result["detected_on"] == []
     assert result["is_blacklisted"] is False
@@ -176,8 +186,7 @@ def test_subnet_check_skips_provider_that_lists_everything():
         lists_everything = provider == "bl.spamcop.net"
         return provider, reversed_ip == "2.0.0.127" or lists_everything, False
     dnsbl._test_point_ok_until.clear()
-    with mock.patch.object(dnsbl, "_check_provider", fake_check), \
-            mock.patch.object(subnet_check, "_check_provider", fake_check):
+    with mock.patch.object(dnsbl, "_lookup", as_lookup(fake_check)):
         result = subnet_check.check_subnet("203.0.113.0/30")
     assert result["blacklisted_count"] == 0
     assert result["failed_providers"] == ["bl.spamcop.net"]
@@ -193,14 +202,50 @@ def test_subnet_check_counts_ips_with_failed_lookups_as_incomplete():
             return provider, False, dnsbl.REFUSED
         return provider, reversed_ip == "2.0.0.127", None
     dnsbl._test_point_ok_until.clear()
-    with mock.patch.object(dnsbl, "_check_provider", fake_check), \
-            mock.patch.object(subnet_check, "_check_provider", fake_check):
+    with mock.patch.object(dnsbl, "_lookup", as_lookup(fake_check)):
         result = subnet_check.check_subnet("203.0.113.0/29")
     by_ip = {r["ip"]: r for r in result["results"]}
     assert by_ip["203.0.113.3"]["failed_on"] == ["zen.spamhaus.org"]
     assert by_ip["203.0.113.1"]["failed_on"] == []
     assert result["incomplete_count"] == 2
     assert result["clean_count"] == result["total_ips"] - 2
+
+
+def test_dnsbl_decodes_spamhaus_codes_and_orders_by_severity():
+    def fake_lookup(reversed_ip, provider, resolver=None):
+        if reversed_ip == "2.0.0.127":
+            return ["127.0.0.2"], None
+        if provider == "zen.spamhaus.org" and reversed_ip == "10.113.0.203":
+            return ["127.0.0.10"], None
+        if provider == "ips.backscatterer.org" and reversed_ip == "10.113.0.203":
+            return ["127.0.0.2"], None
+        return [], None
+    dnsbl._test_point_ok_until.clear()
+    with mock.patch.object(dnsbl, "_lookup", fake_lookup):
+        result = dnsbl.check_dnsbl_providers("203.0.113.10")
+    first, second = result["detected_on"]
+    assert first["provider"] == "zen.spamhaus.org"
+    assert first["severity"] == "high"
+    assert first["categories"] == ["PBL: end-user range, listed by its ISP"]
+    assert second["provider"] == "ips.backscatterer.org"
+    assert second["severity"] == "info"
+    assert result["severity"] == "high"
+
+
+def test_dnsbl_neutral_code_is_not_a_listing():
+    # Mailspike answers 127.0.0.13 (L2, neutral reputation) for ordinary senders.
+    resolver = mock.Mock(resolve=mock.Mock(return_value=_answers("127.0.0.13")))
+    assert dnsbl._lookup("4.3.2.1", "bl.mailspike.net", resolver) == ([], None)
+    resolver = mock.Mock(resolve=mock.Mock(return_value=_answers("127.0.0.13", "127.0.0.11")))
+    assert dnsbl._lookup("4.3.2.1", "bl.mailspike.net", resolver) == (["127.0.0.11"], None)
+
+
+def test_dnsbl_uses_spamhaus_dqs_key_when_set(monkeypatch):
+    monkeypatch.setenv("SPAMHAUS_DQS_KEY", "abc123")
+    assert dnsbl._query_zone("zen.spamhaus.org") == "abc123.zen.dq.spamhaus.net"
+    assert dnsbl._query_zone("bl.spamcop.net") == "bl.spamcop.net"
+    monkeypatch.delenv("SPAMHAUS_DQS_KEY")
+    assert dnsbl._query_zone("zen.spamhaus.org") == "zen.spamhaus.org"
 
 
 def test_dnsbl_nameservers_accept_hostnames(monkeypatch):
