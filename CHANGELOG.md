@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-10-25
+
+### Security
+
+- Frontend image moved to Node.js 22.23.4, the patched 22.x release from the [October 2026 Node.js security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases), which fixes the Brotli decoder out-of-bounds write CVE-2026-111497 among others (#24, #25, thanks @mkaand). The base image is now pinned by digest.
+- Added Dependabot version updates for the Docker base images and GitHub Actions, so the pinned image keeps getting patch releases.
+
+### Fixed
+
+- Blacklists that always showed "No answer" (#23). 36 providers had shut down or stopped answering (all SORBS zones, MSRBL, abuse.ch, NiX Spam `ix.dnsbl.manitu.net`, WPBL `db.wpbl.info`, AUPADS, gweep.ca, TransIP, kundenserver.de, nether.net, imp.ch, Lashback, woody.ch, matrix.spfbl.net and others) and were removed. Added `bl.0spam.org`, `bl.blocklist.de`, `dnsbl.spfbl.net` (the current SPFBL zone) and `truncate.gbudb.net`. AbuseBox now checks 28 blacklists, each verified to answer its test address.
+- Spamhaus could silently report "clean". Through some public resolvers it answers "not listed" for everything, including its own test address. Each blacklist's clean answer now only counts if it also lists its test address (127.0.0.2, rechecked every 30 minutes); otherwise it is shown as "No answer".
+- The subnet check no longer queries the defunct `dnsbl.sorbs.net`.
+
+### Changed
+
+- `DNSBL_NAMESERVERS` accepts hostnames, e.g. a Docker Compose service name. See [Blacklists that show "No answer"](README.md#blacklists-that-show-no-answer) for running your own resolver.
+
 ## [1.2.0] - 2026-10-07
 
 Monitoring that tells you what needs attention, plus a security and accessibility overhaul. (Supersedes the unreleased 1.1.3.)
