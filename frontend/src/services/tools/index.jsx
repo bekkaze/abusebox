@@ -189,9 +189,10 @@ export const downloadSubnetCsv = (data) => {
     ['CIDR', data?.cidr || ''],
     ['Total IPs', data?.total_ips ?? 0],
     ['Blacklisted', data?.blacklisted_count ?? 0],
+    ['Incomplete', data?.incomplete_count ?? 0],
     [],
-    ['IP', 'Blacklisted', 'Listed on'],
-    ...(data?.results || []).map((result) => [result.ip, result.is_blacklisted ? 'Yes' : 'No', (result.listed_on || []).join('; ')]),
+    ['IP', 'Blacklisted', 'Listed on', 'No answer from'],
+    ...(data?.results || []).map((result) => [result.ip, result.is_blacklisted ? 'Yes' : 'No', (result.listed_on || []).join('; '), (result.failed_on || []).join('; ')]),
   ];
   downloadCsv(rows, `subnet-${safeFilename(data?.cidr)}.csv`);
 };

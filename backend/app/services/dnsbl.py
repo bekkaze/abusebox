@@ -58,6 +58,11 @@ _TEST_POINT_NOT_LISTED = "1.0.0.127"
 _TEST_POINT_TTL = 1800.0
 _test_point_ok_until: dict[str, float] = {}
 
+# Why a provider gave no usable answer. Refusals (rate limited, blocked
+# resolver, broken zone) aren't retried: asking again only makes it worse.
+REFUSED = "refused"
+UNREACHABLE = "unreachable"
+
 
 def _nameserver_address(value: str) -> str | None:
     # Accept hostnames (e.g. a compose service name) as well as IPs and DoH URLs.
@@ -124,10 +129,11 @@ def _check_provider(
     reversed_ip: str,
     provider: str,
     resolver: dns.resolver.Resolver | None = None,
-) -> tuple[str, bool, bool]:
+) -> tuple[str, bool, str | None]:
     """Check a single DNSBL provider.
 
-    Returns (provider, is_listed, failed).
+    Returns (provider, is_listed, failure), where failure is None when the
+    provider answered, else REFUSED or UNREACHABLE.
     """
     if resolver is None:
         resolver = _make_resolver()
@@ -138,21 +144,21 @@ def _check_provider(
         for rdata in answers:
             # Only 127.0.0.x responses indicate a real listing.
             if rdata.to_text().startswith("127.0.0."):
-                return provider, True, False
+                return provider, True, None
         # Anything else is an error, not a clean result: 127.255.255.x are
         # refusal codes (Spamhaus returns .254 via public resolvers and .255
         # when rate limited), and an address outside 127/8 means the zone's
         # domain now points somewhere else (e.g. an expired, parked domain).
-        return provider, False, True
+        return provider, False, REFUSED
     except dns.resolver.NXDOMAIN:
         # NXDOMAIN = not listed on this provider
-        return provider, False, False
+        return provider, False, None
     except dns.resolver.NoAnswer:
         # No A record = not listed
-        return provider, False, False
+        return provider, False, None
     except (dns.resolver.NoNameservers, dns.resolver.LifetimeTimeout, dns.exception.DNSException):
         # Actual failures: timeout, servfail, etc.
-        return provider, False, True
+        return provider, False, UNREACHABLE
 
 
 def _answers_test_points(provider: str, resolver: dns.resolver.Resolver) -> bool:
@@ -189,6 +195,7 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
     reversed_ip = ".".join(reversed(resolved_ip.split(".")))
     listed: set[str] = set()
     failed_providers: set[str] = set()
+    refused: set[str] = set()
     resolver = _make_resolver()
 
     def _run_batch(providers: list[str] | set[str]) -> None:
@@ -200,12 +207,14 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
             for future in as_completed(future_map):
                 provider = future_map[future]
                 try:
-                    _, is_listed, failed = future.result()
+                    _, is_listed, failure = future.result()
                     if is_listed:
                         listed.add(provider)
                         failed_providers.discard(provider)
-                    elif failed:
+                    elif failure:
                         failed_providers.add(provider)
+                        if failure == REFUSED:
+                            refused.add(provider)
                 except Exception:
                     failed_providers.add(provider)
 
@@ -214,9 +223,9 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
 
     # Retry pass: providers that timed out may succeed on a second attempt
     # when there is less concurrent load on the resolver.
-    if failed_providers:
-        retry = set(failed_providers)
-        failed_providers.clear()
+    retry = failed_providers - refused
+    if retry:
+        failed_providers.difference_update(retry)
         _run_batch(retry)
 
     # An answer, listed or clean, only counts if the provider still answers

@@ -52,6 +52,7 @@ export default function SubnetCheck() {
               <Stat label="Total IPs" value={data.total_ips} tone="sky" />
               <Stat label="Blacklisted" value={data.blacklisted_count} tone="rose" />
               <Stat label="Clean" value={data.clean_count} tone="emerald" />
+              {data.incomplete_count > 0 && <Stat label="Incomplete" value={data.incomplete_count} tone="amber" />}
             </div>
             <button
               onClick={() => downloadSubnetCsv(data)}
@@ -82,11 +83,16 @@ export default function SubnetCheck() {
                     <tr key={i} className="border-b border-slate-100 dark:border-slate-600 hover:bg-slate-50/60 dark:hover:bg-slate-700/50">
                       <td className="px-4 py-2.5 font-mono text-sm">{result.ip}</td>
                       <td className="px-4 py-2.5">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${result.is_blacklisted ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {result.is_blacklisted ? 'Blacklisted' : 'Clear'}
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${result.is_blacklisted ? 'bg-rose-100 text-rose-700' : result.failed_on?.length ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {result.is_blacklisted ? 'Blacklisted' : result.failed_on?.length ? 'Incomplete' : 'Clear'}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-sm">{result.listed_on?.join(', ') || '—'}</td>
+                      <td className="px-4 py-2.5 text-sm">
+                        {result.listed_on?.join(', ') || '—'}
+                        {result.failed_on?.length > 0 && (
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">No answer: {result.failed_on.join(', ')}</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -104,6 +110,7 @@ function Stat({ label, value, tone }) {
     sky: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800',
     rose: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800',
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
+    amber: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
   };
   return (
     <div className={`rounded-lg border px-4 py-2 text-center ${colors[tone]}`}>

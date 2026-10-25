@@ -42,15 +42,17 @@ def export_subnet_csv(data: dict[str, Any]) -> str:
     writer.writerow(["CIDR", data.get("cidr", "")])
     writer.writerow(["Total IPs", data.get("total_ips", 0)])
     writer.writerow(["Blacklisted", data.get("blacklisted_count", 0)])
+    writer.writerow(["Incomplete", data.get("incomplete_count", 0)])
     writer.writerow([])
 
-    writer.writerow(["IP", "Blacklisted", "Listed On"])
+    writer.writerow(["IP", "Blacklisted", "Listed On", "No Answer From"])
 
     for result in data.get("results", []):
         writer.writerow([
             result["ip"],
             "Yes" if result["is_blacklisted"] else "No",
             ", ".join(result.get("listed_on", [])),
+            ", ".join(result.get("failed_on", [])),
         ])
 
     return output.getvalue()
