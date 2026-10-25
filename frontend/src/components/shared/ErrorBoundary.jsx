@@ -1,5 +1,5 @@
 import React from 'react';
-import { HiExclamationCircle } from 'react-icons/hi';
+import { secondaryButtonClass } from './ui';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -18,17 +18,20 @@ export default class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-          <HiExclamationCircle className="text-5xl text-rose-400 mb-4" />
-          <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-2">Something went wrong</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-md">
+        <div role="alert" className="py-16 max-w-lg">
+          <p className="flex items-baseline gap-3">
+            <span className="font-mono text-xl font-semibold text-s5">5.x</span>
+            <span className="text-xl font-semibold text-ink">This page stopped working</span>
+          </p>
+          <p className="mt-2 font-mono text-xs text-ink-2 break-words">
             {this.state.error?.message || 'An unexpected error occurred.'}
           </p>
           <button
+            type="button"
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-5 rounded-xl text-sm font-medium transition-colors"
+            className={`${secondaryButtonClass} mt-5`}
           >
-            Try Again
+            Try again
           </button>
         </div>
       );

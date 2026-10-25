@@ -1,6 +1,87 @@
 import { useState } from 'react';
+import { HiOutlineLockClosed } from 'react-icons/hi2';
 import { checkSsl } from '../../services/tools';
-import { LookupForm } from '../../components/shared/ui';
+import { SkeletonLine } from '../../components/shared/Skeleton';
+import { Alert, EmptyState, Field, Fields, LookupForm, PageHeader, Section } from '../../components/shared/ui';
+
+const EXPIRY_WARNING_DAYS = 30;
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+// "2026-12-30T23:59:59+00:00" -> "2026-12-30 23:59 UTC"
+const formatStamp = (iso) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC` : null);
+
+function verdictFor(data) {
+  const days = data.days_remaining;
+  if (!data.valid) {
+    if (data.error) return { code: '5.x', tone: 'text-s5', text: 'Certificate invalid' };
+    if (typeof days === 'number' && days < 0) return { code: '5.x', tone: 'text-s5', text: `Certificate expired ${plural(-days, 'day')} ago` };
+    return { code: '5.x', tone: 'text-s5', text: 'Certificate expired' };
+  }
+  if (days < EXPIRY_WARNING_DAYS) return { code: '4.x', tone: 'text-s4', text: `Certificate valid, but expires in ${plural(days, 'day')}` };
+  return { code: '2.x', tone: 'text-s2', text: `Certificate valid, expires in ${plural(days, 'day')}` };
+}
+
+function SslVerdict({ data }) {
+  const verdict = verdictFor(data);
+  return (
+    <div role="status" className="space-y-1">
+      <p className="flex flex-wrap items-baseline gap-x-2.5">
+        <span className={`font-mono text-lg font-semibold ${verdict.tone}`} aria-hidden="true">{verdict.code}</span>
+        <span className="text-lg font-semibold text-ink">{verdict.text}</span>
+      </p>
+      {data.error && <p className="text-sm text-ink-2 break-words">{data.error}</p>}
+      {data.valid && data.days_remaining < EXPIRY_WARNING_DAYS && (
+        <p className="text-sm text-ink-2">Renew it before it expires, or browsers and mail servers will refuse the connection.</p>
+      )}
+    </div>
+  );
+}
+
+/** Common name with the organization after it, when there is one. */
+function nameWithOrg(name) {
+  if (!name?.common_name && !name?.organization) return null;
+  return (
+    <>
+      {name.common_name && <span className="font-mono text-[13px] break-all">{name.common_name}</span>}
+      {name.common_name && name.organization && <span className="text-ink-2"> · </span>}
+      {name.organization}
+    </>
+  );
+}
+
+function CertificateFields({ data }) {
+  const cipher = data.cipher || {};
+  return (
+    <Fields className="tabular-nums">
+      <Field name="Hostname"><span className="font-mono text-[13px] break-all">{data.hostname}</span></Field>
+      <Field name="Subject">{nameWithOrg(data.subject)}</Field>
+      <Field name="Issuer">{nameWithOrg(data.issuer)}</Field>
+      <Field name="Valid-From">{formatStamp(data.not_before)}</Field>
+      <Field name="Expires">{formatStamp(data.not_after)}</Field>
+      <Field name="Serial-Number">
+        {data.serial_number ? <span className="font-mono text-[13px] break-all">{data.serial_number}</span> : null}
+      </Field>
+      <Field name="Protocol">{cipher.protocol ? <span className="font-mono text-[13px]">{cipher.protocol}</span> : null}</Field>
+      <Field name="Cipher">
+        {cipher.name ? (
+          <>
+            <span className="font-mono text-[13px] break-all">{cipher.name}</span>
+            {cipher.bits ? <span className="text-ink-2"> ({cipher.bits}-bit)</span> : null}
+          </>
+        ) : null}
+      </Field>
+      {data.san?.length > 0 && (
+        <Field name={`SAN (${data.san.length})`}>
+          <ul className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {data.san.map((name, i) => (
+              <li key={`${i}-${name}`} className="font-mono text-[13px] break-all">{name}</li>
+            ))}
+          </ul>
+        </Field>
+      )}
+    </Fields>
+  );
+}
 
 export default function SslChecker() {
   const [hostname, setHostname] = useState('');
@@ -17,114 +98,60 @@ export default function SslChecker() {
       const result = await checkSsl(hostname.trim());
       setData(result);
     } catch (err) {
-      setError(err.message || 'Failed to check SSL certificate.');
+      setError(err.message || 'SSL check failed. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const statusColor = (valid, days) => {
-    if (!valid) return 'bg-rose-50 border-rose-200 dark:bg-rose-900/30 dark:border-rose-800';
-    if (days < 30) return 'bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800';
-    return 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800';
-  };
-
-  const statusText = (valid, days) => {
-    if (!valid) return { label: 'Expired / Invalid', color: 'text-rose-700 dark:text-rose-300' };
-    if (days < 30) return { label: `Expiring Soon (${days} days)`, color: 'text-amber-700 dark:text-amber-300' };
-    return { label: `Valid (${days} days remaining)`, color: 'text-emerald-700 dark:text-emerald-300' };
-  };
+  const connectionError = data?.error && !('valid' in data);
+  const hasCertificate = data && !connectionError && Boolean(data.not_after);
 
   return (
-    <section className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
-      <div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Tools</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">SSL Certificate Checker</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Check certificate validity, expiry date, issuer, and cipher details.</p>
-      </div>
+    <div>
+      <PageHeader
+        title="SSL certificate"
+        description="Connects on port 443 and reports whether the certificate is valid, when it expires, who issued it and the cipher in use."
+      />
 
       <LookupForm
         label="Hostname"
         value={hostname}
         onChange={setHostname}
         onSubmit={handleCheck}
-        placeholder="example.com"
+        placeholder="mail.example.com"
         loading={loading}
         buttonLabel="Check SSL"
         loadingLabel="Checking"
         error={error}
       />
 
-
-      {data && (
-        <div className="space-y-4">
-          {data.error && !('valid' in data) ? (
-            <div className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl p-4 text-sm text-rose-700 dark:text-rose-300">{data.error}</div>
-          ) : (
-            <>
-              <div className={`rounded-xl border p-4 ${statusColor(data.valid, data.days_remaining)}`}>
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 font-medium">Certificate Status</p>
-                    <p className={`text-2xl font-bold mt-1 ${statusText(data.valid, data.days_remaining).color}`}>
-                      {statusText(data.valid, data.days_remaining).label}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Hostname</p>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">{data.hostname}</p>
-                  </div>
-                </div>
+      <div className="mt-8">
+        {data ? (
+          <Section
+            id="ssl-report"
+            title={<>Certificate for <span className="font-mono font-semibold break-all">{data.hostname || hostname.trim()}</span></>}
+          >
+            {connectionError ? (
+              <Alert tone="error">{data.error}</Alert>
+            ) : (
+              <div className="space-y-5">
+                <SslVerdict data={data} />
+                {hasCertificate && <CertificateFields data={data} />}
               </div>
-
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 dark:border-slate-600 p-4 space-y-3">
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200">Subject</h4>
-                  <Row label="Common Name" value={data.subject?.common_name} />
-                  <Row label="Organization" value={data.subject?.organization} />
-                </div>
-                <div className="rounded-lg border border-slate-200 dark:border-slate-600 p-4 space-y-3">
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200">Issuer</h4>
-                  <Row label="Common Name" value={data.issuer?.common_name} />
-                  <Row label="Organization" value={data.issuer?.organization} />
-                </div>
-                <div className="rounded-lg border border-slate-200 dark:border-slate-600 p-4 space-y-3">
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200">Validity</h4>
-                  <Row label="Not Before" value={data.not_before} />
-                  <Row label="Not After" value={data.not_after} />
-                  <Row label="Serial Number" value={data.serial_number} />
-                </div>
-                <div className="rounded-lg border border-slate-200 dark:border-slate-600 p-4 space-y-3">
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200">Cipher</h4>
-                  <Row label="Name" value={data.cipher?.name} />
-                  <Row label="Protocol" value={data.cipher?.protocol} />
-                  <Row label="Bits" value={data.cipher?.bits} />
-                </div>
-              </div>
-
-              {data.san?.length > 0 && (
-                <div className="rounded-lg border border-slate-200 dark:border-slate-600 p-4">
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Subject Alternative Names ({data.san.length})</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {data.san.map((name, i) => (
-                      <span key={i} className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full px-3 py-1 text-xs font-mono">{name}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function Row({ label, value }) {
-  return (
-    <div className="flex justify-between text-sm">
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="font-medium text-slate-800 dark:text-slate-200 text-right break-all max-w-[60%]">{value || '—'}</span>
+            )}
+          </Section>
+        ) : loading ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Checking SSL certificate">
+            <SkeletonLine className="h-6 w-80 max-w-full" />
+            <div className="pt-3 space-y-2">{[...Array(8)].map((_, i) => <SkeletonLine key={i} className="h-4 max-w-xl" />)}</div>
+          </div>
+        ) : (
+          <EmptyState icon={HiOutlineLockClosed} title="No check yet">
+            Enter a hostname above to see its certificate status, expiry date, issuer and cipher.
+          </EmptyState>
+        )}
+      </div>
     </div>
   );
 }

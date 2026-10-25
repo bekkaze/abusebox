@@ -175,11 +175,16 @@ export const downloadBlacklistCsv = (data) => {
     ['Hostname', data?.hostname || ''],
     ['Blacklisted', data?.is_blacklisted ? 'Yes' : 'No'],
     [],
-    ['Provider', 'Status'],
-    ...(data?.providers || []).map((provider) => [
-      provider,
-      detected.has(provider) ? (detected.get(provider).status === 'open' ? 'listed' : `listed (${detected.get(provider).status})`) : failed.has(provider) ? 'unavailable' : 'clear',
-    ]),
+    ['Provider', 'Status', 'Severity', 'Meaning'],
+    ...(data?.providers || []).map((provider) => {
+      const entry = detected.get(provider);
+      return [
+        provider,
+        entry ? (entry.status === 'open' ? 'listed' : `listed (${entry.status})`) : failed.has(provider) ? 'unavailable' : 'clear',
+        entry?.severity || '',
+        (entry?.categories || []).filter((item) => item !== 'unknown').join('; '),
+      ];
+    }),
   ];
   downloadCsv(rows, `blacklist-${safeFilename(data?.hostname)}.csv`);
 };

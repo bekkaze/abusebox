@@ -1,37 +1,108 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
-/* Shared building blocks so every page gets the same surfaces, dark mode,
-   labels and states without re-styling them by hand. */
+/* Shared building blocks: one vocabulary for surfaces, controls and states,
+   in the Delivery Report world (paper, ink, hairline rules, one teal accent). */
 
-export const cardClass =
-  'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm';
+export const cardClass = 'bg-paper border border-rule rounded-md';
 
 export const inputClass =
-  'h-11 w-full px-3.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900/60 ' +
-  'text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 ' +
-  'focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors';
+  'h-9 w-full px-3 rounded-md border border-rule-strong bg-paper text-sm text-ink placeholder:text-ink-2 ' +
+  'focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition-colors ' +
+  'disabled:bg-sunk disabled:text-ink-2 aria-[invalid=true]:border-s5';
 
-export const primaryButtonClass =
-  'inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg font-medium text-white bg-cyan-600 ' +
-  'hover:bg-cyan-700 active:translate-y-px transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+export const selectClass = `${inputClass} pr-8`;
 
-export const secondaryButtonClass =
-  'inline-flex items-center justify-center gap-2 h-11 px-4 rounded-lg font-medium text-sm text-slate-700 dark:text-slate-200 ' +
-  'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 active:translate-y-px transition-colors ' +
-  'disabled:opacity-50 disabled:cursor-not-allowed';
+const buttonBase =
+  'inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-md text-sm font-semibold whitespace-nowrap ' +
+  'transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
-export function PageHeader({ eyebrow, title, description, actions }) {
+export const primaryButtonClass = `${buttonBase} text-accent-ink bg-accent hover:bg-accent-hover`;
+
+export const secondaryButtonClass = `${buttonBase} text-ink bg-paper border border-rule-strong hover:bg-sunk`;
+
+export const dangerButtonClass = `${buttonBase} text-paper bg-s5 hover:bg-s5/90`;
+
+export const quietButtonClass = `${buttonBase} text-ink-2 hover:text-ink hover:bg-sunk`;
+
+export const linkClass = 'font-medium text-accent hover:underline underline-offset-2';
+
+/** Page title row. Titles carry their own weight: no eyebrow above them. */
+export function PageHeader({ title, description, actions }) {
   return (
-    <div className={`${cardClass} p-5`}>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div className="min-w-0">
-          {eyebrow && <p className="text-sm text-slate-500 dark:text-slate-400">{eyebrow}</p>}
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h1>
-          {description && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-prose">{description}</p>}
-        </div>
-        {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
+    <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-rule">
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold tracking-tight text-ink">{title}</h1>
+        {description && <p className="mt-1 text-sm text-ink-2 max-w-prose">{description}</p>}
       </div>
-    </div>
+      {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
+    </header>
+  );
+}
+
+/** A titled region separated by a hairline, instead of a boxed card. */
+export function Section({ title, action, children, className = '', id }) {
+  return (
+    <section className={className} aria-labelledby={id}>
+      <div className="flex items-baseline justify-between gap-3 border-b border-rule pb-2 mb-3">
+        <h2 id={id} className="text-sm font-semibold text-ink">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Message-header style details: "Field-Name: value" rows. */
+export function Fields({ children, className = '' }) {
+  return (
+    <dl className={`grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm ${className}`}>{children}</dl>
+  );
+}
+
+export function Field({ name, children }) {
+  return (
+    <>
+      <dt className="font-mono text-xs leading-5 text-ink-2">{name}:</dt>
+      <dd className="min-w-0 text-ink break-words">{children ?? '—'}</dd>
+    </>
+  );
+}
+
+// Result states, named with the SMTP reply class they resemble:
+// 5.x permanent (listed), 4.x temporary (no answer), 3.x pending, 2.x OK.
+const STATUS = {
+  listed: { code: '5.x', label: 'Listed', className: 'text-s5 bg-s5-soft' },
+  unavailable: { code: '4.x', label: 'No answer', className: 'text-s4 bg-s4-soft' },
+  requested: { code: '3.x', label: 'Removal requested', className: 'text-info bg-info-soft' },
+  clear: { code: '2.x', label: 'Clear', className: 'text-s2 bg-s2-soft' },
+};
+
+export function StatusTag({ status, label }) {
+  const info = STATUS[status] || STATUS.clear;
+  return (
+    <span className={`inline-flex items-baseline gap-1.5 rounded px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap ${info.className}`}>
+      <span className="font-mono text-2xs font-normal opacity-80" aria-hidden="true">{info.code}</span>
+      {label || info.label}
+    </span>
+  );
+}
+
+const SEVERITY_TAGS = {
+  critical: { label: 'Critical', className: 'bg-s5 text-paper' },
+  high: { label: 'High', className: 'bg-s5-soft text-s5' },
+  medium: { label: 'Medium', className: 'bg-s4-soft text-s4' },
+  low: { label: 'Low', className: 'bg-sunk text-ink-2 ring-1 ring-inset ring-rule' },
+  info: { label: 'Info', className: 'bg-info-soft text-info' },
+};
+
+/** How much a listing matters: critical, high, medium, low or info. */
+export function SeverityTag({ severity }) {
+  const info = SEVERITY_TAGS[severity];
+  if (!info) return null;
+  return (
+    <span className={`inline-flex rounded px-1.5 py-px text-2xs font-semibold uppercase tracking-wide ${info.className}`}>
+      {info.label}
+    </span>
   );
 }
 
@@ -47,14 +118,23 @@ export function Spinner({ className = 'h-4 w-4' }) {
 /** Single-field lookup used by the Check & Lookup tools. */
 export function LookupForm({ label, value, onChange, onSubmit, placeholder, loading, buttonLabel, loadingLabel, error, hint }) {
   const id = useId();
+  const [missing, setMissing] = useState(false);
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (!loading) onSubmit();
+    if (loading) return;
+    if (!value.trim()) {
+      setMissing(true);
+      document.getElementById(id)?.focus();
+      return;
+    }
+    setMissing(false);
+    onSubmit();
   };
+  const shownError = error || (missing && !value.trim() ? 'Enter a domain or IP address to check.' : '');
   return (
-    <form onSubmit={handleSubmit} className="mt-4" noValidate>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{label}</label>
-      <div className="flex flex-col sm:flex-row gap-3">
+    <form onSubmit={handleSubmit} className="mt-5" noValidate>
+      <label htmlFor={id} className="block text-sm font-medium text-ink mb-1.5">{label}</label>
+      <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
         <input
           id={id}
           type="text"
@@ -62,60 +142,60 @@ export function LookupForm({ label, value, onChange, onSubmit, placeholder, load
           autoComplete="off"
           autoCapitalize="off"
           spellCheck="false"
-          className={inputClass}
+          className={`${inputClass} font-mono`}
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
+          aria-invalid={Boolean(shownError)}
+          aria-describedby={shownError ? `${id}-error` : hint ? `${id}-hint` : undefined}
         />
-        <button type="submit" className={`${primaryButtonClass} sm:min-w-[8.5rem]`} disabled={loading || !value.trim()}>
+        <button type="submit" className={`${primaryButtonClass} sm:min-w-[7.5rem]`} disabled={loading}>
           {loading && <Spinner />}
           {loading ? loadingLabel : buttonLabel}
         </button>
       </div>
-      {hint && !error && <p id={`${id}-hint`} className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
-      {error && <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+      {hint && !shownError && <p id={`${id}-hint`} className="mt-1.5 text-xs text-ink-2">{hint}</p>}
+      {shownError && <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-s5">{shownError}</p>}
     </form>
   );
 }
 
 const ALERT_TONES = {
-  error: 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300',
-  warning: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200',
-  info: 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800 text-sky-800 dark:text-sky-200',
+  error: 'bg-s5-soft text-s5 border-s5/30',
+  warning: 'bg-s4-soft text-s4 border-s4/30',
+  info: 'bg-info-soft text-info border-info/25',
 };
 
 export function Alert({ tone = 'error', children, className = '' }) {
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`rounded-xl border p-4 text-sm ${ALERT_TONES[tone]} ${className}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`rounded-md border px-3.5 py-2.5 text-sm ${ALERT_TONES[tone]} ${className}`}>
       {children}
     </div>
   );
 }
 
-/** Placeholder shown before the first lookup or when a list is empty. */
+/** Placeholder shown before the first lookup or when a list is empty: says what to do next. */
 export function EmptyState({ icon: Icon, title, children, action }) {
   return (
-    <div className="text-center py-10 px-4">
-      {Icon && <Icon className="mx-auto text-4xl text-slate-300 dark:text-slate-600 mb-3" aria-hidden="true" />}
-      {title && <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>}
-      {children && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">{children}</p>}
+    <div className="py-10 px-4 max-w-md">
+      {Icon && <Icon className="text-2xl text-ink-3 mb-3" aria-hidden="true" />}
+      {title && <p className="font-semibold text-ink">{title}</p>}
+      {children && <p className="text-sm text-ink-2 mt-1">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
 
-/** Label/value tile used in result grids. */
+/** Label/value cell used in result grids. */
 export function InfoTile({ label, value, tone }) {
   const tones = {
-    good: 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-900/20',
-    bad: 'border-rose-200 dark:border-rose-800 bg-rose-50/70 dark:bg-rose-900/20',
+    good: 'border-s2/30 bg-s2-soft',
+    bad: 'border-s5/30 bg-s5-soft',
   };
   return (
-    <div className={`rounded-lg border p-3 ${tones[tone] || 'border-slate-200 dark:border-slate-600 bg-slate-50/70 dark:bg-slate-700/30'}`}>
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 mt-0.5 break-all tabular-nums">{value ?? '—'}</p>
+    <div className={`rounded-md border px-3 py-2 ${tones[tone] || 'border-rule bg-paper'}`}>
+      <p className="font-mono text-xs text-ink-2">{label}</p>
+      <p className="text-sm font-semibold text-ink mt-0.5 break-all tabular-nums">{value ?? '—'}</p>
     </div>
   );
 }

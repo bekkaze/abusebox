@@ -1,7 +1,37 @@
 import { useState } from 'react';
-import { HiCheckCircle, HiStatusOnline, HiXCircle } from 'react-icons/hi';
+import { HiOutlineSignal } from 'react-icons/hi2';
 import { checkServerStatus } from '../../services/tools';
-import { Alert, EmptyState, InfoTile, LookupForm, cardClass } from '../../components/shared/ui';
+import { SkeletonLine } from '../../components/shared/Skeleton';
+import { EmptyState, Field, Fields, LookupForm, PageHeader, Section } from '../../components/shared/ui';
+
+/** A field value with its reply class, so pass/fail never depends on colour alone. */
+function Check({ ok, children }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className={`font-mono text-xs font-semibold ${ok ? 'text-s2' : 'text-s5'}`} aria-hidden="true">{ok ? '2.x' : '5.x'}</span>
+      {children}
+    </span>
+  );
+}
+
+function Verdict({ data }) {
+  return (
+    <div role="status" className="space-y-1">
+      <p className="flex flex-wrap items-baseline gap-x-2.5">
+        <span className={`font-mono text-lg font-semibold ${data.is_up ? 'text-s2' : 'text-s5'}`} aria-hidden="true">{data.is_up ? '2.x' : '5.x'}</span>
+        <span className="text-lg font-semibold text-ink">{data.is_up ? 'Server is up' : 'Server is down'}</span>
+      </p>
+      {!data.is_up && data.reason && (
+        <p className="text-sm text-ink-2"><span className="font-semibold text-ink">Reason:</span> {data.reason}</p>
+      )}
+      {data.is_up && data.ssl_error && (
+        <p className="text-sm text-ink-2">
+          <span className="font-mono text-xs font-semibold text-s4">4.x</span> It only answered over plain HTTP: the TLS certificate failed.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function ServerStatus() {
   const [hostname, setHostname] = useState('');
@@ -22,68 +52,81 @@ export default function ServerStatus() {
     }
   };
 
-  const yesNo = (value) => (value ? 'Yes' : 'No');
   const openClosed = (value) => (value ? 'Open' : 'Closed');
-  const goodBad = (value) => (value ? 'good' : 'bad');
+  const httpOk = (code) => code >= 200 && code < 400;
 
   return (
-    <section className="space-y-5">
-      <div className={`${cardClass} p-5`}>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Uptime check</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Is server up?</h1>
-        <LookupForm
-          label="Hostname or URL"
-          value={hostname}
-          onChange={setHostname}
-          onSubmit={handleCheck}
-          placeholder="example.com or https://example.com/health"
-          loading={loading}
-          buttonLabel="Check"
-          loadingLabel="Checking"
-          error={error}
-          hint="Checks DNS, ports 80/443 and an HTTP request. Private and internal addresses are not allowed."
-        />
-      </div>
+    <div>
+      <PageHeader
+        title="Server status"
+        description="Checks whether a host resolves, has ports 80 and 443 open and answers an HTTP request."
+      />
 
-      <div className={`${cardClass} p-5`}>
-        {!data ? (
-          <EmptyState icon={HiStatusOnline} title="No check yet">
+      <LookupForm
+        label="Hostname or URL"
+        value={hostname}
+        onChange={setHostname}
+        onSubmit={handleCheck}
+        placeholder="example.com or https://example.com/health"
+        loading={loading}
+        buttonLabel="Check"
+        loadingLabel="Checking"
+        error={error}
+        hint="Private and internal addresses are not allowed."
+      />
+
+      <div className="mt-8">
+        {data ? (
+          <Section
+            id="server-status-report"
+            title={<>Report for <span className="font-mono font-semibold break-all">{data.hostname}</span></>}
+          >
+            <div className="space-y-5">
+              <Verdict data={data} />
+              <Fields className="border-t border-rule pt-4">
+                <Field name="DNS">
+                  <Check ok={data.dns_resolves}>{data.dns_resolves ? 'Resolves' : 'Does not resolve'}</Check>
+                </Field>
+                <Field name="Resolved-IP">
+                  {data.resolved_ip ? <span className="font-mono text-[13px]">{data.resolved_ip}</span> : null}
+                </Field>
+                {'port_443_open' in data && (
+                  <Field name="Port-443"><Check ok={data.port_443_open}>{openClosed(data.port_443_open)} (HTTPS)</Check></Field>
+                )}
+                {'port_80_open' in data && (
+                  <Field name="Port-80"><Check ok={data.port_80_open}>{openClosed(data.port_80_open)} (HTTP)</Check></Field>
+                )}
+                {data.status_code !== undefined && (
+                  <Field name="HTTP-Status">
+                    <Check ok={httpOk(data.status_code)}><span className="font-mono text-[13px]">{data.status_code}</span></Check>
+                  </Field>
+                )}
+                {data.response_time_ms !== undefined && (
+                  <Field name="Response-Time"><span className="tabular-nums">{data.response_time_ms} ms</span></Field>
+                )}
+                {data.server_header && (
+                  <Field name="Server"><span className="font-mono text-[13px] break-all">{data.server_header}</span></Field>
+                )}
+                {data.final_url && data.final_url !== data.url && (
+                  <Field name="Redirected-To"><span className="font-mono text-[13px] break-all">{data.final_url}</span></Field>
+                )}
+                {data.ssl_error && (
+                  <Field name="TLS"><Check ok={false}>Certificate error (answered over HTTP)</Check></Field>
+                )}
+              </Fields>
+            </div>
+          </Section>
+        ) : loading ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Checking server">
+            <SkeletonLine className="h-6 w-56" />
+            <div className="pt-3 space-y-2">{[...Array(5)].map((_, i) => <SkeletonLine key={i} className="h-4 w-80 max-w-full" />)}</div>
+          </div>
+        ) : (
+          <EmptyState icon={HiOutlineSignal} title="No check yet">
             Enter a hostname or URL to see whether it resolves, which ports are open and how fast it responds.
           </EmptyState>
-        ) : (
-          <div className="space-y-5">
-            <div className="flex items-center gap-4">
-              <div className={`h-14 w-14 rounded-xl flex items-center justify-center text-3xl ${data.is_up ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400'}`}>
-                {data.is_up ? <HiCheckCircle aria-hidden="true" /> : <HiXCircle aria-hidden="true" />}
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-white break-all">{data.hostname}</h2>
-                <p className={`text-sm font-medium ${data.is_up ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                  {data.is_up ? 'Server is up' : 'Server is down'}
-                </p>
-              </div>
-            </div>
-
-            {!data.is_up && data.reason && (
-              <Alert tone="error"><span className="font-semibold">Reason:</span> {data.reason}</Alert>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <InfoTile label="Resolved IP" value={data.resolved_ip} />
-              <InfoTile label="DNS resolves" value={yesNo(data.dns_resolves)} tone={goodBad(data.dns_resolves)} />
-              {'port_443_open' in data && <InfoTile label="Port 443 (HTTPS)" value={openClosed(data.port_443_open)} tone={goodBad(data.port_443_open)} />}
-              {'port_80_open' in data && <InfoTile label="Port 80 (HTTP)" value={openClosed(data.port_80_open)} tone={goodBad(data.port_80_open)} />}
-              {data.status_code !== undefined && (
-                <InfoTile label="HTTP status" value={data.status_code} tone={goodBad(data.status_code >= 200 && data.status_code < 400)} />
-              )}
-              {data.response_time_ms !== undefined && <InfoTile label="Response time" value={`${data.response_time_ms} ms`} />}
-              {data.server_header && <InfoTile label="Server" value={data.server_header} />}
-              {data.final_url && data.final_url !== data.url && <InfoTile label="Redirected to" value={data.final_url} />}
-              {data.ssl_error && <InfoTile label="TLS" value="Certificate error (answered over HTTP)" tone="bad" />}
-            </div>
-          </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }

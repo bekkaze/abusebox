@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { HiDownload, HiShieldCheck } from 'react-icons/hi';
+import { HiOutlineArrowDownTray, HiOutlineShieldCheck } from 'react-icons/hi2';
 import { checkBlacklist } from '../../services/blacklist/checkService';
 import { downloadBlacklistCsv } from '../../services/tools';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
-import { EmptyState, LookupForm, cardClass, secondaryButtonClass } from '../../components/shared/ui';
+import { SkeletonLine } from '../../components/shared/Skeleton';
+import { EmptyState, LookupForm, PageHeader, Section, secondaryButtonClass } from '../../components/shared/ui';
 
 export default function BlacklistCheck() {
   const [searchParams] = useSearchParams();
@@ -43,40 +44,49 @@ export default function BlacklistCheck() {
   }, [requested]);
 
   return (
-    <section className="space-y-5">
-      <div className={`${cardClass} p-5`}>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Quick probe</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Blacklist check</h1>
-        <LookupForm
-          label="IPv4 address or domain"
-          value={hostname}
-          onChange={setHostname}
-          onSubmit={() => handleCheck()}
-          placeholder="203.0.113.10 or mail.example.com"
-          loading={loading}
-          buttonLabel="Run check"
-          loadingLabel="Checking"
-          error={error}
-        />
-      </div>
+    <div>
+      <PageHeader
+        title="Blacklist check"
+        description="Checks one IPv4 address or domain against every DNS blacklist and says why each one lists it."
+      />
 
-      <div className={`${cardClass} p-5`}>
-        {!data ? (
-          <EmptyState icon={HiShieldCheck} title="No check yet">
-            Run a check to see the status on every DNS blacklist provider.
-          </EmptyState>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white break-all">Report for {checked}</h2>
+      <LookupForm
+        label="IPv4 address or domain"
+        value={hostname}
+        onChange={setHostname}
+        onSubmit={() => handleCheck()}
+        placeholder="203.0.113.10 or mail.example.com"
+        loading={loading}
+        buttonLabel="Run check"
+        loadingLabel="Checking"
+        error={error}
+      />
+
+      <div className="mt-8">
+        {data ? (
+          <Section
+            id="blacklist-report"
+            title={<>Report for <span className="font-mono font-semibold break-all">{checked}</span></>}
+            action={(
               <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
-                <HiDownload aria-hidden="true" /> Export CSV
+                <HiOutlineArrowDownTray className="text-base text-ink-2" aria-hidden="true" /> Export CSV
               </button>
-            </div>
+            )}
+          >
             <ResultTableQuick data={data} />
+          </Section>
+        ) : loading ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Checking blacklists">
+            <SkeletonLine className="h-6 w-72" />
+            <SkeletonLine className="h-4 w-96 max-w-full" />
+            <div className="pt-3 space-y-2">{[...Array(6)].map((_, i) => <SkeletonLine key={i} className="h-9" />)}</div>
           </div>
+        ) : (
+          <EmptyState icon={HiOutlineShieldCheck} title="No check yet">
+            Enter an IP or domain above to see its status on every DNS blacklist.
+          </EmptyState>
         )}
       </div>
-    </section>
+    </div>
   );
 }

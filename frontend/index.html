@@ -5,10 +5,23 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Self-hosted threat monitoring for IPs and domains: DNS blacklists, AbuseIPDB, DNS, SSL, WHOIS, SPF/DKIM/DMARC and uptime checks." />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#16191e" media="(prefers-color-scheme: dark)" />
     <title>AbuseBox</title>
   </head>
   <body>
+    <!--
+      THESIS: Every result is a delivery report: field, value, SMTP-style status class (5.x listed,
+      4.x no answer, 3.x pending, 2.x clear) and the reason in plain words. Refuses the KPI-tile SaaS dashboard.
+      OWN-WORLD: White paper, cool grey rail, near-black ink, grey mono field names, hairline rules; red/amber/green
+      status classes; the logo teal is the only accent. Public Sans for the interface, Commit Mono for data only.
+      STORY: The operator opens the dashboard, reads one status line, scans header-style rows of what needs action
+      and why, drills into an asset's full report, re-checks or requests removal.
+      FIRST VIEWPORT: Rail with logo and plain-text nav on the left; a large status line (code + sentence) with a
+      header-field summary strip; attention rows left, scheduler and blacklist history in a narrow right column.
+      FORM: Delivery Report (SMTP bounce notices + RFC 5322 headers), position 4 of 7, seed key 1c2107e2.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -1,18 +1,68 @@
 import { useState } from 'react';
+import { HiOutlineServer } from 'react-icons/hi2';
 import { checkDns } from '../../services/tools';
 import CopyButton from '../../components/shared/CopyButton';
-import { LookupForm } from '../../components/shared/ui';
+import { SkeletonLine } from '../../components/shared/Skeleton';
+import { EmptyState, LookupForm, PageHeader, Section } from '../../components/shared/ui';
 
-const RECORD_COLORS = {
-  A: 'bg-sky-100 text-sky-800',
-  AAAA: 'bg-indigo-100 text-indigo-800',
-  MX: 'bg-amber-100 text-amber-800',
-  TXT: 'bg-slate-100 text-slate-800',
-  CNAME: 'bg-emerald-100 text-emerald-800',
-  NS: 'bg-violet-100 text-violet-800',
-  SOA: 'bg-rose-100 text-rose-800',
-  PTR: 'bg-orange-100 text-orange-800',
-};
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/** Verdict line: what answered, and which record types had nothing. */
+function DnsVerdict({ data }) {
+  const types = Object.keys(data.records);
+  const total = types.reduce((sum, type) => sum + data.records[type].length, 0);
+  const missing = (data.record_types_checked || []).filter((type) => !types.includes(type));
+  return (
+    <div role="status" className="space-y-1">
+      <p className="flex flex-wrap items-baseline gap-x-2.5">
+        <span className={`font-mono text-lg font-semibold ${total ? 'text-s2' : 'text-s4'}`} aria-hidden="true">{total ? '2.x' : '4.x'}</span>
+        <span className="text-lg font-semibold text-ink">
+          {total ? `${plural(total, 'record')} across ${plural(types.length, 'record type')}` : 'No DNS records found'}
+        </span>
+      </p>
+      {total > 0 && missing.length > 0 && (
+        <p className="text-sm text-ink-2">
+          No answer for <span className="font-mono text-xs">{missing.join(', ')}</span>.
+        </p>
+      )}
+      {total === 0 && (
+        <p className="text-sm text-ink-2">Check the spelling, or whether the domain is registered and delegated.</p>
+      )}
+    </div>
+  );
+}
+
+function RecordTable({ type, records }) {
+  const headingId = `dns-${type.toLowerCase()}`;
+  return (
+    <div>
+      <h3 id={headingId} className="flex items-baseline gap-2 mb-2">
+        <span className="font-mono text-sm font-semibold text-ink">{type}</span>
+        <span className="text-xs text-ink-2">{plural(records.length, 'record')}</span>
+      </h3>
+      <div className="relative overflow-x-auto rounded-md border border-rule">
+        <table className="w-full text-sm border-collapse" aria-labelledby={headingId}>
+          <thead className="bg-sunk">
+            <tr className="text-left">
+              <th scope="col" className="px-3 py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule w-full">Value</th>
+              <th scope="col" className="border-b border-rule"><span className="sr-only">Copy</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((record, i) => (
+              <tr key={i} className="border-b border-rule last:border-b-0 align-top hover:bg-sunk/60">
+                <td className="px-3 py-2 font-mono text-[13px] text-ink break-all">{record}</td>
+                <td className="px-3 py-2 text-right">
+                  <CopyButton text={record} label={`Copy ${type} record`} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default function DnsRecords() {
   const [hostname, setHostname] = useState('');
@@ -29,19 +79,18 @@ export default function DnsRecords() {
       const result = await checkDns(hostname.trim());
       setData(result);
     } catch (err) {
-      setError(err.message || 'Failed to lookup DNS records.');
+      setError(err.message || 'DNS lookup failed. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <section className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
-      <div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Tools</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">DNS Record Viewer</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Look up A, AAAA, MX, TXT, CNAME, NS, SOA, and PTR records for any domain.</p>
-      </div>
+    <div>
+      <PageHeader
+        title="DNS records"
+        description="Looks up the A, AAAA, MX, TXT, CNAME, NS, SOA and PTR records for a domain."
+      />
 
       <LookupForm
         label="Domain"
@@ -55,35 +104,30 @@ export default function DnsRecords() {
         error={error}
       />
 
-
-      {data && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Records for <span className="text-cyan-700 dark:text-cyan-400">{data.domain}</span></h3>
-
-          {Object.keys(data.records).length === 0 ? (
-            <p className="text-sm text-slate-500">No records found.</p>
-          ) : (
-            Object.entries(data.records).map(([type, records]) => (
-              <div key={type} className="rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
-                <div className="bg-slate-50 dark:bg-slate-700 px-4 py-2 flex items-center gap-2">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${RECORD_COLORS[type] || 'bg-slate-100 text-slate-700'}`}>
-                    {type}
-                  </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">{records.length} record{records.length !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-600">
-                  {records.map((record, i) => (
-                    <div key={i} className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300 break-all flex items-center justify-between">
-                      <span>{record}</span>
-                      <CopyButton text={record} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </section>
+      <div className="mt-8">
+        {data ? (
+          <Section
+            id="dns-report"
+            title={<>Records for <span className="font-mono font-semibold break-all">{data.domain}</span></>}
+          >
+            <div className="space-y-6">
+              <DnsVerdict data={data} />
+              {Object.entries(data.records).map(([type, records]) => (
+                <RecordTable key={type} type={type} records={records} />
+              ))}
+            </div>
+          </Section>
+        ) : loading ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Looking up DNS records">
+            <SkeletonLine className="h-6 w-72 max-w-full" />
+            <div className="pt-3 space-y-2">{[...Array(6)].map((_, i) => <SkeletonLine key={i} className="h-9" />)}</div>
+          </div>
+        ) : (
+          <EmptyState icon={HiOutlineServer} title="No lookup yet">
+            Enter a domain above to see its DNS records, grouped by type.
+          </EmptyState>
+        )}
+      </div>
+    </div>
   );
 }

@@ -1,71 +1,97 @@
-import ProviderStatusBadge from './ProviderStatusBadge';
-import { providerStatus, sortProviders } from './providerStatus';
+import ListingDetail from './ListingDetail';
+import { listingFor, providerStatus, sortProviders } from './providerStatus';
+import { Field, Fields, StatusTag } from '../shared/ui';
 
 function scoreTone(score) {
-  if (score == null) return 'text-slate-500 dark:text-slate-400';
-  if (score === 0) return 'text-emerald-600 dark:text-emerald-400';
-  if (score <= 25) return 'text-yellow-700 dark:text-yellow-300';
-  if (score <= 75) return 'text-orange-600 dark:text-orange-400';
-  return 'text-rose-600 dark:text-rose-400';
+  if (score == null) return 'text-ink-2';
+  if (score === 0) return 'text-s2';
+  if (score <= 25) return 'text-s4';
+  return 'text-s5';
+}
+
+/** The verdict line above a blacklist result, in reply-class form. */
+export function ResultVerdict({ data, providers, detailsOnly = false }) {
+  const listed = data?.detected_on?.length ?? 0;
+  const unavailable = data?.failed_providers?.length ?? 0;
+  const answered = providers.length - unavailable;
+  return (
+    <div role="status" className="space-y-1">
+      <p className={`flex flex-wrap items-baseline gap-x-2.5 ${detailsOnly ? 'sr-only' : ''}`}>
+        <span className={`font-mono text-lg font-semibold ${listed ? 'text-s5' : 'text-s2'}`} aria-hidden="true">{listed ? '5.x' : '2.x'}</span>
+        <span className="text-lg font-semibold text-ink">
+          {listed ? `Listed on ${listed} of ${providers.length} blacklists` : `Not listed on any of the ${answered} blacklists that answered`}
+        </span>
+      </p>
+      {unavailable > 0 && (
+        <p className="text-sm text-ink-2">
+          <span className="font-mono text-xs font-semibold text-s4">4.x</span> {unavailable} did not answer, so their result is unknown, not clean.
+        </p>
+      )}
+      {data?.is_inconclusive && (
+        <p className="text-sm font-medium text-s4">Too many blacklists did not answer to trust a clean result.</p>
+      )}
+    </div>
+  );
+}
+
+/** One row per blacklist: zone, status, and why it lists the target. */
+export function ProviderRows({ data, providers, action }) {
+  return (
+    <div className="relative overflow-x-auto rounded-md border border-rule">
+      <table className="w-full min-w-[34rem] text-sm border-collapse">
+        <thead className="bg-sunk">
+          <tr className="text-left">
+            <th scope="col" className="px-3 py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule">List</th>
+            <th scope="col" className="px-3 py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule">Status</th>
+            <th scope="col" className="px-3 py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule w-full">Reason</th>
+            {action && <th scope="col" className="border-b border-rule"><span className="sr-only">Action</span></th>}
+          </tr>
+        </thead>
+        <tbody>
+          {providers.map((provider) => {
+            const status = providerStatus(data, provider);
+            const entry = listingFor(data, provider);
+            return (
+              <tr key={provider} className="border-b border-rule last:border-b-0 align-top hover:bg-sunk/60">
+                <td className="px-3 py-2 font-mono text-[13px] text-ink whitespace-nowrap">{provider}</td>
+                <td className="px-3 py-2"><StatusTag status={status} /></td>
+                <td className="px-3 py-2">
+                  {entry ? <ListingDetail entry={entry} /> : status === 'unavailable' ? <span className="text-ink-2">Refused, rate-limited or timed out</span> : null}
+                </td>
+                {action && <td className="px-3 py-2 text-right whitespace-nowrap">{action(provider, status, entry)}</td>}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 const ResultTableQuick = ({ data }) => {
   const providers = sortProviders(data);
-  const listed = data?.detected_on?.length ?? 0;
-  const unavailable = data?.failed_providers?.length ?? 0;
   const abuse = data?.abuseipdb;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" role="status">
-        <span className={`font-semibold ${listed ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-          {listed ? `Listed on ${listed} of ${providers.length} blacklists` : `Not listed on any of ${providers.length - unavailable} blacklists that answered`}
-        </span>
-        {unavailable > 0 && (
-          <span className="text-slate-500 dark:text-slate-400">{unavailable} did not answer</span>
-        )}
-        {data?.is_inconclusive && (
-          <span className="text-amber-700 dark:text-amber-300">Too many providers did not answer to trust a clean result</span>
-        )}
-      </div>
+    <div className="space-y-5">
+      <ResultVerdict data={data} providers={providers} />
 
       {abuse && (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">AbuseIPDB score</p>
-              <p className={`text-3xl font-bold mt-1 tabular-nums ${scoreTone(abuse.abuse_confidence_score)}`}>{abuse.abuse_confidence_score}%</p>
-            </div>
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
-              {[['ISP', abuse.isp], ['Country', abuse.country_code], ['Reports', abuse.total_reports], ['Last reported', abuse.last_reported_at?.slice(0, 10) || 'Never']].map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400">{label}</dt>
-                  <dd className="font-medium text-slate-800 dark:text-slate-200">{value ?? '—'}</dd>
-                </div>
-              ))}
-            </dl>
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-3 border-y border-rule py-3">
+          <div>
+            <p className="font-mono text-xs text-ink-2">AbuseIPDB-Score:</p>
+            <p className={`text-2xl font-semibold tabular-nums ${scoreTone(abuse.abuse_confidence_score)}`}>{abuse.abuse_confidence_score}%</p>
           </div>
+          <Fields className="flex-1 min-w-[16rem]">
+            <Field name="ISP">{abuse.isp}</Field>
+            <Field name="Country">{abuse.country_code}</Field>
+            <Field name="Reports"><span className="tabular-nums">{abuse.total_reports}</span></Field>
+            <Field name="Last-Reported">{abuse.last_reported_at?.slice(0, 10) || 'Never'}</Field>
+          </Fields>
         </div>
       )}
 
-      <div className="overflow-auto max-h-[70vh] rounded-lg border border-slate-200 dark:border-slate-700">
-        <table className="w-full text-sm text-slate-700 dark:text-slate-300 border-collapse">
-          <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 z-[1]">
-            <tr className="text-left border-b border-slate-200 dark:border-slate-700">
-              <th scope="col" className="px-4 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Provider</th>
-              <th scope="col" className="px-4 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-            {providers.map((provider) => (
-              <tr key={provider} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/60">
-                <td className="px-4 py-2.5 font-medium break-all">{provider}</td>
-                <td className="px-4 py-2.5"><ProviderStatusBadge status={providerStatus(data, provider)} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ProviderRows data={data} providers={providers} />
     </div>
   );
 };

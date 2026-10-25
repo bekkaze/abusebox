@@ -1,20 +1,20 @@
 import {
-	HiOutlineViewGrid,
-	HiDesktopComputer,
-	HiCheck,
-	HiOutlineQuestionMarkCircle,
-	HiShieldExclamation,
-	HiGlobe,
-	HiStatusOnline,
-	HiServer,
-	HiLockClosed,
-	HiMail,
-	HiViewList,
-	HiCollection,
-	HiDocumentReport,
-	HiCog,
-	HiClock,
-} from 'react-icons/hi'
+	HiOutlineSquares2X2,
+	HiOutlineServerStack,
+	HiOutlineClock,
+	HiOutlineCog6Tooth,
+	HiOutlineShieldCheck,
+	HiOutlineRectangleStack,
+	HiOutlineTableCells,
+	HiOutlineFlag,
+	HiOutlineGlobeAlt,
+	HiOutlineServer,
+	HiOutlineLockClosed,
+	HiOutlineEnvelope,
+	HiOutlineDocumentText,
+	HiOutlineSignal,
+	HiOutlineBookOpen,
+} from 'react-icons/hi2'
 
 export const DASHBOARD_SIDEBAR_SECTIONS = [
 	{
@@ -24,90 +24,90 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 				key: 'dashboard',
 				label: 'Dashboard',
 				path: '/dashboard',
-				icon: <HiOutlineViewGrid />
+				icon: <HiOutlineSquares2X2 />
 			},
 			{
 				key: 'assets',
 				label: 'Assets',
 				path: '/dashboard/assets',
-				icon: <HiDesktopComputer />
+				icon: <HiOutlineServerStack />
 			},
 			{
 				key: 'activity',
 				label: 'Activity',
 				path: '/dashboard/activity',
-				icon: <HiClock />
+				icon: <HiOutlineClock />
 			},
 			{
 				key: 'settings',
 				label: 'Settings',
 				path: '/dashboard/settings',
-				icon: <HiCog />
+				icon: <HiOutlineCog6Tooth />
 			},
 		],
 	},
 	{
-		label: 'Check & Lookup',
+		label: 'Check & lookup',
 		links: [
 			{
 				key: 'blacklist-check',
-				label: 'Blacklist Check',
+				label: 'Blacklist check',
 				path: '/dashboard/blacklist-check',
-				icon: <HiCheck />
+				icon: <HiOutlineShieldCheck />
 			},
 			{
 				key: 'bulk-check',
-				label: 'Bulk Check',
+				label: 'Bulk check',
 				path: '/dashboard/bulk-check',
-				icon: <HiCollection />
+				icon: <HiOutlineRectangleStack />
 			},
 			{
 				key: 'subnet-check',
 				label: 'Subnet / CIDR',
 				path: '/dashboard/subnet-check',
-				icon: <HiViewList />
+				icon: <HiOutlineTableCells />
 			},
 			{
 				key: 'abuseipdb',
 				label: 'AbuseIPDB',
 				path: '/dashboard/abuseipdb',
-				icon: <HiShieldExclamation />
+				icon: <HiOutlineFlag />
 			},
 			{
 				key: 'whois',
-				label: 'WHOIS Lookup',
+				label: 'WHOIS',
 				path: '/dashboard/whois',
-				icon: <HiGlobe />
+				icon: <HiOutlineGlobeAlt />
 			},
 			{
 				key: 'dns-records',
-				label: 'DNS Records',
+				label: 'DNS records',
 				path: '/dashboard/dns-records',
-				icon: <HiServer />
+				icon: <HiOutlineServer />
 			},
 			{
 				key: 'ssl-checker',
-				label: 'SSL Checker',
+				label: 'SSL certificate',
 				path: '/dashboard/ssl-checker',
-				icon: <HiLockClosed />
+				icon: <HiOutlineLockClosed />
 			},
 			{
 				key: 'email-security',
 				label: 'SPF/DKIM/DMARC',
 				path: '/dashboard/email-security',
-				icon: <HiMail />
+				icon: <HiOutlineEnvelope />
 			},
 			{
 				key: 'dmarc-reports',
-				label: 'DMARC Reports',
+				label: 'DMARC reports',
 				path: '/dashboard/dmarc-reports',
-				icon: <HiDocumentReport />
+				icon: <HiOutlineDocumentText />
 			},
 			{
 				key: 'server-status',
-				label: 'Is Server Up?',
+				label: 'Server status',
 				path: '/dashboard/server-status',
-				icon: <HiStatusOnline />
+				icon: <HiOutlineSignal />
 			},
 		],
 	},
@@ -116,8 +116,8 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 export const DASHBOARD_SIDEBAR_BOTTOM_LINKS = [
 	{
 		key: 'support',
-		label: 'API Docs',
-		path: `${import.meta.env.VITE_API_DOCS_URL || 'http://localhost:8100/swagger/'}`,
-		icon: <HiOutlineQuestionMarkCircle />
+		label: 'API docs',
+		path: import.meta.env.VITE_API_DOCS_URL || '/api/swagger/',
+		icon: <HiOutlineBookOpen />
 	}
 ]

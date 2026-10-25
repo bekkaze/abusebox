@@ -1,6 +1,65 @@
 import { useState } from 'react';
+import { HiOutlineArrowDownTray, HiOutlineTableCells } from 'react-icons/hi2';
 import { checkSubnet, downloadSubnetCsv } from '../../services/tools';
-import { LookupForm } from '../../components/shared/ui';
+import { SkeletonLine } from '../../components/shared/Skeleton';
+import { EmptyState, LookupForm, PageHeader, Section, StatusTag, secondaryButtonClass } from '../../components/shared/ui';
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+const addresses = (count) => `${count} address${count === 1 ? '' : 'es'}`;
+
+/** listed, incomplete (some lists did not answer) or clear for one address. */
+function rowStatus(result) {
+  if (result.is_blacklisted) return { status: 'listed' };
+  if (result.failed_on?.length) return { status: 'unavailable', label: 'Incomplete' };
+  return { status: 'clear' };
+}
+
+/** The report's one-line verdict, in reply-class form. */
+function Verdict({ data }) {
+  const total = data.total_ips ?? 0;
+  const listed = data.blacklisted_count ?? 0;
+  const incomplete = data.incomplete_count ?? 0;
+  const status = listed
+    ? { code: '5.x', tone: 'text-s5', text: `${listed} of ${addresses(total)} listed` }
+    : incomplete
+      ? { code: '4.x', tone: 'text-s4', text: `No listings found, but ${addresses(incomplete)} could not be fully checked` }
+      : { code: '2.x', tone: 'text-s2', text: total === 1 ? 'The address is not listed' : `None of the ${total} addresses is listed` };
+  const skipped = data.failed_providers || [];
+  return (
+    <div role="status" className="space-y-1">
+      <p className="flex flex-wrap items-baseline gap-x-2.5">
+        <span className={`font-mono text-lg font-semibold ${status.tone}`} aria-hidden="true">{status.code}</span>
+        <span className="text-lg font-semibold text-ink">{status.text}</span>
+      </p>
+      {listed > 0 && incomplete > 0 && (
+        <p className="text-sm text-ink-2">
+          <span className="font-mono text-xs font-semibold text-s4">4.x</span> {incomplete} more could not be fully checked, so their result is unknown, not clean.
+        </p>
+      )}
+      {skipped.length > 0 && (
+        <p className="text-sm text-ink-2">
+          <span className="font-mono text-xs font-semibold text-s4">4.x</span> Skipped {plural(skipped.length, 'list')} that did not answer:{' '}
+          <span className="font-mono text-xs text-ink">{skipped.join(', ')}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Compact "Name: value" counts, like the dashboard summary. */
+function SummaryStrip({ items }) {
+  return (
+    <p className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+      {items.map(([name, value]) => (
+        <span key={name} className="whitespace-nowrap">
+          <span className="font-mono text-xs text-ink-2">{name}:</span> <span className="text-ink tabular-nums">{value}</span>
+        </span>
+      ))}
+    </p>
+  );
+}
+
+const thClass = 'px-3 py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule';
 
 export default function SubnetCheck() {
   const [cidr, setCidr] = useState('');
@@ -24,12 +83,11 @@ export default function SubnetCheck() {
   };
 
   return (
-    <section className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
-      <div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Tools</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Subnet / CIDR Check</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Scan an entire IP range against DNSBL providers. Max /24 (256 IPs).</p>
-      </div>
+    <div>
+      <PageHeader
+        title="Subnet / CIDR check"
+        description="Checks every address in a range, up to a /24, against the major DNS blacklists."
+      />
 
       <LookupForm
         label="CIDR range"
@@ -41,81 +99,79 @@ export default function SubnetCheck() {
         buttonLabel="Scan"
         loadingLabel="Scanning"
         error={error}
-        hint="Up to /24 (256 addresses) against 7 major DNSBL providers."
+        hint="Up to /24 (256 addresses), checked against 7 major DNS blacklists."
       />
 
+      <div className="mt-8">
+        {data ? (
+          <Section
+            id="subnet-report"
+            title={<>Report for <span className="font-mono font-semibold break-all">{data.cidr}</span></>}
+            action={(
+              <button type="button" className={secondaryButtonClass} onClick={() => downloadSubnetCsv(data)}>
+                <HiOutlineArrowDownTray className="text-base text-ink-2" aria-hidden="true" /> Export CSV
+              </button>
+            )}
+          >
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Verdict data={data} />
+                <SummaryStrip
+                  items={[
+                    ['Total', data.total_ips],
+                    ['Listed', data.blacklisted_count],
+                    ['Clean', data.clean_count],
+                    ['Incomplete', data.incomplete_count ?? 0],
+                  ]}
+                />
+              </div>
 
-      {data && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex gap-4">
-              <Stat label="Total IPs" value={data.total_ips} tone="sky" />
-              <Stat label="Blacklisted" value={data.blacklisted_count} tone="rose" />
-              <Stat label="Clean" value={data.clean_count} tone="emerald" />
-              {data.incomplete_count > 0 && <Stat label="Incomplete" value={data.incomplete_count} tone="amber" />}
-            </div>
-            <button
-              onClick={() => downloadSubnetCsv(data)}
-              className="text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:text-cyan-800"
-            >
-              Export CSV
-            </button>
-          </div>
-
-          {data.failed_providers?.length > 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400" role="status">
-              Skipped {data.failed_providers.length} provider{data.failed_providers.length === 1 ? '' : 's'} that did not answer: {data.failed_providers.join(', ')}
-            </p>
-          )}
-
-          <div className="rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
-            <div className="scrollable-table overflow-auto max-h-[60vh]">
-              <table className="w-full text-slate-700 dark:text-slate-300 border-collapse">
-                <thead className="sticky top-0 bg-slate-50 dark:bg-slate-700">
-                  <tr className="text-left border-b border-slate-200 dark:border-slate-600">
-                    <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">IP Address</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Listed On</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.results.map((result, i) => (
-                    <tr key={i} className="border-b border-slate-100 dark:border-slate-600 hover:bg-slate-50/60 dark:hover:bg-slate-700/50">
-                      <td className="px-4 py-2.5 font-mono text-sm">{result.ip}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${result.is_blacklisted ? 'bg-rose-100 text-rose-700' : result.failed_on?.length ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {result.is_blacklisted ? 'Blacklisted' : result.failed_on?.length ? 'Incomplete' : 'Clear'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-sm">
-                        {result.listed_on?.join(', ') || '—'}
-                        {result.failed_on?.length > 0 && (
-                          <span className="block text-xs text-slate-500 dark:text-slate-400">No answer: {result.failed_on.join(', ')}</span>
-                        )}
-                      </td>
+              <div className="overflow-auto max-h-[60vh] rounded-md border border-rule">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="sticky top-0 z-[1] bg-sunk">
+                    <tr className="text-left">
+                      <th scope="col" className={thClass}>IP</th>
+                      <th scope="col" className={thClass}>Status</th>
+                      <th scope="col" className={`${thClass} w-full`}>Listed on</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.results.map((result, i) => {
+                      const { status, label } = rowStatus(result);
+                      return (
+                        <tr key={i} className="border-b border-rule last:border-b-0 align-top hover:bg-sunk/60">
+                          <td className="px-3 py-2 font-mono text-[13px] text-ink whitespace-nowrap">{result.ip}</td>
+                          <td className="px-3 py-2"><StatusTag status={status} label={label} /></td>
+                          <td className="px-3 py-2">
+                            {result.listed_on?.length
+                              ? <span className="font-mono text-[13px] text-ink">{result.listed_on.join(', ')}</span>
+                              : !result.failed_on?.length && <span className="text-ink-3" aria-label="None">—</span>}
+                            {result.failed_on?.length > 0 && (
+                              <span className="block text-xs text-ink-2">
+                                No answer from <span className="font-mono">{result.failed_on.join(', ')}</span>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </Section>
+        ) : loading ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Scanning range">
+            <SkeletonLine className="h-6 w-72" />
+            <SkeletonLine className="h-4 w-96 max-w-full" />
+            <div className="pt-3 space-y-2">{[...Array(8)].map((_, i) => <SkeletonLine key={i} className="h-9" />)}</div>
           </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function Stat({ label, value, tone }) {
-  const colors = {
-    sky: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800',
-    rose: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
-    amber: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
-  };
-  return (
-    <div className={`rounded-lg border px-4 py-2 text-center ${colors[tone]}`}>
-      <p className="text-xs uppercase tracking-wide opacity-70">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
+        ) : (
+          <EmptyState icon={HiOutlineTableCells} title="No scan yet">
+            Enter a range such as 203.0.113.0/24 to see which of its addresses are listed.
+          </EmptyState>
+        )}
+      </div>
     </div>
   );
 }

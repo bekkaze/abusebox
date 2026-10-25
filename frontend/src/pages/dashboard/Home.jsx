@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { HiDesktopComputer, HiExclamationCircle, HiPlay, HiShieldCheck, HiShieldExclamation, HiCheckCircle } from "react-icons/hi";
-import StatGrid from "../../components/dashboard/home/StatGrid";
+import { HiOutlinePlay, HiOutlineServerStack } from "react-icons/hi2";
 import HistoryChart from "../../components/dashboard/home/HistoryChart";
-import { StatSkeleton } from "../../components/shared/Skeleton";
+import { SkeletonLine } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
 import { EventList, IssueRow } from "../../components/shared/activity";
 import { groupIssuesByAsset } from "../../components/shared/severity";
-import { Alert, EmptyState, PageHeader, Spinner, cardClass, primaryButtonClass, secondaryButtonClass } from "../../components/shared/ui";
+import { Alert, EmptyState, Field, Fields, Section, Spinner, linkClass, primaryButtonClass, secondaryButtonClass } from "../../components/shared/ui";
 import HostnameService from "../../services/hostname";
 import { listEvents } from "../../services/events";
 import { getSchedulerStatus, runSchedulerNow } from "../../services/settings";
@@ -27,62 +26,84 @@ function formatInterval(minutes) {
   return `${minutes} min`;
 }
 
-function Card({ title, action, children, className = "" }) {
+const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/** The page's one-line verdict, written like an SMTP reply: class code, then meaning. */
+function StatusLine({ assets, attention }) {
+  const critical = attention.filter((group) => group.issues[0].severity === "critical").length;
+  const warning = attention.filter((group) => group.issues[0].severity === "warning").length;
+  const status = critical
+    ? { code: "5.x", tone: "text-s5", text: `${plural(critical, "asset")} need${critical === 1 ? "s" : ""} action` }
+    : warning
+      ? { code: "4.x", tone: "text-s4", text: `${plural(warning, "asset")} with warnings` }
+      : { code: "2.x", tone: "text-s2", text: assets.length === 1 ? "Your asset is clear" : `All ${assets.length} assets are clear` };
+  // The headline names the worst class; the rest of the attention list is counted beside it.
+  const rest = attention.length - (critical || warning);
   return (
-    <section className={`${cardClass} p-5 ${className}`}>
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <h2 className="text-base font-semibold text-slate-900 dark:text-white">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
+    <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span className={`font-mono text-[1.75rem] leading-none font-semibold ${status.tone}`}>{status.code}</span>
+      <span className="text-2xl font-semibold tracking-tight text-ink">{status.text}</span>
+      {(critical || warning) > 0 && rest > 0 && (
+        <span className="text-base font-normal text-ink-2">+ {rest} more to review</span>
+      )}
+    </h1>
   );
 }
 
-function SchedulerCard({ status, isAdmin, onRun, running }) {
-  if (!status) return <div className={`${cardClass} p-5 h-full animate-pulse`} aria-busy="true" />;
-  const healthy = status.enabled && status.running && !status.last_error;
+function Summary({ assets, listed, monitored, scheduler }) {
+  const items = [
+    ["Assets", assets.length],
+    ["Listed", listed],
+    ["Monitored", `${monitored} of ${assets.length}`],
+    ["Last-Run", scheduler?.last_cycle_finished ? <TimeAgo date={scheduler.last_cycle_finished} /> : "not yet"],
+  ];
   return (
-    <Card title="Scheduler" className="h-full">
-      <div className="flex items-center gap-2 mb-4">
-        <span className={`h-2.5 w-2.5 rounded-full ${healthy ? "bg-emerald-500" : status.enabled ? "bg-amber-500" : "bg-slate-400"}`} aria-hidden="true" />
-        <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
-          {!status.enabled ? "Off" : status.cycle_in_progress ? "Checking assets now" : status.running ? "Running" : "Enabled, not running"}
+    <p className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+      {items.map(([name, value]) => (
+        <span key={name} className="whitespace-nowrap">
+          <span className="font-mono text-xs text-ink-2">{name}:</span> <span className="text-ink tabular-nums">{value}</span>
         </span>
+      ))}
+    </p>
+  );
+}
+
+function Scheduler({ status, isAdmin, onRun, running }) {
+  if (!status) {
+    return (
+      <div className="space-y-2" aria-busy="true">
+        {[...Array(4)].map((_, i) => <SkeletonLine key={i} className="h-4" />)}
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-        <div>
-          <dt className="text-xs text-slate-500 dark:text-slate-400">Default interval</dt>
-          <dd className="font-medium text-slate-800 dark:text-slate-100">{formatInterval(status.interval_minutes)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-500 dark:text-slate-400">Monitored</dt>
-          <dd className="font-medium text-slate-800 dark:text-slate-100 tabular-nums">{status.monitored_assets}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-500 dark:text-slate-400">Last run</dt>
-          <dd className="font-medium text-slate-800 dark:text-slate-100">
-            {status.last_cycle_finished ? <TimeAgo date={status.last_cycle_finished} /> : "Not yet"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-500 dark:text-slate-400">Due now</dt>
-          <dd className="font-medium text-slate-800 dark:text-slate-100 tabular-nums">{status.due_assets}</dd>
-        </div>
-      </dl>
-      {status.last_error && <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">Last run failed: {status.last_error}</p>}
+    );
+  }
+  const healthy = status.enabled && status.running && !status.last_error;
+  const state = !status.enabled ? "Off" : status.cycle_in_progress ? "Checking assets now" : status.running ? "Running" : "Enabled, not running";
+  return (
+    <>
+      <Fields>
+        <Field name="Status">
+          <span className="inline-flex items-center gap-1.5">
+            <span className={`h-1.5 w-1.5 rounded-full ${healthy ? "bg-s2" : status.enabled ? "bg-s4" : "bg-ink-3"}`} aria-hidden="true" />
+            {state}
+          </span>
+        </Field>
+        <Field name="Interval">{formatInterval(status.interval_minutes)}</Field>
+        <Field name="Monitored"><span className="tabular-nums">{status.monitored_assets}</span></Field>
+        <Field name="Due-Now"><span className="tabular-nums">{status.due_assets}</span></Field>
+      </Fields>
+      {status.last_error && <p className="mt-3 text-xs text-s5">Last run failed: {status.last_error}</p>}
       {!status.enabled && (
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-          Assets are only checked when added or re-checked. <Link to="/dashboard/settings" className="text-cyan-700 dark:text-cyan-400 hover:underline">Turn it on in Settings</Link>.
+        <p className="mt-3 text-xs text-ink-2">
+          Assets are only checked when added or re-checked. <Link to="/dashboard/settings" className={linkClass}>Turn it on in Settings</Link>.
         </p>
       )}
       {isAdmin && status.enabled && (
         <button type="button" onClick={onRun} disabled={running || status.cycle_in_progress || status.due_assets === 0} className={`${secondaryButtonClass} mt-4 w-full`}>
-          {running || status.cycle_in_progress ? <Spinner /> : <HiPlay aria-hidden="true" />}
-          {status.due_assets === 0 ? "Nothing due" : `Check ${status.due_assets} due asset${status.due_assets === 1 ? "" : "s"} now`}
+          {running || status.cycle_in_progress ? <Spinner /> : <HiOutlinePlay aria-hidden="true" />}
+          {status.due_assets === 0 ? "Nothing due" : `Check ${plural(status.due_assets, "due asset")} now`}
         </button>
       )}
-    </Card>
+    </>
   );
 }
 
@@ -122,7 +143,6 @@ export default function Home() {
 
   const listed = assets.filter((item) => item.is_blacklisted);
   const attention = groupIssuesByAsset(assets);
-  const urgentAssets = attention.filter((group) => group.issues.some((issue) => issue.severity !== "info")).length;
   const monitored = assets.filter((item) => item.is_monitor_enabled).length;
 
   // Red badge on the tab icon while anything is listed.
@@ -148,85 +168,86 @@ export default function Home() {
 
   const chartAssets = (listed.length ? listed : assets.filter((asset) => asset.check_blacklist)).slice(0, 2);
 
+  if (error) {
+    return (
+      <Alert tone="error">
+        {error}{" "}
+        <button type="button" className="font-semibold underline" onClick={() => load()}>Retry</button>
+      </Alert>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3" aria-busy="true" aria-label="Loading dashboard">
+        <SkeletonLine className="h-8 w-80" />
+        <SkeletonLine className="h-4 w-96" />
+        <div className="pt-6 space-y-3">{[...Array(5)].map((_, i) => <SkeletonLine key={i} className="h-10" />)}</div>
+      </div>
+    );
+  }
+
+  if (assets.length === 0) {
+    return (
+      <EmptyState
+        icon={HiOutlineServerStack}
+        title="Nothing to monitor yet"
+        action={<Link to="/dashboard/assets" className={primaryButtonClass}>Add an asset</Link>}
+      >
+        Add the domains and mail server IPs you look after. AbuseBox checks them on a schedule and lists anything that needs action here.
+      </EmptyState>
+    );
+  }
+
   return (
-    <section className="space-y-5">
-      <PageHeader
-        eyebrow="Overview"
-        title="Monitoring summary"
-        description="What needs your attention across every monitored domain and IP."
-        actions={<AutoRefresh onRefresh={refresh} loading={refreshing} />}
-      />
-
-      {error ? (
-        <Alert tone="error">
-          {error}{" "}
-          <button type="button" className="font-medium underline" onClick={() => load()}>Retry</button>
-        </Alert>
-      ) : loading ? (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true">
-          {[...Array(4)].map((_, i) => <StatSkeleton key={i} />)}
+    <div>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-rule">
+        <div className="min-w-0">
+          <StatusLine assets={assets} attention={attention} />
+          <Summary assets={assets} listed={listed.length} monitored={monitored} scheduler={scheduler} />
         </div>
-      ) : assets.length === 0 ? (
-        <div className={cardClass}>
-          <EmptyState
-            icon={HiShieldCheck}
-            title="Nothing to monitor yet"
-            action={<Link to="/dashboard/assets" className={primaryButtonClass}>Add an asset</Link>}
+        <AutoRefresh onRefresh={refresh} loading={refreshing} />
+      </div>
+
+      <div className="mt-6 grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_17rem]">
+        <div className="space-y-8 min-w-0">
+          <Section
+            title={attention.length ? `Needs attention (${attention.length})` : "Needs attention"}
+            action={attention.length > ATTENTION_LIMIT && (
+              <Link to="/dashboard/assets?filter=attention" className={`text-sm ${linkClass}`}>All {attention.length}</Link>
+            )}
           >
-            Add the domains and mail server IPs you care about. AbuseBox checks them on a schedule and lists anything that needs attention here.
-          </EmptyState>
+            {attention.length === 0 ? (
+              <p className="py-2 text-sm text-ink-2">Nothing is listed, expiring or down. AbuseBox keeps checking on schedule.</p>
+            ) : (
+              <ul>
+                {attention.slice(0, ATTENTION_LIMIT).map((group) => (
+                  <IssueRow key={group.hostnameId} issues={group.issues} hostname={group.hostname} hostnameId={group.hostnameId} />
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          <Section title="Recent activity" action={<Link to="/dashboard/activity" className={`text-sm ${linkClass}`}>View all</Link>}>
+            <EventList events={events} emptyText="No changes detected yet. Listings, recoveries and expiry warnings will show up here." />
+          </Section>
         </div>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:gap-4 grid-cols-2 xl:grid-cols-4">
-            <StatGrid title="Assets" bodyText={assets.length} icon={<HiDesktopComputer />} tone="sky" />
-            <StatGrid title="Currently listed" bodyText={listed.length} icon={<HiShieldExclamation />} tone="rose" />
-            <StatGrid title="Need attention" bodyText={urgentAssets} icon={<HiExclamationCircle />} tone="amber" />
-            <StatGrid title="Monitored" bodyText={`${monitored} of ${assets.length}`} icon={<HiShieldCheck />} tone="emerald" />
-          </div>
 
-          <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
-            <Card
-              title="Needs attention"
-              className="lg:col-span-2"
-              action={attention.length > ATTENTION_LIMIT && (
-                <Link to="/dashboard/assets?filter=attention" className="text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline">
-                  All {attention.length}
-                </Link>
-              )}
-            >
-              {attention.length === 0 ? (
-                <div className="flex items-center gap-3 py-6 text-emerald-700 dark:text-emerald-400">
-                  <HiCheckCircle className="text-2xl" aria-hidden="true" />
-                  <p className="text-sm font-medium">All clear. Nothing is listed, expiring or down.</p>
-                </div>
-              ) : (
-                <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {attention.slice(0, ATTENTION_LIMIT).map((group) => (
-                    <IssueRow key={group.hostnameId} issues={group.issues} hostname={group.hostname} hostnameId={group.hostnameId} />
-                  ))}
-                </ul>
-              )}
-            </Card>
-
-            <SchedulerCard status={scheduler} isAdmin={Boolean(me?.is_superuser)} onRun={runNow} running={runningCycle} />
-          </div>
-
-          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-            <Card
-              title="Recent activity"
-              action={<Link to="/dashboard/activity" className="text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline">View all</Link>}
-            >
-              <EventList events={events} emptyText="No changes detected yet. Listings, recoveries and expiry warnings will show up here." />
-            </Card>
-            <div className="space-y-4">
-              {chartAssets.map((asset) => (
-                <HistoryChart key={asset.id} hostnameId={asset.id} hostname={asset.hostname} />
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </section>
+        <aside className="space-y-8 min-w-0">
+          <Section title="Scheduler">
+            <Scheduler status={scheduler} isAdmin={Boolean(me?.is_superuser)} onRun={runNow} running={runningCycle} />
+          </Section>
+          {chartAssets.length > 0 && (
+            <Section title="Blacklist history">
+              <div className="space-y-6">
+                {chartAssets.map((asset) => (
+                  <HistoryChart key={asset.id} hostnameId={asset.id} hostname={asset.hostname} />
+                ))}
+              </div>
+            </Section>
+          )}
+        </aside>
+      </div>
+    </div>
   );
 }

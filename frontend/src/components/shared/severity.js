@@ -1,36 +1,11 @@
-// Shared severity styling. Status colors are always paired with an icon and a
-// text label wherever they are used.
+// Shared severity styling for health issues and activity events. Status colours
+// are always paired with an icon or a text label wherever they are used.
 export const SEVERITY = {
-  critical: {
-    label: 'Critical',
-    text: 'text-rose-600 dark:text-rose-400',
-    soft: 'bg-rose-100 dark:bg-rose-900/40',
-    badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200',
-  },
-  warning: {
-    label: 'Warning',
-    text: 'text-amber-600 dark:text-amber-400',
-    soft: 'bg-amber-100 dark:bg-amber-900/40',
-    badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
-  },
-  info: {
-    label: 'Info',
-    text: 'text-sky-600 dark:text-sky-400',
-    soft: 'bg-sky-100 dark:bg-sky-900/40',
-    badge: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200',
-  },
-  success: {
-    label: 'Resolved',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    soft: 'bg-emerald-100 dark:bg-emerald-900/40',
-    badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
-  },
-  ok: {
-    label: 'Healthy',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    soft: 'bg-emerald-100 dark:bg-emerald-900/40',
-    badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
-  },
+  critical: { label: 'Critical', text: 'text-s5', soft: 'bg-s5-soft', badge: 'bg-s5-soft text-s5' },
+  warning: { label: 'Warning', text: 'text-s4', soft: 'bg-s4-soft', badge: 'bg-s4-soft text-s4' },
+  info: { label: 'Info', text: 'text-info', soft: 'bg-info-soft', badge: 'bg-info-soft text-info' },
+  success: { label: 'Resolved', text: 'text-s2', soft: 'bg-s2-soft', badge: 'bg-s2-soft text-s2' },
+  ok: { label: 'Healthy', text: 'text-s2', soft: 'bg-s2-soft', badge: 'bg-s2-soft text-s2' },
 };
 
 export const SEVERITY_RANK = { critical: 0, warning: 1, info: 2, ok: 3 };

@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HiLockClosed, HiUser } from "react-icons/hi";
 
 import { useAuth } from "../services/auth/authProvider";
 import { loginUser } from "../services/auth/authService";
-import loginImg from "../assets/login.jpg";
+import { Alert, Spinner, cardClass, inputClass, primaryButtonClass } from "../components/shared/ui";
+
+const labelClass = "block text-sm font-medium text-ink mb-1.5";
 
 const Login = () => {
+  const id = useId();
   const { setToken } = useAuth();
   const navigate = useNavigate();
 
@@ -17,6 +19,10 @@ const Login = () => {
 
   const handleLogin = async (event) => {
     event.preventDefault();
+    if (!username.trim() || !password) {
+      setDetail("Enter your username and password.");
+      return;
+    }
     setLoading(true);
     setDetail("");
 
@@ -36,69 +42,63 @@ const Login = () => {
   };
 
   return (
-    <div className='min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-950'>
-      <div className='relative hidden lg:block'>
-        <img className='w-full h-full object-cover opacity-80' src={loginImg} alt='Security monitoring' />
-        <div className='absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent' />
-        <div className='absolute bottom-10 left-10 right-10 text-white'>
-          <p className='text-cyan-300 text-sm font-semibold tracking-wide'>ABUSEBOX</p>
-          <h1 className='text-4xl font-bold mt-3 leading-tight'>Stay ahead of blacklist incidents with fast response workflows.</h1>
+    <main className="min-h-screen bg-paper flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center justify-center gap-2.5 mb-6">
+          <img src="/logo.png" alt="" className="h-9 w-9 rounded-md object-cover" />
+          <span className="text-xl font-semibold tracking-tight text-ink">AbuseBox</span>
         </div>
-      </div>
 
-      <div className='flex items-center justify-center px-6 py-12'>
-        <form className='w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl shadow-black/30' onSubmit={handleLogin}>
-          <p className='text-slate-400 text-sm'>Welcome back</p>
-          <h2 className='text-white text-3xl font-bold mt-1'>Sign in to AbuseBox</h2>
+        <form className={`${cardClass} p-6`} onSubmit={handleLogin} noValidate>
+          <h1 className="text-base font-semibold text-ink">Sign in</h1>
 
-          <div className='mt-7 space-y-4'>
-            <label className='block'>
-              <span className='text-slate-300 text-sm'>Username</span>
-              <div className='mt-2 relative'>
-                <HiUser className='absolute left-3 top-1/2 -translate-y-1/2 text-slate-500' />
-                <input
-                  className='w-full rounded-xl bg-slate-800 border border-slate-700 pl-10 pr-3 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500'
-                  placeholder='admin'
-                  type='text'
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  autoComplete='username'
-                />
-              </div>
-            </label>
+          <div className="mt-5 space-y-4">
+            <div>
+              <label htmlFor={`${id}-username`} className={labelClass}>Username</label>
+              <input
+                id={`${id}-username`}
+                className={inputClass}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoCapitalize="off"
+                spellCheck="false"
+                aria-invalid={Boolean(detail)}
+              />
+            </div>
 
-            <label className='block'>
-              <span className='text-slate-300 text-sm'>Password</span>
-              <div className='mt-2 relative'>
-                <HiLockClosed className='absolute left-3 top-1/2 -translate-y-1/2 text-slate-500' />
-                <input
-                  className='w-full rounded-xl bg-slate-800 border border-slate-700 pl-10 pr-3 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500'
-                  placeholder='••••••••'
-                  type='password'
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete='current-password'
-                />
-              </div>
-            </label>
+            <div>
+              <label htmlFor={`${id}-password`} className={labelClass}>Password</label>
+              <input
+                id={`${id}-password`}
+                className={inputClass}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                aria-invalid={Boolean(detail)}
+              />
+            </div>
           </div>
+
+          {detail ? <Alert tone="error" className="mt-4">{detail}</Alert> : null}
 
           <button
-            className='w-full mt-7 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 py-3 text-slate-950 font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity'
-            disabled={loading || !username.trim() || !password}
+            type="submit"
+            className={`${primaryButtonClass} w-full mt-5`}
+            disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading && <Spinner />}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
-
-          {detail ? <p className='text-red-400 text-sm mt-4'>{detail}</p> : null}
-
-          <div className='mt-6 rounded-xl border border-slate-800 bg-slate-800/50 p-3'>
-            <p className='text-xs text-slate-400'>Local default credentials</p>
-            <p className='text-sm text-slate-200 mt-1'><span className='font-semibold'>admin</span> / <span className='font-semibold'>password123</span></p>
-          </div>
         </form>
+
+        <p className="mt-4 text-center text-xs text-ink-2">
+          New install? The default sign-in is <span className="font-mono text-ink">admin</span> / <span className="font-mono text-ink">password123</span>. Change it in Settings after you sign in.
+        </p>
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -1,29 +1,15 @@
 import { Link } from 'react-router-dom';
-import {
-  HiCheckCircle, HiExclamation, HiExclamationCircle, HiGlobe, HiInformationCircle, HiLockClosed, HiLockOpen,
-  HiShieldCheck, HiShieldExclamation, HiStatusOffline, HiStatusOnline, HiSwitchHorizontal,
-} from 'react-icons/hi';
+import { HiChevronRight } from 'react-icons/hi2';
 import TimeAgo from './TimeAgo';
 import { SEVERITY } from './severity';
 
-const SEVERITY_ICONS = {
-  critical: HiExclamationCircle,
-  warning: HiExclamation,
-  info: HiInformationCircle,
-  success: HiCheckCircle,
-  ok: HiCheckCircle,
-};
-
-const EVENT_ICONS = {
-  'blacklist.listed': HiShieldExclamation,
-  'blacklist.delisted': HiShieldCheck,
-  'blacklist.changed': HiSwitchHorizontal,
-  'server.down': HiStatusOffline,
-  'server.up': HiStatusOnline,
-  'ssl.expiring': HiLockOpen,
-  'ssl.invalid': HiLockOpen,
-  'ssl.renewed': HiLockClosed,
-  'domain.expiring': HiGlobe,
+// Health and event severities, written as the SMTP reply class they resemble.
+const CODES = {
+  critical: { code: '5.x', text: 'text-s5' },
+  warning: { code: '4.x', text: 'text-s4' },
+  info: { code: '3.x', text: 'text-info' },
+  success: { code: '2.x', text: 'text-s2' },
+  ok: { code: '2.x', text: 'text-s2' },
 };
 
 // Long provider lists are summarized; the asset page has the full table.
@@ -32,50 +18,75 @@ function listPreview(items, max = 5) {
   return `${items.slice(0, max).join(', ')} and ${items.length - max} more`;
 }
 
-/** Small pill: icon + label, so meaning never depends on color alone. */
-export function SeverityBadge({ severity, label }) {
+/** Reply-class code plus its meaning for screen readers. */
+export function SeverityCode({ severity, className = '' }) {
+  const code = CODES[severity] || CODES.info;
   const info = SEVERITY[severity] || SEVERITY.info;
-  const Icon = SEVERITY_ICONS[severity] || HiInformationCircle;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${info.badge}`}>
-      <Icon aria-hidden="true" /> {label || info.label}
+    <span className={`font-mono text-xs font-semibold ${code.text} ${className}`}>
+      <span aria-hidden="true">{code.code}</span>
+      <span className="sr-only">{info.label}</span>
     </span>
   );
 }
 
-/** One "needs attention" line: severity icon, asset link, message(s). */
+/** Small tag: code + label, so meaning never depends on colour alone. */
+export function SeverityBadge({ severity, label }) {
+  const info = SEVERITY[severity] || SEVERITY.info;
+  const code = CODES[severity] || CODES.info;
+  return (
+    <span className={`inline-flex items-baseline gap-1.5 rounded px-1.5 py-0.5 text-xs font-semibold ${info.badge}`}>
+      <span className="font-mono text-2xs font-normal opacity-80" aria-hidden="true">{code.code}</span>
+      {label || info.label}
+    </span>
+  );
+}
+
+/** One "needs attention" row: reply class, asset, what is wrong. */
 export function IssueRow({ issue, issues, hostname, hostnameId }) {
   const list = issues || [issue];
   const worst = list[0];
-  const info = SEVERITY[worst.severity] || SEVERITY.info;
-  const Icon = SEVERITY_ICONS[worst.severity] || HiInformationCircle;
-  return (
-    <li className="flex items-start gap-3 py-2.5">
-      <Icon className={`mt-0.5 flex-shrink-0 text-lg ${info.text}`} aria-label={info.label} role="img" />
-      <div className="min-w-0 flex-1">
-        {hostname && (
-          <Link to={`/dashboard/assets/${hostnameId}`} className="block text-sm font-semibold text-slate-900 dark:text-white hover:text-cyan-700 dark:hover:text-cyan-400 truncate">
-            {hostname}
-          </Link>
-        )}
+  const content = (
+    <>
+      <SeverityCode severity={worst.severity} className="pt-px" />
+      <div className="min-w-0">
+        {hostname && <p className="font-mono text-sm font-semibold text-ink truncate">{hostname}</p>}
         {list.map((item) => (
-          <p key={item.message} className="text-sm text-slate-600 dark:text-slate-300">{item.message}</p>
+          <p key={item.message} className="text-sm text-ink-2">{item.message}</p>
         ))}
       </div>
+    </>
+  );
+  if (!hostname) {
+    return <li className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2 py-2.5">{content}</li>;
+  }
+  return (
+    <li>
+      <Link
+        to={`/dashboard/assets/${hostnameId}`}
+        className="group grid grid-cols-[2.25rem_minmax(0,1fr)_auto] gap-x-2 py-2.5 -mx-2 px-2 rounded-md hover:bg-sunk hover:no-underline"
+      >
+        {content}
+        <HiChevronRight className="self-center text-ink-3 group-hover:text-ink-2" aria-hidden="true" />
+      </Link>
     </li>
   );
 }
 
-/** Timeline of asset events. `showHostname` for cross-asset feeds. */
+const formatStamp = (iso) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+/** Timeline of asset events, newest first, drawn like a Received: header chain. */
 export function EventList({ events, showHostname = true, emptyText = 'No activity yet.' }) {
   if (!events?.length) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center">{emptyText}</p>;
+    return <p className="text-sm text-ink-2 py-4">{emptyText}</p>;
   }
   return (
-    <ol className="relative">
-      {events.map((event, index) => {
-        const info = SEVERITY[event.severity] || SEVERITY.info;
-        const Icon = EVENT_ICONS[event.event_type] || SEVERITY_ICONS[event.severity] || HiInformationCircle;
+    <ol className="border-l border-rule">
+      {events.map((event) => {
         const details = event.details || {};
         const extra = details.added?.length
           ? listPreview(details.added)
@@ -83,28 +94,20 @@ export function EventList({ events, showHostname = true, emptyText = 'No activit
             ? `Removed: ${listPreview(details.removed)}`
             : details.reason || details.error || null;
         return (
-          <li key={event.id} className="relative flex gap-3 pb-4 last:pb-0">
-            {index < events.length - 1 && (
-              <span className="absolute left-[15px] top-8 bottom-0 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-            )}
-            <span className={`relative z-[1] flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${info.soft}`}>
-              <Icon className={`text-base ${info.text}`} aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <p className="text-sm text-slate-800 dark:text-slate-100">
-                {showHostname && (
-                  <>
-                    <Link to={`/dashboard/assets/${event.hostname_id}`} className="font-semibold hover:text-cyan-700 dark:hover:text-cyan-400 break-all">
-                      {event.hostname}
-                    </Link>
-                    <span className="text-slate-400" aria-hidden="true"> · </span>
-                  </>
-                )}
-                <span className={event.severity === 'critical' ? 'font-medium' : ''}>{event.title}</span>
-              </p>
-              {extra && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 break-words">{extra}</p>}
-              <TimeAgo date={event.created} className="text-xs text-slate-400 dark:text-slate-500" />
-            </div>
+          <li key={event.id} className="relative pl-4 pb-3.5 last:pb-0">
+            <span className="absolute -left-[3px] top-[7px] h-[5px] w-[5px] rounded-full bg-rule-strong" aria-hidden="true" />
+            <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-ink-2">
+              <SeverityCode severity={event.severity} />
+              <TimeAgo date={event.created} className="font-mono" />
+              <span className="sr-only">{formatStamp(event.created)}</span>
+              {showHostname && (
+                <Link to={`/dashboard/assets/${event.hostname_id}`} className="font-mono text-ink hover:text-accent break-all">
+                  {event.hostname}
+                </Link>
+              )}
+            </p>
+            <p className={`text-sm text-ink mt-0.5 ${event.severity === 'critical' ? 'font-semibold' : ''}`}>{event.title}</p>
+            {extra && <p className="text-xs text-ink-2 mt-0.5 break-words">{extra}</p>}
           </li>
         );
       })}

@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  HiBell, HiCollection, HiDownload, HiExclamation, HiExclamationCircle, HiOutlinePlusCircle, HiRefresh, HiSearch, HiShieldCheck, HiShieldExclamation,
-  HiTrash, HiViewGrid, HiViewGridAdd, HiViewList, HiX,
-} from "react-icons/hi";
+  HiChevronDown, HiOutlineArrowDownTray, HiOutlineArrowPath, HiOutlineBell, HiOutlineMagnifyingGlass, HiOutlinePlus,
+  HiOutlineRectangleStack, HiOutlineServerStack, HiOutlineSquares2X2, HiOutlineSquaresPlus, HiOutlineTableCells,
+  HiOutlineTrash, HiXMark,
+} from "react-icons/hi2";
 import { toast } from "react-toastify";
 import HostnameService from "../../services/hostname";
 import { useAuth } from "../../services/auth/authProvider";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
 import CidrImportDialog from "../../components/dashboard/blacklistMonitor/CidrImportDialog";
 import BulkMonitorDialog from "../../components/dashboard/blacklistMonitor/BulkMonitorDialog";
-import { AssetCardSkeleton } from "../../components/shared/Skeleton";
+import { SkeletonLine } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
-import { SEVERITY, SEVERITY_RANK } from "../../components/shared/severity";
-import { Alert, EmptyState, PageHeader, cardClass, primaryButtonClass, secondaryButtonClass } from "../../components/shared/ui";
+import { SeverityBadge, SeverityCode } from "../../components/shared/activity";
+import { SEVERITY_RANK } from "../../components/shared/severity";
+import {
+  Alert, EmptyState, PageHeader, linkClass, primaryButtonClass, secondaryButtonClass, selectClass, inputClass,
+} from "../../components/shared/ui";
 import { downloadCsv } from "../../services/tools";
 
 const CHECK_BADGE_MAP = {
@@ -58,6 +62,23 @@ const SORTS = [
 ];
 
 const PAGE_SIZE = 60;
+const FINDINGS_SHOWN = 3;
+
+// Local control styles: a segmented group of standard h-9 buttons.
+const segmentGroupClass = 'inline-flex h-9 max-w-full rounded-md border border-rule-strong bg-paper overflow-x-auto';
+const segmentClass = (on, padding = 'px-3') =>
+  `inline-flex items-center gap-1.5 ${padding} text-sm whitespace-nowrap transition-colors border-l border-rule-strong first:border-l-0 focus-visible:outline-offset-[-2px] disabled:opacity-50 disabled:cursor-not-allowed ` +
+  (on ? 'bg-accent-soft text-accent font-semibold' : 'text-ink-2 hover:bg-sunk hover:text-ink');
+const iconButtonClass =
+  'relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-2 hover:text-s5 hover:bg-s5-soft transition-colors';
+// Shared primitives carry fixed widths/paddings; these variants swap them rather than stack conflicting utilities.
+const searchInputClass = inputClass.replace('px-3', 'pl-8 pr-3');
+const sortSelectClass = selectClass.replace('w-full', 'w-auto');
+const quietDangerButtonClass =
+  'inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-md text-sm font-semibold whitespace-nowrap transition-colors ' +
+  'text-s5 hover:bg-s5-soft disabled:opacity-50 disabled:cursor-not-allowed';
+const clearButtonClass = 'inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-2 hover:text-ink hover:bg-sunk transition-colors';
+const thBase = 'py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule text-left whitespace-nowrap';
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
@@ -75,25 +96,46 @@ function importSummary(result, verb) {
   return parts.join(', ');
 }
 
-/** One-line blacklist status for a card or row. */
+function matchesFilter(item, key) {
+  if (key === 'listed') return item.is_blacklisted;
+  if (key === 'clean') return !item.is_blacklisted;
+  if (key === 'attention') return (item.health?.issues || []).some((issue) => issue.severity !== 'info');
+  return true;
+}
+
+/** One-line blacklist result, with the reply class it maps to (null when there is nothing to judge). */
 function blacklistSummary(item) {
   const bl = item.health?.blacklist;
   if (!bl) {
-    if (!item.check_blacklist) return { text: 'Blacklist check off', className: 'text-slate-500 dark:text-slate-400' };
-    if (item.checked === 'Not checked') return { text: 'Not checked yet', className: 'text-slate-500 dark:text-slate-400' };
-    return { text: 'Blacklist check failed', className: 'text-amber-700 dark:text-amber-400' };
+    if (!item.check_blacklist) return { severity: null, text: 'Blacklist check off' };
+    if (item.checked === 'Not checked') return { severity: null, text: 'Not checked yet' };
+    return { severity: 'warning', text: 'Blacklist check failed' };
   }
-  if (bl.listed_count > 0) return { text: `Listed on ${bl.listed_count} of ${bl.total}`, className: 'text-rose-700 dark:text-rose-400' };
-  if (bl.inconclusive) return { text: `Inconclusive: ${bl.failed} providers did not answer`, className: 'text-amber-700 dark:text-amber-400' };
+  if (bl.listed_count > 0) return { severity: 'critical', text: `Listed on ${bl.listed_count} of ${bl.total} blacklists` };
+  if (bl.inconclusive) return { severity: 'warning', text: `Inconclusive: ${bl.failed} blacklists did not answer` };
   return {
-    text: bl.failed ? `Clear on ${bl.total - bl.failed} of ${bl.total} providers` : `Clear on ${bl.total} providers`,
-    className: 'text-emerald-700 dark:text-emerald-400',
+    severity: 'ok',
+    text: bl.failed ? `Clear on ${bl.total - bl.failed} of ${bl.total}; ${bl.failed} did not answer` : `Clear on ${bl.total} blacklists`,
   };
 }
 
-/** Most important non-blacklist issue, shown under the blacklist line. */
-function otherIssue(item) {
-  return (item.health?.issues || []).find((issue) => issue.kind !== 'blacklist');
+/** The blacklist line first, then every other health issue, worst first (the API sorts them). */
+function findingsFor(item) {
+  const others = (item.health?.issues || [])
+    .filter((issue) => issue.kind !== 'blacklist')
+    .map((issue) => ({ severity: issue.severity, text: issue.message }));
+  return [blacklistSummary(item), ...others];
+}
+
+/** Overall health as a reply class: a listing beats everything else. */
+function healthOf(item) {
+  if (item.is_blacklisted) return { severity: 'critical', label: 'Listed' };
+  if (!item.health || item.checked === 'Not checked') return { severity: 'info', label: 'Not checked' };
+  const status = item.health.status;
+  if (status === 'critical') return { severity: 'critical', label: 'Critical' };
+  if (status === 'warning') return { severity: 'warning', label: 'Warning' };
+  if (status === 'info') return { severity: 'info', label: 'Info' };
+  return { severity: 'ok', label: 'Healthy' };
 }
 
 function urgency(item) {
@@ -121,40 +163,98 @@ function exportAssetsCsv(assets) {
   downloadCsv(rows, `abusebox-assets-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
-/** Overall state: listed beats other critical issues, then warnings, then healthy. */
-function assetState(item) {
-  if (item.is_blacklisted) return { icon: HiShieldExclamation, label: 'Listed', tone: 'rose' };
-  if (item.health?.status === 'critical') return { icon: HiExclamationCircle, label: 'Critical issue', tone: 'rose' };
-  if (item.health?.status === 'warning') return { icon: HiExclamation, label: 'Warning', tone: 'amber' };
-  return { icon: HiShieldCheck, label: 'Healthy', tone: 'emerald' };
+const typeLabel = (item) => (item.hostname_type === 'ipv4' ? 'IPv4' : 'Domain');
+
+function HealthBadge({ item }) {
+  const health = healthOf(item);
+  return <SeverityBadge severity={health.severity} label={health.label} />;
 }
 
-const STATE_TONES = {
-  rose: { box: 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400', text: 'text-rose-600 dark:text-rose-400' },
-  amber: { box: 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400', text: 'text-amber-600 dark:text-amber-400' },
-  emerald: { box: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400', text: 'text-emerald-600 dark:text-emerald-400' },
-};
-
-function StatusIcon({ item, compact = false }) {
-  const state = assetState(item);
-  const Icon = state.icon;
-  if (compact) return <Icon className={`flex-shrink-0 ${STATE_TONES[state.tone].text}`} role="img" aria-label={state.label} />;
+/** Findings as reply-class lines; healthy lines stay quiet, problems read in full ink. */
+function FindingList({ item, className = '' }) {
+  const lines = findingsFor(item);
+  const shown = lines.slice(0, FINDINGS_SHOWN);
+  const more = lines.length - shown.length;
   return (
-    <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${STATE_TONES[state.tone].box}`}>
-      <Icon className="text-xl" role="img" aria-label={state.label} />
-    </div>
+    <ul className={`space-y-0.5 ${className}`}>
+      {shown.map((line) => {
+        const quiet = !line.severity || line.severity === 'ok' || line.severity === 'info';
+        return (
+          <li key={line.text} className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-1.5">
+            {line.severity ? <SeverityCode severity={line.severity} className="leading-5" /> : <span aria-hidden="true" />}
+            <span className={`text-sm leading-5 ${quiet ? 'text-ink-2' : 'text-ink'}`}>{line.text}</span>
+          </li>
+        );
+      })}
+      {more > 0 && (
+        <li className="pl-[2.125rem] text-xs text-ink-2">and {more} more</li>
+      )}
+    </ul>
   );
 }
 
-function SelectBox({ checked, onChange, label }) {
+function CheckTags({ item }) {
+  const enabled = Object.entries(CHECK_BADGE_MAP).filter(([key]) => item[key]).map(([, label]) => label);
+  if (!enabled.length) return <span className="text-ink-2">None</span>;
+  return (
+    <ul className="flex flex-wrap gap-1" aria-label="Enabled checks">
+      {enabled.map((label) => (
+        <li key={label} className="rounded px-1 font-mono text-2xs leading-4 text-ink-2 ring-1 ring-inset ring-rule">{label}</li>
+      ))}
+    </ul>
+  );
+}
+
+function LastChecked({ item }) {
+  if (item.checked === 'Not checked' || !item.checked) return <span className="text-ink-2">Never</span>;
+  return <TimeAgo date={item.checked} className="text-ink-2" />;
+}
+
+function SelectBox({ checked, onChange, label, indeterminate = false }) {
   return (
     <input
       type="checkbox"
       checked={checked}
       onChange={onChange}
       aria-label={label}
-      className="relative z-10 h-4 w-4 rounded border-slate-300 accent-cyan-600 cursor-pointer"
+      ref={(el) => { if (el) el.indeterminate = indeterminate; }}
+      className="relative z-10 h-4 w-4 align-middle rounded border-rule-strong accent-accent cursor-pointer"
     />
+  );
+}
+
+function LoadingState({ view }) {
+  if (view === 'table') {
+    return (
+      <div className="rounded-md border border-rule overflow-hidden" aria-busy="true" aria-label="Loading assets">
+        <div className="h-9 bg-sunk border-b border-rule" />
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-3 py-3 border-b border-rule last:border-b-0">
+            <SkeletonLine className="h-4 w-4" />
+            <SkeletonLine className="h-4 w-48" />
+            <SkeletonLine className="h-4 w-12" />
+            <SkeletonLine className="h-5 w-20" />
+            <SkeletonLine className="h-4 flex-1" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading assets">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="rounded-md border border-rule p-4 space-y-3">
+          <SkeletonLine className="h-5 w-20" />
+          <SkeletonLine className="h-4 w-2/3" />
+          <SkeletonLine className="h-3 w-1/2" />
+          <div className="flex gap-1 pt-3 border-t border-rule">
+            <SkeletonLine className="h-4 w-8" />
+            <SkeletonLine className="h-4 w-10" />
+            <SkeletonLine className="h-4 w-8" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -168,7 +268,7 @@ export default function Assets() {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [view, setView] = useState(() => readPref('abusebox.assets.view', 'cards'));
+  const [view, setView] = useState(() => readPref('abusebox.assets.view', 'table'));
   const [sort, setSort] = useState(() => readPref('abusebox.assets.sort', 'status'));
   const [selected, setSelected] = useState(() => new Set());
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -186,7 +286,7 @@ export default function Assets() {
   };
 
   const fetchAssets = useCallback(async ({ quiet = false } = {}) => {
-    // Background refreshes keep the current cards on screen instead of
+    // Background refreshes keep the current rows on screen instead of
     // flashing skeletons.
     if (quiet) setRefreshing(true); else setIsLoading(true);
     setErrorMessage("");
@@ -232,6 +332,12 @@ export default function Assets() {
       await hostnameService.deleteHostname(id);
       toast.success(`Deleted ${hostname}`);
       setAssets((prev) => prev.filter((item) => item.id !== id));
+      setSelected((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch {
       toast.error('Could not delete the asset.');
     }
@@ -265,6 +371,11 @@ export default function Assets() {
     }
   };
 
+  const filterCounts = useMemo(
+    () => Object.fromEntries(FILTERS.map((f) => [f.key, assets.filter((item) => matchesFilter(item, f.key)).length])),
+    [assets],
+  );
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     const matches = assets.filter((item) => {
@@ -272,11 +383,7 @@ export default function Assets() {
         || item.hostname.toLowerCase().includes(query)
         || item.hostname_type.toLowerCase().includes(query)
         || (item.description || '').toLowerCase().includes(query);
-      if (!matchSearch) return false;
-      if (filterStatus === 'listed') return item.is_blacklisted;
-      if (filterStatus === 'clean') return !item.is_blacklisted;
-      if (filterStatus === 'attention') return (item.health?.issues || []).some((issue) => issue.severity !== 'info');
-      return true;
+      return matchSearch && matchesFilter(item, filterStatus);
     });
     const sorters = {
       status: (a, b) => urgency(a) - urgency(b) || a.hostname.localeCompare(b.hostname),
@@ -288,8 +395,9 @@ export default function Assets() {
   }, [assets, search, filterStatus, sort]);
 
   const shown = filtered.slice(0, visible);
-  const listedCount = assets.filter((item) => item.is_blacklisted).length;
+  const listedCount = filterCounts.listed || 0;
   const allShownSelected = shown.length > 0 && shown.every((item) => selected.has(item.id));
+  const someShownSelected = !allShownSelected && shown.some((item) => selected.has(item.id));
 
   const toggle = (id) => setSelected((prev) => {
     const next = new Set(prev);
@@ -330,11 +438,11 @@ export default function Assets() {
 
   const chooseView = (value) => { setView(value); writePref('abusebox.assets.view', value); };
   const chooseSort = (value) => { setSort(value); writePref('abusebox.assets.sort', value); };
+  const clearFilters = () => { setSearch(''); setFilterStatus('all'); };
 
   return (
-    <section className={`space-y-5 ${selected.size ? 'pb-24' : ''}`}>
+    <section className="space-y-4">
       <PageHeader
-        eyebrow="Monitor"
         title="Assets"
         description={assets.length
           ? `${plural(assets.length, 'asset')} tracked${listedCount ? `, ${listedCount} currently listed` : ''}.`
@@ -343,118 +451,150 @@ export default function Assets() {
           <>
             <AutoRefresh onRefresh={refresh} loading={refreshing || isLoading} />
             <button type="button" className={secondaryButtonClass} onClick={() => setCidrModalOpen(true)}>
-              <HiViewGridAdd className="text-lg" aria-hidden="true" /> CIDR import
+              <HiOutlineSquaresPlus className="text-base text-ink-2" aria-hidden="true" /> Import CIDR
             </button>
             <button type="button" className={secondaryButtonClass} onClick={() => setBulkModalOpen(true)}>
-              <HiCollection className="text-lg" aria-hidden="true" /> Bulk list
+              <HiOutlineRectangleStack className="text-base text-ink-2" aria-hidden="true" /> Add list
             </button>
             <button type="button" className={primaryButtonClass} onClick={() => setAddModalOpen(true)}>
-              <HiOutlinePlusCircle className="text-lg" aria-hidden="true" /> Add asset
+              <HiOutlinePlus className="text-base" aria-hidden="true" /> Add asset
             </button>
           </>
         )}
       />
 
       {assets.length > 0 && (
-        <div className="flex flex-col xl:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[min(100%,16rem)]">
             <label htmlFor="asset-search" className="sr-only">Search assets</label>
-            <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-base text-ink-2" aria-hidden="true" />
             <input
               id="asset-search"
               type="search"
-              placeholder="Search by hostname, type or description"
+              placeholder="Search hostname, type or description"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 pl-9 pr-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className={searchInputClass}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div role="group" aria-label="Filter assets" className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setFilterStatus(f.key)}
-                  aria-pressed={filterStatus === f.key}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${filterStatus === f.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <label htmlFor="asset-sort" className="sr-only">Sort assets</label>
-            <select
-              id="asset-sort"
-              value={sort}
-              onChange={(e) => chooseSort(e.target.value)}
-              className="h-11 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              {SORTS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-            </select>
-            <div role="group" aria-label="Layout" className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
-              {[['cards', HiViewGrid, 'Card view'], ['table', HiViewList, 'Table view']].map(([key, Icon, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={view === key}
-                  aria-label={label}
-                  title={label}
-                  onClick={() => chooseView(key)}
-                  className={`p-2 rounded-md transition-colors ${view === key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
-                >
-                  <Icon aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-            <button type="button" className={secondaryButtonClass} onClick={() => exportAssetsCsv(filtered)} title="Export the assets shown as CSV">
-              <HiDownload aria-hidden="true" /> CSV
-            </button>
+          <div role="group" aria-label="Filter assets" className={segmentGroupClass}>
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilterStatus(f.key)}
+                aria-pressed={filterStatus === f.key}
+                className={segmentClass(filterStatus === f.key)}
+              >
+                {f.label}
+                <span className="font-mono text-xs font-normal tabular-nums opacity-80">{filterCounts[f.key]}</span>
+              </button>
+            ))}
           </div>
+          <label htmlFor="asset-sort" className="sr-only">Sort assets</label>
+          <select id="asset-sort" value={sort} onChange={(e) => chooseSort(e.target.value)} className={sortSelectClass}>
+            {SORTS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+          </select>
+          <div role="group" aria-label="Layout" className={segmentGroupClass}>
+            {[['table', HiOutlineTableCells, 'Table view'], ['cards', HiOutlineSquares2X2, 'Card view']].map(([key, Icon, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={view === key}
+                aria-label={label}
+                title={label}
+                onClick={() => chooseView(key)}
+                className={segmentClass(view === key, 'px-2.5')}
+              >
+                <Icon className="text-base" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+          <button type="button" className={secondaryButtonClass} onClick={() => exportAssetsCsv(filtered)} title="Export the assets shown as CSV">
+            <HiOutlineArrowDownTray className="text-base text-ink-2" aria-hidden="true" /> CSV
+          </button>
         </div>
       )}
 
       {isLoading ? (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading assets">
-          {[...Array(6)].map((_, i) => <AssetCardSkeleton key={i} />)}
-        </div>
+        <LoadingState view={view} />
       ) : errorMessage ? (
         <Alert tone="error">
           {errorMessage}{' '}
           <button type="button" className="font-medium underline" onClick={() => fetchAssets()}>Retry</button>
         </Alert>
       ) : assets.length === 0 ? (
-        <div className={cardClass}>
-          <EmptyState
-            icon={HiShieldCheck}
-            title="No assets yet"
-            action={<button type="button" className={primaryButtonClass} onClick={() => setAddModalOpen(true)}>Add your first asset</button>}
-          >
-            Add a mail server IP or a domain. AbuseBox checks it against 22 blacklists now, then again on a schedule, and alerts you when something changes.
-          </EmptyState>
-        </div>
+        <EmptyState
+          icon={HiOutlineServerStack}
+          title="No assets yet"
+          action={(
+            <div className="space-y-3">
+              <button type="button" className={primaryButtonClass} onClick={() => setAddModalOpen(true)}>
+                <HiOutlinePlus className="text-base" aria-hidden="true" /> Add your first asset
+              </button>
+              <p className="text-sm text-ink-2">
+                Watching many? <button type="button" className={linkClass} onClick={() => setBulkModalOpen(true)}>Paste a list</button> of
+                up to 300 domains and IPs, or <button type="button" className={linkClass} onClick={() => setCidrModalOpen(true)}>import a CIDR range</button> up
+                to /24.
+              </p>
+            </div>
+          )}
+        >
+          Add a mail server IP or a domain you own. AbuseBox checks it against 24 blacklists right away, then again on a schedule, and alerts you when something changes.
+        </EmptyState>
       ) : filtered.length === 0 ? (
-        <div className={cardClass}>
-          <EmptyState icon={HiSearch} title="No matching assets">
-            {filterStatus === 'attention' ? 'Nothing needs attention right now.' : 'Try a different search or filter.'}
-          </EmptyState>
-        </div>
+        <EmptyState
+          icon={HiOutlineMagnifyingGlass}
+          title="No matching assets"
+          action={<button type="button" className={secondaryButtonClass} onClick={clearFilters}>Clear search and filter</button>}
+        >
+          {filterStatus === 'attention' && !search.trim() ? 'Nothing needs attention right now.' : 'No asset matches this search and filter.'}
+        </EmptyState>
       ) : (
         <>
-          <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
-            <label className="inline-flex items-center gap-2 cursor-pointer">
-              <SelectBox checked={allShownSelected} onChange={toggleAllShown} label="Select all shown assets" />
-              Select all
-            </label>
-            <span aria-live="polite">
-              Showing {shown.length} of {plural(filtered.length, 'asset')}
-            </span>
+          <div
+            className={`flex flex-wrap items-center gap-2 min-h-9 text-sm text-ink-2 ${selected.size ? 'sticky top-14 z-20 -mx-2 px-2 py-2 bg-paper border-b border-rule' : ''}`}
+          >
+            {view === 'cards' && (
+              <label className="inline-flex items-center gap-2 mr-2 cursor-pointer">
+                <SelectBox checked={allShownSelected} indeterminate={someShownSelected} onChange={toggleAllShown} label="Select all shown assets" />
+                Select all
+              </label>
+            )}
+            {selected.size > 0 ? (
+              <div role="region" aria-label="Bulk actions" className="flex flex-1 flex-wrap items-center gap-2">
+                <span className="font-semibold text-ink mr-auto" aria-live="polite">{selected.size} selected</span>
+                <button type="button" disabled={bulkBusy} onClick={() => runBulk('recheck')} className={secondaryButtonClass}>
+                  <HiOutlineArrowPath className="text-base text-ink-2" aria-hidden="true" /> Re-check
+                </button>
+                <BulkToggle label="Monitoring" disabled={bulkBusy} onOn={() => runBulk('enable_monitoring')} onOff={() => runBulk('disable_monitoring')} />
+                <BulkToggle label="Alerts" icon={HiOutlineBell} disabled={bulkBusy} onOn={() => runBulk('enable_alerts')} onOff={() => runBulk('disable_alerts')} />
+                <button type="button" disabled={bulkBusy} onClick={() => runBulk('delete')} className={quietDangerButtonClass}>
+                  <HiOutlineTrash className="text-base" aria-hidden="true" /> Delete
+                </button>
+                <button type="button" onClick={() => setSelected(new Set())} className={clearButtonClass} aria-label="Clear selection" title="Clear selection">
+                  <HiXMark className="text-base" aria-hidden="true" />
+                </button>
+              </div>
+            ) : (
+              <span aria-live="polite">Showing {shown.length} of {plural(filtered.length, 'asset')}</span>
+            )}
           </div>
 
           {view === 'table' ? (
-            <AssetTable items={shown} selected={selected} onToggle={toggle} />
+            <AssetTable
+              items={shown}
+              selected={selected}
+              onToggle={toggle}
+              onDelete={handleDelete}
+              allSelected={allShownSelected}
+              someSelected={someShownSelected}
+              onToggleAll={toggleAllShown}
+              sort={sort}
+              onSort={chooseSort}
+            />
           ) : (
-            <ul className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            <ul className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
               {shown.map((item) => (
                 <AssetCard key={item.id} item={item} selected={selected.has(item.id)} onToggle={() => toggle(item.id)} onDelete={() => handleDelete(item.id, item.hostname)} />
               ))}
@@ -462,30 +602,14 @@ export default function Assets() {
           )}
 
           {filtered.length > shown.length && (
-            <div className="text-center">
+            <div className="flex flex-wrap items-center gap-3">
               <button type="button" className={secondaryButtonClass} onClick={() => setVisible((v) => v + PAGE_SIZE)}>
                 Show {Math.min(PAGE_SIZE, filtered.length - shown.length)} more
               </button>
+              <span className="text-sm text-ink-2">{filtered.length - shown.length} not shown</span>
             </div>
           )}
         </>
-      )}
-
-      {selected.size > 0 && (
-        <div role="region" aria-label="Bulk actions" className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:left-[calc(50%+8rem)] z-40 w-[calc(100%-2rem)] max-w-3xl">
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 shadow-xl">
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 mr-auto">{selected.size} selected</span>
-            <button type="button" disabled={bulkBusy} onClick={() => runBulk('recheck')} className={secondaryButtonClass}><HiRefresh aria-hidden="true" /> Re-check</button>
-            <BulkToggle label="Monitoring" disabled={bulkBusy} onOn={() => runBulk('enable_monitoring')} onOff={() => runBulk('disable_monitoring')} />
-            <BulkToggle label="Alerts" icon={HiBell} disabled={bulkBusy} onOn={() => runBulk('enable_alerts')} onOff={() => runBulk('disable_alerts')} />
-            <button type="button" disabled={bulkBusy} onClick={() => runBulk('delete')} className="inline-flex items-center gap-2 h-11 px-4 rounded-lg text-sm font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-50">
-              <HiTrash aria-hidden="true" /> Delete
-            </button>
-            <button type="button" onClick={() => setSelected(new Set())} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Clear selection">
-              <HiX aria-hidden="true" />
-            </button>
-          </div>
-        </div>
       )}
 
       <AddNewMonitorDialog
@@ -504,119 +628,120 @@ export default function Assets() {
 
 function BulkToggle({ label, icon: Icon, onOn, onOff, disabled }) {
   return (
-    <div className="inline-flex h-11 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden" role="group" aria-label={label}>
-      <span className="inline-flex items-center gap-1.5 px-3 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/60">
-        {Icon && <Icon aria-hidden="true" />}{label}
+    <div className="inline-flex h-9 rounded-md border border-rule-strong bg-paper overflow-hidden" role="group" aria-label={label}>
+      <span className="inline-flex items-center gap-1.5 px-2.5 text-sm text-ink-2 bg-sunk">
+        {Icon && <Icon className="text-base" aria-hidden="true" />}{label}
       </span>
-      <button type="button" disabled={disabled} onClick={onOn} className="px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50">On</button>
-      <button type="button" disabled={disabled} onClick={onOff} className="px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 border-l border-slate-200 dark:border-slate-600 disabled:opacity-50">Off</button>
+      <button type="button" disabled={disabled} onClick={onOn} className={segmentClass(false)}>On</button>
+      <button type="button" disabled={disabled} onClick={onOff} className={segmentClass(false)}>Off</button>
     </div>
   );
 }
 
 function AssetCard({ item, selected, onToggle, onDelete }) {
-  const summary = blacklistSummary(item);
-  const issue = otherIssue(item);
-  const enabledChecks = Object.entries(CHECK_BADGE_MAP).filter(([key]) => item[key]).map(([, label]) => label);
+  const meta = [typeLabel(item), item.is_monitor_enabled ? 'Monitored' : 'Not monitored', item.is_alert_enabled && 'Alerts on'].filter(Boolean);
   return (
-    <li className={`relative bg-white dark:bg-slate-800 border rounded-xl p-5 shadow-sm hover:shadow-md transition-all focus-within:border-cyan-400 ${selected ? 'border-cyan-500 ring-1 ring-cyan-500' : 'border-slate-200 dark:border-slate-700 hover:border-cyan-300 dark:hover:border-cyan-700'}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <StatusIcon item={item} />
-          <div className="min-w-0">
-            {/* The link's ::after covers the card so the whole card is clickable. */}
-            <Link
-              to={`/dashboard/assets/${item.id}`}
-              className="block text-base font-semibold text-slate-900 dark:text-white truncate after:absolute after:inset-0 after:rounded-xl focus:outline-none"
-              title={item.hostname}
-            >
-              {item.hostname}
-            </Link>
-            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              <span>{item.hostname_type === 'ipv4' ? 'IPv4' : 'Domain'}</span>
-              {item.is_monitor_enabled && <><span aria-hidden="true">&middot;</span><span>Monitored</span></>}
-              {item.is_alert_enabled && <><span aria-hidden="true">&middot;</span><span>Alerts</span></>}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+    <li
+      className={`relative flex flex-col rounded-md border p-4 transition-colors focus-within:border-accent ${selected ? 'bg-accent-soft border-accent/40' : 'bg-paper border-rule hover:border-rule-strong'}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <HealthBadge item={item} />
+        <div className="flex items-center gap-1 -my-1 -mr-1.5">
           <SelectBox checked={selected} onChange={onToggle} label={`Select ${item.hostname}`} />
-          <button
-            type="button"
-            onClick={onDelete}
-            className="relative z-10 p-2 -m-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors"
-            aria-label={`Delete ${item.hostname}`}
-            title="Delete"
-          >
-            <HiTrash aria-hidden="true" />
+          <button type="button" onClick={onDelete} className={iconButtonClass} aria-label={`Delete ${item.hostname}`} title="Delete">
+            <HiOutlineTrash className="text-base" aria-hidden="true" />
           </button>
         </div>
       </div>
 
+      {/* The link's ::after covers the card so the whole card is clickable. */}
+      <Link
+        to={`/dashboard/assets/${item.id}`}
+        className="mt-2 block font-mono text-[15px] font-semibold text-ink truncate hover:text-accent after:absolute after:inset-0 after:rounded-md focus:outline-none"
+        title={item.hostname}
+      >
+        {item.hostname}
+      </Link>
+      <p className="mt-0.5 text-xs text-ink-2">{meta.join(' · ')}</p>
       {item.description && (
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 truncate" title={item.description}>{item.description}</p>
+        <p className="mt-1.5 text-sm text-ink-2 truncate" title={item.description}>{item.description}</p>
       )}
 
-      <p className={`mt-4 text-sm font-semibold ${summary.className}`}>{summary.text}</p>
-      {issue && (
-        <p className={`mt-1 text-sm ${SEVERITY[issue.severity]?.text || ''}`}>{issue.message}</p>
-      )}
+      <FindingList item={item} className="mt-3 mb-3" />
 
-      <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-        <div className="flex flex-wrap gap-1" aria-label="Enabled checks">
-          {enabledChecks.map((label) => (
-            <span key={label} className="inline-flex rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 text-[11px] font-semibold">{label}</span>
-          ))}
-        </div>
-        <TimeAgo date={item.checked} className="text-xs text-slate-500 dark:text-slate-400 flex-shrink-0" />
+      <div className="mt-auto flex items-center justify-between gap-2 pt-3 border-t border-rule">
+        <CheckTags item={item} />
+        <span className="flex-shrink-0 text-xs"><LastChecked item={item} /></span>
       </div>
     </li>
   );
 }
 
-function AssetTable({ items, selected, onToggle }) {
+const SORTABLE = { name: 'Asset', status: 'Health', checked: 'Last-Checked' };
+const ARIA_SORT = { name: 'ascending', status: 'other', checked: 'descending' };
+
+function SortHeader({ sortKey, sort, onSort, className = '' }) {
+  const active = sort === sortKey;
   return (
-    <div className={`${cardClass} overflow-x-auto`}>
-      <table className="w-full min-w-[760px] text-sm text-slate-700 dark:text-slate-300">
-        <thead className="bg-slate-50 dark:bg-slate-700/60 text-left">
+    <th scope="col" className={`${thBase} px-3 ${className}`} aria-sort={active ? ARIA_SORT[sortKey] : undefined}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 hover:text-ink ${active ? 'text-ink' : ''}`}
+        title={`Sort by ${SORTABLE[sortKey].toLowerCase()}`}
+      >
+        {SORTABLE[sortKey]}
+        <HiChevronDown className={`text-xs ${active ? '' : 'invisible'}`} aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
+function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSelected, onToggleAll, sort, onSort }) {
+  return (
+    <div className="relative overflow-x-auto rounded-md border border-rule">
+      <table className="w-full min-w-[60rem] text-sm border-collapse">
+        <thead className="bg-sunk">
           <tr>
-            <th scope="col" className="w-10 px-4 py-3"><span className="sr-only">Select</span></th>
-            <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Asset</th>
-            <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Blacklists</th>
-            <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Other issues</th>
-            <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Monitoring</th>
-            <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-500 dark:text-slate-400">Last checked</th>
+            <th scope="col" className={`${thBase} w-9 pl-3 pr-1`}>
+              <SelectBox checked={allSelected} indeterminate={someSelected} onChange={onToggleAll} label="Select all shown assets" />
+            </th>
+            <SortHeader sortKey="name" sort={sort} onSort={onSort} />
+            <th scope="col" className={`${thBase} px-3`}>Type</th>
+            <SortHeader sortKey="status" sort={sort} onSort={onSort} />
+            <th scope="col" className={`${thBase} px-3 w-full`}>Findings</th>
+            <SortHeader sortKey="checked" sort={sort} onSort={onSort} />
+            <th scope="col" className={`${thBase} px-3`}>Checks</th>
+            <th scope="col" className={`${thBase} px-3`}>Monitor</th>
+            <th scope="col" className={`${thBase} px-3`}><span className="sr-only">Actions</span></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+        <tbody>
           {items.map((item) => {
-            const summary = blacklistSummary(item);
-            const issues = (item.health?.issues || []).filter((issue) => issue.kind !== 'blacklist');
+            const isSelected = selected.has(item.id);
             return (
-              <tr key={item.id} className={selected.has(item.id) ? 'bg-cyan-50/60 dark:bg-cyan-900/20' : 'hover:bg-slate-50/60 dark:hover:bg-slate-700/30'}>
-                <td className="px-4 py-3"><SelectBox checked={selected.has(item.id)} onChange={() => onToggle(item.id)} label={`Select ${item.hostname}`} /></td>
-                <td className="px-3 py-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <StatusIcon item={item} compact />
-                    <Link to={`/dashboard/assets/${item.id}`} className="font-semibold text-slate-900 dark:text-white hover:text-cyan-700 dark:hover:text-cyan-400 break-all">{item.hostname}</Link>
-                  </div>
-                  {item.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-xs">{item.description}</p>}
+              <tr key={item.id} className={`border-b border-rule last:border-b-0 align-top ${isSelected ? 'bg-accent-soft' : 'hover:bg-sunk/60'}`}>
+                <td className="pl-3 pr-1 py-2.5">
+                  <SelectBox checked={isSelected} onChange={() => onToggle(item.id)} label={`Select ${item.hostname}`} />
                 </td>
-                <td className={`px-3 py-3 font-medium ${summary.className}`}>{summary.text}</td>
-                <td className="px-3 py-3">
-                  {issues.length ? (
-                    <ul className="space-y-0.5">
-                      {issues.slice(0, 2).map((issue) => (
-                        <li key={issue.message} className={SEVERITY[issue.severity]?.text}>{issue.message}</li>
-                      ))}
-                    </ul>
-                  ) : <span className="text-slate-400">—</span>}
+                <td className="px-3 py-2 min-w-[12rem] max-w-[18rem]">
+                  <Link to={`/dashboard/assets/${item.id}`} className="font-mono text-[13px] font-semibold leading-5 text-ink hover:text-accent break-all">
+                    {item.hostname}
+                  </Link>
+                  {item.description && <p className="text-xs text-ink-2 mt-0.5 truncate" title={item.description}>{item.description}</p>}
                 </td>
-                <td className="px-3 py-3 whitespace-nowrap">
+                <td className="px-3 py-2 leading-5 text-ink-2 whitespace-nowrap">{typeLabel(item)}</td>
+                <td className="px-3 py-2 whitespace-nowrap"><HealthBadge item={item} /></td>
+                <td className="px-3 py-2 min-w-[16rem]"><FindingList item={item} /></td>
+                <td className="px-3 py-2 leading-5 whitespace-nowrap"><LastChecked item={item} /></td>
+                <td className="px-3 py-2.5 min-w-[7rem]"><CheckTags item={item} /></td>
+                <td className="px-3 py-2 leading-5 whitespace-nowrap text-ink-2">
                   {item.is_monitor_enabled ? 'On' : 'Off'}{item.is_alert_enabled ? ' · alerts' : ''}
                 </td>
-                <td className="px-3 py-3 whitespace-nowrap">
-                  {item.checked === 'Not checked' ? <span className="text-slate-400">Never</span> : <TimeAgo date={item.checked} />}
+                <td className="px-2 py-1 text-right">
+                  <button type="button" onClick={() => onDelete(item.id, item.hostname)} className={iconButtonClass} aria-label={`Delete ${item.hostname}`} title="Delete">
+                    <HiOutlineTrash className="text-base" aria-hidden="true" />
+                  </button>
                 </td>
               </tr>
             );

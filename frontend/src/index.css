@@ -1,12 +1,65 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import '@fontsource-variable/public-sans/wght.css';
+@import '@fontsource/commit-mono/400.css';
+@import '@fontsource/commit-mono/600.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Delivery Report: results read like a mail delivery report.
+  White paper, ink, hairline rules; status classes borrowed from SMTP
+  (5.x listed, 4.x no answer, 2.x clear); the logo's teal is the only accent.
+  Colours are RGB channels so Tailwind opacity modifiers work.
+*/
 :root {
-  --surface-bg: #f3f4f6;
-  --card-border: #e5e7eb;
+  --paper: 255 255 255;        /* content */
+  --rail: 243 244 246;         /* navigation and side panels */
+  --sunk: 248 249 250;         /* table heads, inset fields */
+  --ink: 20 23 28;
+  --ink-2: 88 96 108;          /* field names, secondary text (6.3:1 on paper) */
+  --ink-3: 140 147 157;        /* disabled, decorative only */
+  --rule: 226 229 234;
+  --rule-strong: 200 205 212;
+  --accent: 13 117 127;        /* logo teal; 5.4:1 on paper */
+  --accent-hover: 9 95 104;
+  --accent-ink: 255 255 255;
+  --accent-soft: 230 244 245;
+  --s5: 180 35 24;             /* listed / critical */
+  --s5-soft: 254 242 241;
+  --s4: 154 88 0;              /* no answer / warning */
+  --s4-soft: 255 246 228;
+  --s2: 26 116 72;             /* clear / ok */
+  --s2-soft: 236 247 240;
+  --info: 52 84 136;
+  --info-soft: 238 242 249;
+  --scrim: 15 17 21;           /* behind dialogs; dark in both themes */
+  color-scheme: light;
+}
+
+.dark {
+  --paper: 22 25 30;
+  --rail: 15 17 21;
+  --sunk: 28 32 38;
+  --ink: 231 234 238;
+  --ink-2: 158 166 177;
+  --ink-3: 104 112 124;
+  --rule: 45 50 58;
+  --rule-strong: 66 73 84;
+  --accent: 72 196 204;
+  --accent-hover: 110 214 220;
+  --accent-ink: 6 22 24;
+  --accent-soft: 18 46 49;
+  --s5: 250 120 110;
+  --s5-soft: 60 26 24;
+  --s4: 232 172 76;
+  --s4-soft: 54 39 14;
+  --s2: 96 204 145;
+  --s2-soft: 20 46 33;
+  --info: 146 176 226;
+  --info-soft: 28 36 54;
+  --scrim: 0 0 0;
+  color-scheme: dark;
 }
 
 html,
@@ -16,34 +69,30 @@ body,
 }
 
 body {
-  background: var(--surface-bg);
-  color: #111827;
-  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+  font-family: theme('fontFamily.sans');
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-feature-settings: 'tnum' 1;
   -webkit-font-smoothing: antialiased;
-}
-
-/* Dark theme: page background (visible on overscroll) and native controls. */
-.dark {
-  color-scheme: dark;
-  --surface-bg: #0f172a;
-}
-
-.dark body {
-  color: #e2e8f0;
 }
 
 /* One consistent, visible keyboard focus indicator everywhere. */
 :focus-visible {
-  outline: 2px solid #06b6d4;
+  outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
-/* Inputs already show a focus ring via Tailwind utilities. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
+}
+
+::selection {
+  background: rgb(var(--accent) / 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -57,14 +106,30 @@ textarea:focus-visible {
   }
 }
 
-.landing {
-  background:
-    radial-gradient(circle at 8% 12%, rgba(34, 211, 238, 0.24), transparent 32%),
-    radial-gradient(circle at 80% 78%, rgba(52, 211, 153, 0.22), transparent 30%),
-    linear-gradient(130deg, #020617, #111827 52%, #0b1324);
+code,
+pre,
+kbd {
+  font-family: theme('fontFamily.mono');
 }
 
-code,
-pre {
-  font-family: "JetBrains Mono", monospace;
+/* react-toastify, in the same paper-and-ink vocabulary. Set on the container so it
+   wins over the library's own :root defaults whatever the import order. */
+.Toastify {
+  --toastify-color-light: rgb(var(--paper));
+  --toastify-color-dark: rgb(var(--paper));
+  --toastify-text-color-light: rgb(var(--ink));
+  --toastify-text-color-dark: rgb(var(--ink));
+  --toastify-color-info: rgb(var(--info));
+  --toastify-color-success: rgb(var(--s2));
+  --toastify-color-warning: rgb(var(--s4));
+  --toastify-color-error: rgb(var(--s5));
+  --toastify-font-family: theme('fontFamily.sans');
+  --toastify-toast-bd-radius: 6px;
+  --toastify-toast-min-height: 48px;
+}
+
+.Toastify__toast {
+  border: 1px solid rgb(var(--rule));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  font-size: 0.875rem;
 }

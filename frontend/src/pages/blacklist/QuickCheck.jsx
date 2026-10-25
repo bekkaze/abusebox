@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { HiArrowLeft, HiDownload } from 'react-icons/hi';
+import { HiOutlineArrowDownTray, HiOutlineArrowLeft } from 'react-icons/hi2';
 import { checkBlacklist } from '../../services/blacklist/checkService';
 import { downloadBlacklistCsv } from '../../services/tools';
+import Navbar from '../../components/landing/Navbar';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
-import { LookupForm, Spinner, cardClass, secondaryButtonClass } from '../../components/shared/ui';
+import { SkeletonLine } from '../../components/shared/Skeleton';
+import { LookupForm, PageHeader, linkClass, secondaryButtonClass } from '../../components/shared/ui';
 
 const QuickCheck = () => {
   const location = useLocation();
@@ -30,46 +32,56 @@ const QuickCheck = () => {
   }, [hostname]);
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 px-4 py-8">
-      <main className="max-w-5xl mx-auto space-y-5">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline">
-          <HiArrowLeft aria-hidden="true" /> Back to home
+    <div className="min-h-screen bg-paper text-ink">
+      <Navbar />
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <Link to="/" className={`${linkClass} inline-flex items-center gap-1.5 text-sm mb-5`}>
+          <HiOutlineArrowLeft aria-hidden="true" /> Back to home
         </Link>
 
-        <div className={`${cardClass} p-5`}>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Public check</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Blacklist report</h1>
-          <LookupForm
-            label="Domain or IPv4 address"
-            value={input}
-            onChange={setInput}
-            onSubmit={() => setSearchParams({ hostname: input.trim() })}
-            placeholder="example.com or 8.8.8.8"
-            loading={loading}
-            buttonLabel="Check"
-            loadingLabel="Checking"
-            error={error}
-          />
-        </div>
+        <PageHeader
+          title="Blacklist report"
+          description="Check a domain or IPv4 address against every blacklist AbuseBox watches. No account needed."
+        />
+
+        <LookupForm
+          label="Domain or IPv4 address"
+          value={input}
+          onChange={setInput}
+          onSubmit={() => setSearchParams({ hostname: input.trim() })}
+          placeholder="example.com or 8.8.8.8"
+          loading={loading}
+          buttonLabel="Check"
+          loadingLabel="Checking"
+          error={error}
+        />
 
         {(loading || data) && (
-          <div className={`${cardClass} p-5`}>
+          <section aria-labelledby="quick-check-report" className="mt-10">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-3 mb-5">
+              <h2 id="quick-check-report" className="text-lg font-semibold tracking-tight text-ink break-all">
+                {loading ? 'Checking ' : 'Report for '}<span className="font-mono">{hostname}</span>
+              </h2>
+              {!loading && (
+                <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
+                  <HiOutlineArrowDownTray className="text-base" aria-hidden="true" /> Export CSV
+                </button>
+              )}
+            </div>
             {loading ? (
-              <div className="flex items-center gap-3 text-slate-600 dark:text-slate-300 py-6" role="status">
-                <Spinner className="h-5 w-5 text-cyan-600" /> Querying blacklist providers for {hostname}
+              <div role="status" className="space-y-3">
+                <p className="text-sm text-ink-2">
+                  Querying blacklist providers for <span className="font-mono text-ink">{hostname}</span>. This can take up to 30 seconds.
+                </p>
+                <SkeletonLine className="h-6 w-72 max-w-full" />
+                <div className="rounded-md border border-rule p-3 space-y-3">
+                  {[...Array(8)].map((_, i) => <SkeletonLine key={i} className="h-4" style={{ width: `${92 - i * 6}%` }} />)}
+                </div>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white break-all">Target: {hostname}</h2>
-                  <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
-                    <HiDownload aria-hidden="true" /> Export CSV
-                  </button>
-                </div>
-                <ResultTableQuick data={data} />
-              </div>
+              <ResultTableQuick data={data} />
             )}
-          </div>
+          </section>
         )}
       </main>
     </div>

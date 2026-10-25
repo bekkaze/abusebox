@@ -29,8 +29,9 @@ const Activity = lazy(() => import("../pages/dashboard/Activity"));
 function LazyPage({ children }) {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-cyan-600"></div>
+      <div className="space-y-3 py-2" aria-busy="true" aria-label="Loading">
+        <div className="h-7 w-64 rounded bg-rule/70 animate-pulse" />
+        <div className="h-4 w-96 max-w-full rounded bg-rule/70 animate-pulse" />
       </div>
     }>
       {children}

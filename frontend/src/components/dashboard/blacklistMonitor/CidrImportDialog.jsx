@@ -1,15 +1,14 @@
 import React, { useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
+import { inputClass, primaryButtonClass, secondaryButtonClass, Spinner } from "../../shared/ui";
+import { CHECK_TOGGLES } from "./assetForm";
 
-const CHECK_TOGGLES = [
-  { name: "check_blacklist", label: "Blacklist (DNSBL)" },
-  { name: "check_abuseipdb", label: "AbuseIPDB" },
-  { name: "check_dns", label: "DNS Records" },
-  { name: "check_ssl", label: "SSL Certificate" },
-  { name: "check_whois", label: "WHOIS Lookup" },
-  { name: "check_email_security", label: "SPF/DKIM/DMARC" },
-  { name: "check_server_status", label: "Server Status" },
-];
+// Dialog surface and form vocabulary: flat paper, hairline border, one soft shadow.
+const panelClass =
+  "inline-block w-full max-w-lg p-5 sm:p-6 my-8 text-left align-middle transition-all transform " +
+  "bg-paper rounded-md border border-rule shadow-[0_12px_32px_rgb(0_0_0/0.18)]";
+const labelClass = "block text-sm font-medium text-ink mb-1.5";
+const checkboxClass = "h-4 w-4 rounded border-rule-strong accent-accent";
 
 const initialForm = {
   cidr: "",
@@ -64,94 +63,98 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
         <div className="min-h-screen px-4 text-center">
           <Transition.Child
             as={React.Fragment}
-            enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100"
-            leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0"
+            enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100"
+            leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0"
           >
-            <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+            <Dialog.Overlay className="fixed inset-0 bg-scrim/50" />
           </Transition.Child>
 
           <span className="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
 
           <Transition.Child
             as={React.Fragment}
-            enter="ease-out duration-300" enterFrom="opacity-0 translate-y-4" enterTo="opacity-100 translate-y-0"
-            leave="ease-in duration-200" leaveFrom="opacity-100 translate-y-0" leaveTo="opacity-0 translate-y-4"
+            enter="ease-out duration-200" enterFrom="opacity-0 translate-y-4" enterTo="opacity-100 translate-y-0"
+            leave="ease-in duration-150" leaveFrom="opacity-100 translate-y-0" leaveTo="opacity-0 translate-y-4"
           >
-            <div className="inline-block w-full max-w-lg p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-slate-800 shadow-xl rounded-xl border border-slate-200 dark:border-slate-700">
-              <Dialog.Title as="h3" className="text-xl font-semibold leading-6 text-slate-900 dark:text-white">
-                CIDR Import
+            <div className={panelClass}>
+              <Dialog.Title as="h3" className="text-base font-semibold text-ink">
+                Import a CIDR range
               </Dialog.Title>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Import an IP range as monitored assets (up to /24, 254 hosts). The scheduler checks them on its next run.
+              <p className="mt-1 text-sm text-ink-2">
+                Adds every usable address in an IPv4 range as an asset, up to a /24 (254 hosts). The scheduler checks them on its next run.
               </p>
 
-              <div className="mt-4 space-y-4">
+              <div className="mt-5 space-y-4">
                 <div>
-                  <label htmlFor="cidr-import-range" className="block text-sm font-medium text-slate-700 dark:text-slate-300">CIDR range</label>
+                  <label htmlFor="cidr-import-range" className={labelClass}>CIDR range</label>
                   <input
                     type="text"
                     id="cidr-import-range"
                     name="cidr"
                     value={form.cidr}
                     onChange={handleChange}
-                    placeholder="192.168.1.0/24"
-                    className="mt-1 p-2.5 w-full border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white"
+                    placeholder="192.0.2.0/24"
+                    autoComplete="off"
+                    spellCheck="false"
+                    aria-describedby={hostCount > 0 ? "cidr-import-count" : undefined}
+                    className={`${inputClass} font-mono`}
                   />
                   {hostCount > 0 && (
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      This will create <span className="font-semibold text-cyan-700 dark:text-cyan-400">{hostCount}</span> asset{hostCount !== 1 ? 's' : ''}
+                    <p id="cidr-import-count" className="mt-1.5 text-xs text-ink-2">
+                      Creates <span className="font-semibold text-ink tabular-nums">{hostCount}</span> asset{hostCount !== 1 ? "s" : ""}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="cidr-import-description" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description <span className="font-normal text-slate-400">(optional)</span></label>
+                  <label htmlFor="cidr-import-description" className={labelClass}>
+                    Description <span className="font-normal text-ink-2">(optional)</span>
+                  </label>
                   <input
                     type="text"
                     id="cidr-import-description"
                     name="description"
                     value={form.description}
                     onChange={handleChange}
-                    placeholder="Optional description for all imported IPs"
-                    className="mt-1 p-2.5 w-full border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white"
+                    placeholder="Applied to every imported IP"
+                    className={inputClass}
                   />
                 </div>
 
-                {/* Check Toggles */}
-                <div>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Checks to Run</p>
-                  <div className="grid grid-cols-2 gap-2">
+                <fieldset>
+                  <legend className="text-sm font-medium text-ink mb-1">Checks to run</legend>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                     {CHECK_TOGGLES.map((toggle) => (
-                      <label key={toggle.name} className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                      <label key={toggle.name} className="flex items-center gap-2.5 py-1.5 cursor-pointer">
                         <input
                           type="checkbox"
                           name={toggle.name}
                           checked={form[toggle.name] || false}
                           onChange={handleChange}
-                          className="h-4 w-4 rounded border-slate-300 accent-cyan-600"
+                          className={checkboxClass}
                         />
-                        <span className="text-sm text-slate-700 dark:text-slate-300">{toggle.label}</span>
+                        <span className="text-sm text-ink">{toggle.label}</span>
                       </label>
                     ))}
                   </div>
-                </div>
+                </fieldset>
 
-                {/* Monitor & Alert */}
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" />
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Monitoring</span>
+                <fieldset className="flex flex-wrap gap-x-6 gap-y-2 pt-4 border-t border-rule">
+                  <legend className="sr-only">Monitoring</legend>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className={checkboxClass} />
+                    <span className="text-sm text-ink">Monitor on a schedule</span>
                   </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" />
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Alerts</span>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className={checkboxClass} />
+                    <span className="text-sm text-ink">Alert when newly listed</span>
                   </label>
-                </div>
+                </fieldset>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+                    className={secondaryButtonClass}
                     onClick={() => setIsOpen(false)}
                     disabled={submitting}
                   >
@@ -159,21 +162,12 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
                   </button>
                   <button
                     type="button"
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 min-w-[120px] justify-center"
+                    className={`${primaryButtonClass} min-w-[8rem]`}
                     disabled={!form.cidr.trim() || submitting}
                     onClick={handleSubmit}
                   >
-                    {submitting ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Importing...
-                      </>
-                    ) : (
-                      'Import'
-                    )}
+                    {submitting && <Spinner />}
+                    {submitting ? "Importing" : hostCount > 0 ? `Import ${hostCount} address${hostCount !== 1 ? "es" : ""}` : "Import"}
                   </button>
                 </div>
               </div>

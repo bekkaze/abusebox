@@ -1,17 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import { HiOutlineDocumentArrowUp } from 'react-icons/hi2';
 import { toast } from 'react-toastify';
 import { parseTargetFile } from '../../../services/tools';
+import { inputClass, linkClass, primaryButtonClass, secondaryButtonClass, Spinner } from '../../shared/ui';
+import { CHECK_TOGGLES } from './assetForm';
 
-const CHECK_TOGGLES = [
-  { name: 'check_blacklist', label: 'Blacklist (DNSBL)' },
-  { name: 'check_abuseipdb', label: 'AbuseIPDB' },
-  { name: 'check_dns', label: 'DNS Records' },
-  { name: 'check_ssl', label: 'SSL Certificate' },
-  { name: 'check_whois', label: 'WHOIS Lookup' },
-  { name: 'check_email_security', label: 'SPF/DKIM/DMARC' },
-  { name: 'check_server_status', label: 'Server Status' },
-];
+// Dialog surface and form vocabulary: flat paper, hairline border, one soft shadow.
+const panelClass =
+  'inline-block w-full max-w-2xl p-5 sm:p-6 my-8 text-left align-middle transition-all transform ' +
+  'bg-paper rounded-md border border-rule shadow-[0_12px_32px_rgb(0_0_0/0.18)]';
+const labelClass = 'block text-sm font-medium text-ink mb-1.5';
+const checkboxClass = 'h-4 w-4 rounded border-rule-strong accent-accent';
+// inputClass carries a fixed h-9; the textarea needs the same look at its own height.
+const textareaClass = `${inputClass.replace('h-9 ', '')} py-2 font-mono`;
+
+const MAX_TARGETS = 300;
 
 const initialForm = {
   targets: '',
@@ -46,7 +50,8 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
   const [uploading, setUploading] = useState(false);
   const targets = useMemo(() => parseTargets(form.targets), [form.targets]);
   const invalidTargets = targets.filter((target) => !isIpv4(target) && !isDomain(target));
-  const canSubmit = targets.length > 0 && targets.length <= 300 && invalidTargets.length === 0 && !submitting && !uploading;
+  const tooMany = targets.length > MAX_TARGETS;
+  const canSubmit = targets.length > 0 && !tooMany && invalidTargets.length === 0 && !submitting && !uploading;
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -92,40 +97,96 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
     }
   };
 
+  const countHasProblem = invalidTargets.length > 0 || tooMany;
+
   return (
     <Transition show={isOpen} as={React.Fragment}>
       <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={() => !submitting && setIsOpen(false)}>
         <div className="min-h-screen px-4 text-center">
-          <Transition.Child as={React.Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
-            <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+          <Transition.Child as={React.Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
+            <Dialog.Overlay className="fixed inset-0 bg-scrim/50" />
           </Transition.Child>
           <span className="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
-          <Transition.Child as={React.Fragment} enter="ease-out duration-300" enterFrom="opacity-0 translate-y-4" enterTo="opacity-100 translate-y-0" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0 translate-y-4">
-            <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-slate-800 shadow-xl rounded-xl border border-slate-200 dark:border-slate-700">
-              <Dialog.Title as="h3" className="text-xl font-semibold text-slate-900 dark:text-white">Bulk Monitoring List</Dialog.Title>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Paste or upload up to 300 domains/IPs. TXT, CSV, and Excel (.xlsx) files are supported.</p>
+          <Transition.Child as={React.Fragment} enter="ease-out duration-200" enterFrom="opacity-0 translate-y-4" enterTo="opacity-100 translate-y-0" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0 translate-y-4">
+            <div className={panelClass}>
+              <Dialog.Title as="h3" className="text-base font-semibold text-ink">Add a list of assets</Dialog.Title>
+              <p className="mt-1 text-sm text-ink-2">
+                Paste or upload up to {MAX_TARGETS} domains and IPv4 addresses. TXT, CSV and Excel (.xlsx) files work. New assets are checked on the next scheduler run.
+              </p>
 
-              <div className="mt-4 space-y-4">
-                <label htmlFor="bulk-targets" className="block text-sm font-medium text-slate-700 dark:text-slate-300 -mb-2">Targets, one per line or comma-separated</label>
-                <textarea id="bulk-targets" name="targets" value={form.targets} onChange={handleChange} rows={8} placeholder={'mail.example.com\n203.0.113.10\nexample.org'} className="w-full p-3 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white" />
-                <label className="inline-flex items-center text-sm font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline focus-within:ring-2 focus-within:ring-cyan-500 rounded">{uploading ? 'Reading file…' : 'Upload TXT, CSV, or Excel'}<input type="file" accept=".txt,.csv,.xlsx" onChange={handleFile} disabled={uploading} className="sr-only" /></label>
-                <p className={`text-xs ${invalidTargets.length || targets.length > 300 ? 'text-rose-600' : 'text-slate-500 dark:text-slate-400'}`}>
-                  {targets.length} unique target{targets.length !== 1 ? 's' : ''} {targets.length > 300 && '(maximum is 300)'}
-                  {invalidTargets.length > 0 && ` — invalid: ${invalidTargets.slice(0, 3).join(', ')}${invalidTargets.length > 3 ? '…' : ''}`}
-                </p>
-                <input name="description" aria-label="Description for every target" value={form.description} onChange={handleChange} placeholder="Optional description for every target" className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:bg-slate-700 dark:text-white" />
+              <div className="mt-5 space-y-4">
+                <div>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-1.5">
+                    <label htmlFor="bulk-targets" className="text-sm font-medium text-ink">Targets, one per line or comma-separated</label>
+                    <label className={`${linkClass} inline-flex items-center gap-1.5 text-sm cursor-pointer rounded focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent`}>
+                      <HiOutlineDocumentArrowUp className="text-base" aria-hidden="true" />
+                      {uploading ? 'Reading file…' : 'Upload TXT, CSV or Excel'}
+                      <input type="file" accept=".txt,.csv,.xlsx" onChange={handleFile} disabled={uploading} className="sr-only" />
+                    </label>
+                  </div>
+                  <textarea
+                    id="bulk-targets"
+                    name="targets"
+                    value={form.targets}
+                    onChange={handleChange}
+                    rows={8}
+                    spellCheck="false"
+                    autoCapitalize="off"
+                    placeholder={'mail.example.com\n203.0.113.10\nexample.org'}
+                    aria-invalid={countHasProblem}
+                    aria-describedby="bulk-targets-count"
+                    className={textareaClass}
+                  />
+                  <p id="bulk-targets-count" className={`mt-1.5 text-xs ${countHasProblem ? 'text-s5' : 'text-ink-2'}`}>
+                    <span className="tabular-nums">{targets.length}</span> unique target{targets.length !== 1 ? 's' : ''}{tooMany && ` (maximum is ${MAX_TARGETS})`}
+                    {invalidTargets.length > 0 && (
+                      <>
+                        {'. Not a domain or IPv4: '}
+                        <span className="font-mono">{invalidTargets.slice(0, 3).join(', ')}</span>
+                        {invalidTargets.length > 3 && ` and ${invalidTargets.length - 3} more`}
+                      </>
+                    )}
+                  </p>
+                </div>
 
                 <div>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Checks to Run</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {CHECK_TOGGLES.map((toggle) => <label key={toggle.name} className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer"><input type="checkbox" name={toggle.name} checked={form[toggle.name]} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" /><span className="text-sm text-slate-700 dark:text-slate-300">{toggle.label}</span></label>)}
+                  <label htmlFor="bulk-description" className={labelClass}>
+                    Description <span className="font-normal text-ink-2">(optional, applies to every target)</span>
+                  </label>
+                  <input id="bulk-description" name="description" aria-label="Description for every target" value={form.description} onChange={handleChange} placeholder="Outbound mail relays" className={inputClass} />
+                </div>
+
+                <fieldset>
+                  <legend className="text-sm font-medium text-ink mb-1">Checks to run</legend>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                    {CHECK_TOGGLES.map((toggle) => (
+                      <label key={toggle.name} className="flex items-center gap-2.5 py-1.5 cursor-pointer">
+                        <input type="checkbox" name={toggle.name} checked={form[toggle.name]} onChange={handleChange} className={checkboxClass} />
+                        <span className="text-sm text-ink">{toggle.label}</span>
+                      </label>
+                    ))}
                   </div>
+                </fieldset>
+
+                <fieldset className="flex flex-wrap gap-x-6 gap-y-2 pt-4 border-t border-rule">
+                  <legend className="sr-only">Monitoring</legend>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className={checkboxClass} />
+                    <span className="text-sm text-ink">Monitor on a schedule</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className={checkboxClass} />
+                    <span className="text-sm text-ink">Alert when newly listed</span>
+                  </label>
+                </fieldset>
+
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setIsOpen(false)} disabled={submitting} className={secondaryButtonClass}>Cancel</button>
+                  <button type="button" onClick={handleSubmit} disabled={!canSubmit} className={`${primaryButtonClass} min-w-[8rem]`}>
+                    {submitting && <Spinner />}
+                    {submitting ? 'Adding' : `Add ${targets.length || ''} target${targets.length === 1 ? '' : 's'}`}
+                  </button>
                 </div>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2"><input type="checkbox" name="is_monitor_enabled" checked={form.is_monitor_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" /><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Monitoring</span></label>
-                  <label className="flex items-center gap-2"><input type="checkbox" name="is_alert_enabled" checked={form.is_alert_enabled} onChange={handleChange} className="h-4 w-4 rounded border-slate-300 accent-cyan-600" /><span className="text-sm font-medium text-slate-700 dark:text-slate-300">Enable Alerts</span></label>
-                </div>
-                <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setIsOpen(false)} disabled={submitting} className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 px-4 rounded-lg disabled:opacity-50">Cancel</button><button type="button" onClick={handleSubmit} disabled={!canSubmit} className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-5 rounded-lg disabled:opacity-50">{submitting ? 'Adding…' : `Add ${targets.length || ''} Target${targets.length === 1 ? '' : 's'}`}</button></div>
               </div>
             </div>
           </Transition.Child>
