@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-10-26
+
+A redesigned interface, decoded blacklist results, and a production-grade frontend.
+
+Upgrading: `docker compose pull && docker compose up -d`. The database is migrated automatically. `VITE_ALLOWED_HOSTS`, `VITE_BASE_URL` and `VITE_API_DOCS_URL` in `.env` are no longer used. See [Upgrading to v1.3.0](README.md#upgrading-to-v130).
+
+### Highlights
+
+- **New interface.** Every result now reads like a mail delivery report: a status line with an SMTP-style class (5.x listed, 4.x no answer, 3.x pending, 2.x clear), the reason in plain words, and details as header-style fields. The redesign covers the dashboard, assets (table view first, sortable columns, per-row actions), asset detail, every check tool, settings, sign-in, the command palette and the public landing page. Light theme leads; dark mode is supported throughout. Fonts are self-hosted (Public Sans, Commit Mono), so the UI no longer loads anything from Google Fonts.
+- **Blacklist results say why.** Each listing is decoded with its meaning and a severity (critical, high, medium, low, info), e.g. Spamhaus SBL spam source vs. PBL end-user range. Results are sorted most serious first and exported to CSV with severity and meaning.
+- **Two more blacklists.** Added `bl.spameatingmonkey.net` and `bip.virusfree.cz`, and switched Mailspike to `bl.mailspike.net`, which adds graded reputation (its neutral L2 answer is not treated as a listing). AbuseBox now checks 24 blacklists.
+- **Spamhaus key support.** Set `SPAMHAUS_DQS_KEY` to query Spamhaus through its Data Query Service. The free public mirror is for non-commercial use only; ISPs and commercial users need a key.
+
+### Changed
+
+- The frontend image is now a static production build served by nginx, which also proxies `/api` to the backend. Node.js is no longer in the runtime image, the UI answers on any hostname, and the API docs are at `/api/swagger/`.
+- Database schema changes now use Alembic migrations. Databases from 1.x are detected, brought up to the baseline and stamped on first start.
+- Docker images: `:latest` now follows stable releases only, and `main` publishes `:edge`.
+- Removed the unused `blacklisted_hostnames` table and the `react-typed` dependency.
+
 ## [1.2.2] - 2026-10-25
 
 ### Fixed

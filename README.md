@@ -52,7 +52,7 @@ Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets a
 Most blacklist tools check one thing at a time. AbuseBox gives you a **single pane of glass** to:
 
 - See **what needs attention** in one list: blacklist listings, expiring certificates and domains, servers down, weak email security
-- Scan **22 DNSBL providers** in seconds
+- Scan **24 DNSBL providers** in seconds, each listing decoded with a severity
 - Get **AbuseIPDB reputation scores** alongside blacklist results
 - Run **bulk checks** on up to 300 IPs/domains at once (paste or upload TXT/CSV/XLSX)
 - Scan entire **subnets (CIDR /24)** for blacklisted IPs
@@ -76,7 +76,7 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 | **Needs-attention dashboard** | Listings, invalid/expiring SSL, expiring domains, servers down, weak email security, overdue checks, scheduler status | Yes |
 | **Activity log** | Every detected change (listed, delisted, down, recovered, expiring) with severity filters | Yes |
 | **Alerts** | Email and webhook (Slack/Discord formatted) for new listings, removals, outages and expiry warnings, with a test button | Yes |
-| **Blacklist Quick Check** | Scan hostname/IP against 22 DNSBL providers (rate limited for anonymous use) | No |
+| **Blacklist Quick Check** | Scan hostname/IP against 24 DNSBL providers (rate limited for anonymous use) | No |
 | **Bulk Check** | Check up to 300 IPs/domains at once, from a list or a TXT/CSV/XLSX file | Yes |
 | **Subnet / CIDR Check** | Scan an entire IP range (max /24) against key DNSBL providers | Yes |
 | **AbuseIPDB** | IP reputation score, abuse reports, ISP & geolocation | Yes |
@@ -125,7 +125,7 @@ Open `http://localhost:3000` and you're ready to go.
 
 > Default login: `admin` / `password123`. **Change it in Settings right after the first sign-in.**
 >
-> To open AbuseBox from another machine, add that hostname or IP to `VITE_ALLOWED_HOSTS` and `APP_CORS_ALLOWED_ORIGINS` in `.env`.
+> The UI answers on any hostname, so you can open it from another machine right away. Put it behind your own HTTPS reverse proxy before exposing it to a network you don't trust.
 
 ### Manual Setup
 
@@ -155,6 +155,14 @@ yarn dev
 Open `http://localhost:3000`.
 
 </details>
+
+### Upgrading to v1.3.0
+
+`docker compose pull && docker compose up -d` (or `git pull && docker compose up -d --build`). The database is migrated automatically on start, and data is kept.
+
+- **The frontend is now a production build served by nginx**, not the Vite dev server. `VITE_ALLOWED_HOSTS`, `VITE_BASE_URL` and `VITE_API_DOCS_URL` in `.env` are no longer used and can be removed. The API docs moved to `http://localhost:3000/api/swagger/`.
+- **Database migrations now use Alembic.** Existing databases are detected and upgraded on the first start.
+- **ISPs and other commercial users need a Spamhaus key.** Set `SPAMHAUS_DQS_KEY` (see [Configuration](#configuration)).
 
 ### Upgrading from v1.1.x
 
@@ -186,7 +194,6 @@ Create a `.env` file in the project root (Docker Compose reads it automatically,
 APP_SECRET_KEY=
 APP_DEBUG=false
 APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
-VITE_ALLOWED_HOSTS=localhost,127.0.0.1
 DATABASE_URL=sqlite:///./app.db   # ignored by Docker Compose (always uses the data volume)
 
 # Default admin, created on first start only
@@ -197,6 +204,11 @@ DEFAULT_ADMIN_PHONE=11111111
 
 # Optional: AbuseIPDB (free key at https://www.abuseipdb.com/account/api)
 ABUSEIPDB_API_KEY=
+
+# Optional: Spamhaus Data Query Service key (required for commercial use, including ISPs)
+SPAMHAUS_DQS_KEY=
+# Optional: your own DNS resolver for blacklist lookups
+DNSBL_NAMESERVERS=
 
 # Scheduled monitoring
 SCHEDULER_ENABLED=true
@@ -226,6 +238,7 @@ WEBHOOK_URL=
 | `SMTP_HOST` | SMTP server for email alerts | No |
 | `WEBHOOK_URL` | Webhook URL for alerts (Slack and Discord URLs get chat messages). A URL set in Settings → Notifications takes precedence | No |
 | `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers (IPs or hostnames) for blacklist lookups. Spamhaus and some others refuse public resolvers; see [Blacklists that show "No answer"](#blacklists-that-show-no-answer) | No |
+| `SPAMHAUS_DQS_KEY` | Spamhaus [Data Query Service](https://www.spamhaus.com/data-access/free-data-query-service/) key. When set, Spamhaus lookups use your key instead of the public mirror. Spamhaus's free public mirror is for non-commercial use only; ISPs and commercial users need a paid key | No |
 
 > DNS Records, SSL Checker, WHOIS, SPF/DKIM/DMARC, and Server Status work out of the box with no API keys.
 
@@ -233,7 +246,7 @@ WEBHOOK_URL=
 
 Each check also asks every blacklist about its test addresses: 127.0.0.2 must be listed and 127.0.0.1 must not be. A blacklist that gets either wrong, times out or returns a refusal code is shown as **No answer**, and its result (clean or listed) is ignored.
 
-The usual cause is the DNS resolver. Spamhaus (`zen.spamhaus.org`, `cbl.abuseat.org`) refuses queries from large public resolvers such as Google, Cloudflare and Quad9, and others rate limit them. Run your own recursive resolver so the blacklists see your server's IP. For Docker, a `docker-compose.override.yml` next to `docker-compose.yml`:
+The usual cause is the DNS resolver. Spamhaus (`zen.spamhaus.org`) refuses queries from large public resolvers such as Google, Cloudflare and Quad9, and others rate limit them. Run your own recursive resolver so the blacklists see your server's IP. For Docker, a `docker-compose.override.yml` next to `docker-compose.yml`:
 
 ```yaml
 services:
@@ -251,11 +264,11 @@ and in `.env`:
 DNSBL_NAMESERVERS=unbound
 ```
 
-Frontend config (`frontend/.env`):
+Frontend: the Docker image serves the built UI with nginx and proxies `/api` to `BACKEND_URL` (default `http://backend:8100`). For the development server (`yarn dev`), `frontend/.env` sets:
 
 | Variable | Description |
 |---|---|
-| `VITE_BASE_URL` | Backend URL for Vite proxy (default: `http://localhost:8100`) |
+| `VITE_BASE_URL` | Backend URL for the dev server's `/api` proxy (default: `http://localhost:8100`) |
 | `VITE_ALLOWED_HOSTS` | Hostnames the dev server answers to (default: `localhost,127.0.0.1`) |
 
 ---
@@ -303,8 +316,8 @@ curl -s -H "Authorization: Bearer $TOKEN" "localhost:8100/tools/dns/?hostname=ex
 
 Full interactive docs available after startup:
 
-- **Swagger UI:** `http://localhost:8100/swagger/`
-- **ReDoc:** `http://localhost:8100/redoc/`
+- **Swagger UI:** `http://localhost:3000/api/swagger/` (or `http://localhost:8100/swagger/` on the backend directly)
+- **ReDoc:** `http://localhost:3000/api/redoc/`
 
 ---
 
@@ -312,10 +325,10 @@ Full interactive docs available after startup:
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3.11, FastAPI, SQLAlchemy 2, PyJWT, dnspython |
-| Frontend | React 18, React Router 7, Vite 6, Tailwind CSS 3, Headless UI, Recharts |
+| Backend | Python 3.11, FastAPI, SQLAlchemy 2 + Alembic, PyJWT, dnspython |
+| Frontend | React 18, React Router 7, Vite 6, Tailwind CSS 3, Headless UI, Recharts; served by nginx |
 | Database | SQLite (swappable via `DATABASE_URL`) |
-| Deployment | Docker + Docker Compose; images published to GHCR |
+| Deployment | Docker + Docker Compose; multi-arch images (amd64, arm64) on GHCR: `:latest` = newest stable release, `:edge` = main |
 | CI | GitHub Actions: backend tests, frontend lint and build |
 
 ---
@@ -355,6 +368,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.3.0** | October 26, 2026 | Redesigned interface (delivery-report results, table-first assets, self-hosted fonts), decoded blacklist listings with severity, 24 lists, Spamhaus key support, nginx production frontend, Alembic migrations |
 | **v1.2.2** | October 25, 2026 | Blacklists that list every address (or answer from a parked domain) are ignored instead of reported as listings; subnet scans skip blacklists that fail their test addresses; five noise lists removed (22 remain) |
 | **v1.2.1** | October 25, 2026 | Node.js 22.23.4 security update (CVE-2026-111497), dead blacklists removed, blocked or rate-limited blacklists shown as "No answer" instead of clean, Dependabot for base images |
 | **v1.2.0** | October 7, 2026 | Needs-attention dashboard, activity log, recovery/outage/expiry alerts (Slack, Discord, webhooks), bulk actions and table view, check history, user management, command palette; scheduler fix (#20), security hardening, dependency updates, accessibility and dark mode overhaul |
