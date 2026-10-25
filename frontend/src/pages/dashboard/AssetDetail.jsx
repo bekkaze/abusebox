@@ -238,7 +238,7 @@ export default function AssetDetail() {
       {inconclusive && (
         <Alert tone="warning">
           {blacklist.failed_providers?.length} providers did not answer during the last check, so the clean result is not reliable.
-          The previous status was kept. Your DNS resolver may be rate limited or blocked by some blacklists.
+          The previous status was kept. Your DNS resolver may be rate limited or blocked by some blacklists; set <code>DNSBL_NAMESERVERS</code> to your own resolver.
         </Alert>
       )}
 

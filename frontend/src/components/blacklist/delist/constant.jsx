@@ -11,11 +11,9 @@ const REMOVAL_PAGES = {
   'dnsbl-3.uceprotect.net': 'https://www.uceprotect.net/en/rblcheck.php',
   'psbl.surriel.com': 'https://psbl.org/',
   'dnsbl.dronebl.org': 'https://dronebl.org/lookup',
-  'ix.dnsbl.manitu.net': 'https://www.dnsbl.manitu.net/',
   'dyna.spamrats.com': 'https://www.spamrats.com/removal.php',
   'noptr.spamrats.com': 'https://www.spamrats.com/removal.php',
   'spam.spamrats.com': 'https://www.spamrats.com/removal.php',
-  'ubl.lashback.com': 'https://blacklist.lashback.com/',
 };
 
 export function removalPageFor(provider) {

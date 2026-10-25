@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "backend"
-version = "1.2.0"
+version = "1.2.1"
 description = "AbuseBox FastAPI backend"
 authors = ["bekkaze <bekkaze7@gmail.com>"]
 readme = "README.md"

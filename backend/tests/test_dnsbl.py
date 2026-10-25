@@ -37,15 +37,10 @@ MXTOOLBOX_SHARED_PROVIDERS = [
     "noptr.spamrats.com",
     "spam.spamrats.com",
     "rbl.interserver.net",
-    "ubl.lashback.com",
     "bl.nordspam.com",
-    "spamrbl.imp.ch",
-    "wormrbl.imp.ch",
     "z.mailspike.net",
     "ips.backscatterer.org",
-    "relays.nether.net",
-    "matrix.spfbl.net",
-    "blacklist.woody.ch",
+    "dnsbl.spfbl.net",
     "all.s5h.net",
 ]
 
@@ -153,6 +148,14 @@ class TestCheckProvider:
 
 @pytest.mark.network
 class TestCheckDnsblProviders:
+    @pytest.mark.timeout(60)
+    def test_every_provider_answers_its_test_point(self):
+        """RFC 5782: each zone must list 127.0.0.2. A zone failing this is dead
+        (or refusing this resolver) and should be removed from BASE_PROVIDERS."""
+        resolver = _make_resolver()
+        silent = [p for p in BASE_PROVIDERS if not _check_provider("2.0.0.127", p, resolver)[1]]
+        assert len(silent) <= 2, f"Providers not answering the test point: {silent}"
+
     @pytest.mark.timeout(30)
     def test_result_structure(self):
         result = check_dnsbl_providers("127.0.0.1")

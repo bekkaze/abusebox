@@ -1,6 +1,8 @@
 import ipaddress
+import logging
 import os
 import socket
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from urllib.parse import urlparse
@@ -9,71 +11,66 @@ import dns.resolver
 import dns.name
 import dns.rdatatype
 
+logger = logging.getLogger(__name__)
+
+# Every zone here answers the RFC 5782 test point (127.0.0.2). Zones that
+# stopped answering it (SORBS, MSRBL, abuse.ch, NiX Spam, WPBL, AUPADS, ...)
+# were removed in 1.2.1: they only ever came back as "clean" or "no answer".
 BASE_PROVIDERS = [
     "all.s5h.net",
-    "aspews.ext.sorbs.net",
     "b.barracudacentral.org",
+    "bl.0spam.org",
+    "bl.blocklist.de",
     "bl.nordspam.com",
     "bl.spamcop.net",
     "blackholes.five-ten-sg.com",
-    "blacklist.woody.ch",
     "bogons.cymru.com",
     "cbl.abuseat.org",
-    "combined.abuse.ch",
-    "combined.rbl.msrbl.net",
-    "db.wpbl.info",
     "dnsbl-1.uceprotect.net",
     "dnsbl-2.uceprotect.net",
     "dnsbl-3.uceprotect.net",
-    "dnsbl.cyberlogic.net",
     "dnsbl.dronebl.org",
-    "dnsbl.sorbs.net",
-    "drone.abuse.ch",
-    "duinv.aupads.org",
-    "dul.dnsbl.sorbs.net",
+    "dnsbl.spfbl.net",
     "dyna.spamrats.com",
-    "http.dnsbl.sorbs.net",
-    "images.rbl.msrbl.net",
     "ips.backscatterer.org",
-    "ix.dnsbl.manitu.net",
     "korea.services.net",
-    "matrix.spfbl.net",
-    "misc.dnsbl.sorbs.net",
     "noptr.spamrats.com",
-    "orvedb.aupads.org",
-    "phishing.rbl.msrbl.net",
-    "proxy.bl.gweep.ca",
-    "proxy.block.transip.nl",
     "psbl.surriel.com",
     "rbl.interserver.net",
-    "relays.bl.gweep.ca",
-    "relays.bl.kundenserver.de",
-    "relays.nether.net",
-    "residential.block.transip.nl",
     "singular.ttk.pte.hu",
-    "smtp.dnsbl.sorbs.net",
-    "socks.dnsbl.sorbs.net",
-    "spam.abuse.ch",
     "spam.dnsbl.anonmails.de",
-    "spam.dnsbl.sorbs.net",
-    "spam.rbl.msrbl.net",
     "spam.spamrats.com",
     "spambot.bls.digibase.ca",
-    "spamrbl.imp.ch",
     "spamsources.fabel.dk",
-    "ubl.lashback.com",
-    "virbl.bit.nl",
-    "virus.rbl.msrbl.net",
-    "virus.rbl.jp",
-    "web.dnsbl.sorbs.net",
-    "wormrbl.imp.ch",
+    "truncate.gbudb.net",
     "z.mailspike.net",
     "zen.spamhaus.org",
-    "zombie.dnsbl.sorbs.net",
 ]
 
 _DNSBL_TIMEOUT = 5.0
 _INCONCLUSIVE_FAILURE_RATIO = 0.20
+
+# RFC 5782 test point: every provider above lists 127.0.0.2. When one doesn't,
+# it is refusing our resolver (Spamhaus answers NXDOMAIN through some public
+# resolvers), so its "not listed" answers mean nothing.
+_TEST_POINT = "2.0.0.127"
+_TEST_POINT_TTL = 1800.0
+_test_point_ok_until: dict[str, float] = {}
+
+
+def _nameserver_address(value: str) -> str | None:
+    # Accept hostnames (e.g. a compose service name) as well as IPs and DoH URLs.
+    if "://" in value:
+        return value
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        pass
+    try:
+        return socket.gethostbyname(value)
+    except OSError:
+        logger.warning("DNSBL_NAMESERVERS: cannot resolve %r, skipping it", value)
+        return None
 
 
 def _make_resolver() -> dns.resolver.Resolver:
@@ -83,7 +80,10 @@ def _make_resolver() -> dns.resolver.Resolver:
 
     nameservers = os.environ.get("DNSBL_NAMESERVERS", "").strip()
     if nameservers:
-        resolver.nameservers = [ns.strip() for ns in nameservers.split(",") if ns.strip()]
+        addresses = [_nameserver_address(ns.strip()) for ns in nameservers.split(",") if ns.strip()]
+        addresses = [address for address in addresses if address]
+        if addresses:
+            resolver.nameservers = addresses
 
     return resolver
 
@@ -159,6 +159,20 @@ def _check_provider(
         return provider, False, True
 
 
+def _answers_test_point(provider: str, resolver: dns.resolver.Resolver) -> bool:
+    if _test_point_ok_until.get(provider, 0.0) > time.monotonic():
+        return True
+    try:
+        _, is_listed, _ = _check_provider(_TEST_POINT, provider, resolver)
+    except Exception:
+        return False
+    # Only successes are cached, so a provider that is refusing us is re-tested
+    # on the next check instead of staying "no answer" for half an hour.
+    if is_listed:
+        _test_point_ok_until[provider] = time.monotonic() + _TEST_POINT_TTL
+    return is_listed
+
+
 def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
     resolved_ip = _resolve_ipv4(hostname_or_ip)
     if not resolved_ip:
@@ -204,6 +218,14 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
         retry = set(failed_providers)
         failed_providers.clear()
         _run_batch(retry)
+
+    # A clean answer only counts if the provider still answers its test point.
+    clean = [p for p in BASE_PROVIDERS if p not in listed and p not in failed_providers]
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        healthy = executor.map(lambda provider: _answers_test_point(provider, resolver), clean)
+        for provider, ok in zip(clean, healthy):
+            if not ok:
+                failed_providers.add(provider)
 
     detected_on = [
         {

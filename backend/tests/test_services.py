@@ -105,6 +105,44 @@ def test_dnsbl_marks_result_inconclusive_when_many_providers_fail():
     assert result["is_blacklisted"] is False
 
 
+def test_dnsbl_clean_answer_from_provider_ignoring_test_point_counts_as_failed():
+    # Spamhaus answers NXDOMAIN (looks clean) through some public resolvers,
+    # including for its always-listed test point 127.0.0.2.
+    def fake_check(reversed_ip, provider, resolver=None):
+        refusing = provider == "zen.spamhaus.org"
+        return provider, reversed_ip == "2.0.0.127" and not refusing, False
+    dnsbl._test_point_ok_until.clear()
+    with mock.patch.object(dnsbl, "_check_provider", fake_check):
+        result = dnsbl.check_dnsbl_providers("203.0.113.10")
+    assert result["failed_providers"] == ["zen.spamhaus.org"]
+    assert result["is_blacklisted"] is False
+    assert result["is_inconclusive"] is False
+
+
+def test_dnsbl_test_point_success_is_cached():
+    calls = []
+    def fake_check(reversed_ip, provider, resolver=None):
+        calls.append(reversed_ip)
+        return provider, reversed_ip == "2.0.0.127", False
+    dnsbl._test_point_ok_until.clear()
+    with mock.patch.object(dnsbl, "_check_provider", fake_check):
+        dnsbl.check_dnsbl_providers("203.0.113.10")
+        dnsbl.check_dnsbl_providers("203.0.113.11")
+    assert calls.count("2.0.0.127") == len(dnsbl.BASE_PROVIDERS)
+
+
+def test_dnsbl_nameservers_accept_hostnames(monkeypatch):
+    monkeypatch.setenv("DNSBL_NAMESERVERS", "192.0.2.53, unbound, missing.invalid")
+    lookup = {"unbound": "172.18.0.5"}
+    def fake_gethostbyname(name):
+        if name not in lookup:
+            raise OSError(name)
+        return lookup[name]
+    with mock.patch.object(dnsbl.socket, "gethostbyname", fake_gethostbyname):
+        resolver = dnsbl._make_resolver()
+    assert resolver.nameservers == ["192.0.2.53", "172.18.0.5"]
+
+
 # --- target file parsing -----------------------------------------------------------
 
 def test_parse_csv_targets_dedupes_and_skips_header():

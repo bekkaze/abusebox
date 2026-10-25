@@ -28,7 +28,7 @@ def check_subnet(cidr: str, providers: list[str] | None = None) -> dict[str, Any
             "bl.spamcop.net",
             "cbl.abuseat.org",
             "b.barracudacentral.org",
-            "dnsbl.sorbs.net",
+            "z.mailspike.net",
             "dnsbl-1.uceprotect.net",
             "psbl.surriel.com",
             "dnsbl.dronebl.org",
