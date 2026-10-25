@@ -9,10 +9,15 @@ from app.services.events import detect_events
 from app.services.health import domain_expiry_days, summarize
 
 
-def bl(*listed, failed=0, inconclusive=False, total=60):
+PROVIDERS = ["a", "b", "zen.spamhaus.org"]
+
+
+def bl(*listed, failed=0, inconclusive=False, total=60, providers=None):
+    if providers is None:
+        providers = PROVIDERS + [f"p{i}" for i in range(total - len(PROVIDERS))]
     return {
         "detected_on": [{"provider": p, "status": "open"} for p in listed],
-        "providers": [f"p{i}" for i in range(total)],
+        "providers": providers,
         "failed_providers": [f"f{i}" for i in range(failed)],
         "is_inconclusive": inconclusive,
         "is_blacklisted": bool(listed),
@@ -52,6 +57,22 @@ def test_provider_changes_while_listed():
 
     same = detect_events({"blacklist": bl("a")}, {"blacklist": bl("a")}, was_blacklisted=True, is_blacklisted=True)
     assert same == []
+
+
+def test_dropped_provider_is_not_reported_as_delisting():
+    # The upgrade stopped checking "b"; the asset wasn't delisted from it.
+    after_upgrade = ["a", "zen.spamhaus.org"]
+    only_dropped = detect_events({"blacklist": bl("b")}, {"blacklist": bl(providers=after_upgrade)},
+                                 was_blacklisted=True, is_blacklisted=False)
+    assert only_dropped == []
+
+    still_listed = detect_events({"blacklist": bl("a", "b")}, {"blacklist": bl("a", providers=after_upgrade)},
+                                 was_blacklisted=True, is_blacklisted=True)
+    assert still_listed == []
+
+    newly_listed = detect_events({"blacklist": bl("b")}, {"blacklist": bl("a", providers=after_upgrade)},
+                                 was_blacklisted=True, is_blacklisted=True)
+    assert types(newly_listed) == ["blacklist.listed"]
 
 
 def test_inconclusive_result_produces_no_blacklist_event():

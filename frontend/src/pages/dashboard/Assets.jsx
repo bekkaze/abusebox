@@ -430,7 +430,7 @@ export default function Assets() {
             title="No assets yet"
             action={<button type="button" className={primaryButtonClass} onClick={() => setAddModalOpen(true)}>Add your first asset</button>}
           >
-            Add a mail server IP or a domain. AbuseBox checks it against 27 blacklists now, then again on a schedule, and alerts you when something changes.
+            Add a mail server IP or a domain. AbuseBox checks it against 22 blacklists now, then again on a schedule, and alerts you when something changes.
           </EmptyState>
         </div>
       ) : filtered.length === 0 ? (

@@ -41,7 +41,7 @@ export default function SubnetCheck() {
         buttonLabel="Scan"
         loadingLabel="Scanning"
         error={error}
-        hint="Up to /24 (256 addresses) against 8 major DNSBL providers."
+        hint="Up to /24 (256 addresses) against 7 major DNSBL providers."
       />
 
 

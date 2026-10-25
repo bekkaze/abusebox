@@ -56,6 +56,11 @@ def detect_events(
     if new_bl is not None and not new_bl["inconclusive"]:
         new_set = set(new_bl["listed"])
         old_set = set(old_bl["listed"]) if old_bl else set()
+        if old_bl is not None:
+            # A list AbuseBox no longer checks (e.g. removed in an upgrade)
+            # hasn't delisted the asset; ignore it on both sides.
+            old_set &= set(new_bl["providers"])
+            was_blacklisted = bool(old_set)
         if is_blacklisted and not was_blacklisted:
             events.append(_event(
                 "blacklist.listed", "critical",

@@ -29,8 +29,6 @@ MXTOOLBOX_SHARED_PROVIDERS = [
     "bl.spamcop.net",
     "b.barracudacentral.org",
     "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl-3.uceprotect.net",
     "dnsbl.dronebl.org",
     "psbl.surriel.com",
     "dyna.spamrats.com",

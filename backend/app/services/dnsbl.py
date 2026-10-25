@@ -15,8 +15,11 @@ logger = logging.getLogger(__name__)
 
 # Every zone here answers the RFC 5782 test points (127.0.0.2 listed, 127.0.0.1
 # not listed). Zones that stopped answering them (SORBS, MSRBL, abuse.ch, NiX
-# Spam, WPBL, AUPADS, ...) were removed in 1.2.1. bogons.cymru.com was removed
-# in 1.2.2: it lists unallocated space, including 127.0.0.1, not abusers.
+# Spam, WPBL, AUPADS, ...) were removed in 1.2.1. Removed in 1.2.2 as noise:
+# bogons.cymru.com (unallocated space, not abusers), blackholes.five-ten-sg.com
+# (retired, lists nothing), cbl.abuseat.org (now Spamhaus XBL, already in zen),
+# korea.services.net (a country block) and UCEPROTECT levels 2/3 (whole
+# networks and ASNs, mostly innocent neighbours).
 BASE_PROVIDERS = [
     "all.s5h.net",
     "b.barracudacentral.org",
@@ -24,16 +27,11 @@ BASE_PROVIDERS = [
     "bl.blocklist.de",
     "bl.nordspam.com",
     "bl.spamcop.net",
-    "blackholes.five-ten-sg.com",
-    "cbl.abuseat.org",
     "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl-3.uceprotect.net",
     "dnsbl.dronebl.org",
     "dnsbl.spfbl.net",
     "dyna.spamrats.com",
     "ips.backscatterer.org",
-    "korea.services.net",
     "noptr.spamrats.com",
     "psbl.surriel.com",
     "rbl.interserver.net",

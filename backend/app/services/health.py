@@ -35,6 +35,7 @@ def blacklist_state(result: dict | None) -> dict | None:
         return None
     return {
         "listed": sorted(d.get("provider") for d in bl.get("detected_on", []) if d.get("provider")),
+        "providers": sorted(bl.get("providers", [])),
         "total": len(bl.get("providers", [])),
         "failed": len(bl.get("failed_providers", [])),
         "inconclusive": bool(bl.get("is_inconclusive")),
