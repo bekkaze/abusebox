@@ -13,9 +13,10 @@ import dns.rdatatype
 
 logger = logging.getLogger(__name__)
 
-# Every zone here answers the RFC 5782 test point (127.0.0.2). Zones that
-# stopped answering it (SORBS, MSRBL, abuse.ch, NiX Spam, WPBL, AUPADS, ...)
-# were removed in 1.2.1: they only ever came back as "clean" or "no answer".
+# Every zone here answers the RFC 5782 test points (127.0.0.2 listed, 127.0.0.1
+# not listed). Zones that stopped answering them (SORBS, MSRBL, abuse.ch, NiX
+# Spam, WPBL, AUPADS, ...) were removed in 1.2.1. bogons.cymru.com was removed
+# in 1.2.2: it lists unallocated space, including 127.0.0.1, not abusers.
 BASE_PROVIDERS = [
     "all.s5h.net",
     "b.barracudacentral.org",
@@ -24,7 +25,6 @@ BASE_PROVIDERS = [
     "bl.nordspam.com",
     "bl.spamcop.net",
     "blackholes.five-ten-sg.com",
-    "bogons.cymru.com",
     "cbl.abuseat.org",
     "dnsbl-1.uceprotect.net",
     "dnsbl-2.uceprotect.net",
@@ -50,10 +50,13 @@ BASE_PROVIDERS = [
 _DNSBL_TIMEOUT = 5.0
 _INCONCLUSIVE_FAILURE_RATIO = 0.20
 
-# RFC 5782 test point: every provider above lists 127.0.0.2. When one doesn't,
-# it is refusing our resolver (Spamhaus answers NXDOMAIN through some public
-# resolvers), so its "not listed" answers mean nothing.
-_TEST_POINT = "2.0.0.127"
+# RFC 5782 test points: every provider above lists 127.0.0.2 and must not list
+# 127.0.0.1. A provider that doesn't list 127.0.0.2 is refusing our resolver
+# (Spamhaus answers NXDOMAIN through some public resolvers), so its "not
+# listed" answers mean nothing. One that lists 127.0.0.1 is listing everything
+# (AHBL did this when it shut down in 2015), so its listings mean nothing.
+_TEST_POINT_LISTED = "2.0.0.127"
+_TEST_POINT_NOT_LISTED = "1.0.0.127"
 _TEST_POINT_TTL = 1800.0
 _test_point_ok_until: dict[str, float] = {}
 
@@ -134,20 +137,15 @@ def _check_provider(
     query = f"{reversed_ip}.{provider}"
     try:
         answers = resolver.resolve(query, "A")
-        refused = False
         for rdata in answers:
-            result = rdata.to_text()
-            parts = result.split(".")
             # Only 127.0.0.x responses indicate a real listing.
-            if parts[0] == "127" and parts[1] == "0" and parts[2] == "0":
+            if rdata.to_text().startswith("127.0.0."):
                 return provider, True, False
-            # 127.255.255.x are error codes (e.g. Spamhaus returns
-            # 127.255.255.254 when queried via public DNS resolvers, and
-            # .255 when rate limited). The provider refused to answer, so
-            # report it as failed rather than silently counting it as clear.
-            if parts[:3] == ["127", "255", "255"]:
-                refused = True
-        return provider, False, refused
+        # Anything else is an error, not a clean result: 127.255.255.x are
+        # refusal codes (Spamhaus returns .254 via public resolvers and .255
+        # when rate limited), and an address outside 127/8 means the zone's
+        # domain now points somewhere else (e.g. an expired, parked domain).
+        return provider, False, True
     except dns.resolver.NXDOMAIN:
         # NXDOMAIN = not listed on this provider
         return provider, False, False
@@ -159,18 +157,22 @@ def _check_provider(
         return provider, False, True
 
 
-def _answers_test_point(provider: str, resolver: dns.resolver.Resolver) -> bool:
+def _answers_test_points(provider: str, resolver: dns.resolver.Resolver) -> bool:
     if _test_point_ok_until.get(provider, 0.0) > time.monotonic():
         return True
     try:
-        _, is_listed, _ = _check_provider(_TEST_POINT, provider, resolver)
+        _, positive_listed, _ = _check_provider(_TEST_POINT_LISTED, provider, resolver)
+        healthy = positive_listed
+        if healthy:
+            _, negative_listed, negative_failed = _check_provider(_TEST_POINT_NOT_LISTED, provider, resolver)
+            healthy = not negative_listed and not negative_failed
     except Exception:
         return False
     # Only successes are cached, so a provider that is refusing us is re-tested
     # on the next check instead of staying "no answer" for half an hour.
-    if is_listed:
+    if healthy:
         _test_point_ok_until[provider] = time.monotonic() + _TEST_POINT_TTL
-    return is_listed
+    return healthy
 
 
 def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
@@ -219,12 +221,14 @@ def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
         failed_providers.clear()
         _run_batch(retry)
 
-    # A clean answer only counts if the provider still answers its test point.
-    clean = [p for p in BASE_PROVIDERS if p not in listed and p not in failed_providers]
+    # An answer, listed or clean, only counts if the provider still answers
+    # its test points correctly.
+    answered = [p for p in BASE_PROVIDERS if p not in failed_providers]
     with ThreadPoolExecutor(max_workers=12) as executor:
-        healthy = executor.map(lambda provider: _answers_test_point(provider, resolver), clean)
-        for provider, ok in zip(clean, healthy):
+        healthy = executor.map(lambda provider: _answers_test_points(provider, resolver), answered)
+        for provider, ok in zip(answered, healthy):
             if not ok:
+                listed.discard(provider)
                 failed_providers.add(provider)
 
     detected_on = [

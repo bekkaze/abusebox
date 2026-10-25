@@ -149,12 +149,15 @@ class TestCheckProvider:
 @pytest.mark.network
 class TestCheckDnsblProviders:
     @pytest.mark.timeout(60)
-    def test_every_provider_answers_its_test_point(self):
-        """RFC 5782: each zone must list 127.0.0.2. A zone failing this is dead
-        (or refusing this resolver) and should be removed from BASE_PROVIDERS."""
+    def test_every_provider_answers_its_test_points(self):
+        """RFC 5782: each zone must list 127.0.0.2 and not 127.0.0.1. A zone
+        failing this is dead (or refusing this resolver) and should be removed
+        from BASE_PROVIDERS."""
         resolver = _make_resolver()
         silent = [p for p in BASE_PROVIDERS if not _check_provider("2.0.0.127", p, resolver)[1]]
-        assert len(silent) <= 2, f"Providers not answering the test point: {silent}"
+        assert len(silent) <= 2, f"Providers not listing 127.0.0.2: {silent}"
+        lists_localhost = [p for p in BASE_PROVIDERS if _check_provider("1.0.0.127", p, resolver)[1]]
+        assert not lists_localhost, f"Providers listing 127.0.0.1: {lists_localhost}"
 
     @pytest.mark.timeout(30)
     def test_result_structure(self):

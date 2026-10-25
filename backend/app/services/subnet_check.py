@@ -2,7 +2,7 @@ import ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from app.services.dnsbl import BASE_PROVIDERS, _check_provider, _make_resolver
+from app.services.dnsbl import BASE_PROVIDERS, _answers_test_points, _check_provider, _make_resolver
 
 
 MAX_SUBNET_SIZE = 256  # /24 max
@@ -37,11 +37,18 @@ def check_subnet(cidr: str, providers: list[str] | None = None) -> dict[str, Any
     resolver = _make_resolver()
     results: list[dict[str, Any]] = []
 
+    # Skip providers that fail their test points: one listing everything would
+    # flag the whole range, and one refusing us would report it all clean.
+    with ThreadPoolExecutor(max_workers=max(len(providers), 1)) as executor:
+        healthy = list(executor.map(lambda provider: _answers_test_points(provider, resolver), providers))
+    failed_providers = [p for p, ok in zip(providers, healthy) if not ok]
+    providers = [p for p, ok in zip(providers, healthy) if ok]
+
     def _check_ip(ip: str) -> dict[str, Any]:
         reversed_ip = ".".join(reversed(ip.split(".")))
         listed_on: list[str] = []
 
-        with ThreadPoolExecutor(max_workers=len(providers)) as executor:
+        with ThreadPoolExecutor(max_workers=max(len(providers), 1)) as executor:
             futures = {
                 executor.submit(_check_provider, reversed_ip, provider, resolver): provider
                 for provider in providers
@@ -82,5 +89,6 @@ def check_subnet(cidr: str, providers: list[str] | None = None) -> dict[str, Any
         "blacklisted_count": blacklisted_count,
         "clean_count": len(results) - blacklisted_count,
         "providers_checked": providers,
+        "failed_providers": failed_providers,
         "results": results,
     }

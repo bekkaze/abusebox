@@ -61,6 +61,12 @@ export default function SubnetCheck() {
             </button>
           </div>
 
+          {data.failed_providers?.length > 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400" role="status">
+              Skipped {data.failed_providers.length} provider{data.failed_providers.length === 1 ? '' : 's'} that did not answer: {data.failed_providers.join(', ')}
+            </p>
+          )}
+
           <div className="rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
             <div className="scrollable-table overflow-auto max-h-[60vh]">
               <table className="w-full text-slate-700 dark:text-slate-300 border-collapse">
