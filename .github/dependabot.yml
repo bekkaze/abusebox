@@ -15,6 +15,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: python
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Stay on the stable nginx line (even minor versions); odd minors are mainline.
+      - dependency-name: nginx
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

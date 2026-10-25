@@ -28,12 +28,10 @@ services:
     build: ./frontend
     depends_on:
       - backend
+    # nginx serves the built UI and proxies /api to the backend, so the UI
+    # works from any hostname and the API docs are at /api/swagger/.
     environment:
-      - VITE_BASE_URL=http://backend:8100
-      - VITE_API_DOCS_URL=${VITE_API_DOCS_URL:-http://localhost:8100/swagger/}
-      # Hostnames the dev server will answer to. Add your server's domain/IP here
-      # (or in .env) when accessing AbuseBox from another machine.
-      - VITE_ALLOWED_HOSTS=${VITE_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - BACKEND_URL=http://backend:8100
     ports:
       - 3000:3000
 

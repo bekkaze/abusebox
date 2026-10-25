@@ -36,6 +36,8 @@ export default ({ mode }) => {
           // instead of treating every user as the frontend container.
           xfwd: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
+          // Lets the backend link its API docs (/api/swagger/) through this proxy.
+          headers: { 'X-Forwarded-Prefix': '/api' },
         },
       },
     },

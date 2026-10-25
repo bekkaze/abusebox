@@ -112,8 +112,10 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}-${{ matrix.component }}
+          # :latest follows stable release tags only (metadata-action's default
+          # latest=auto skips pre-releases); main publishes :edge.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=edge,branch=main
             type=sha,prefix=sha-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
