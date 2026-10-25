@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.2] - 2026-10-25
+
+### Fixed
+
+- A blacklist that starts listing every address would have reported all your assets as listed. This happens when a list shuts down (AHBL did it in 2015) or its domain expires. Each blacklist must now also leave its "never listed" test address (127.0.0.1) unlisted, as RFC 5782 requires; otherwise its result, listed or clean, is ignored and shown as "No answer".
+- Answers outside 127.0.0.x (other error codes, or a web server's IP from a parked domain) were counted as clean. They now count as "No answer".
+- Subnet scans now skip blacklists that fail their test addresses and show which were skipped, instead of possibly flagging the whole range or reporting it clean.
+- Subnet scans counted a failed lookup as clean, so a blacklist that started rate limiting partway through a scan made every remaining IP look clean. IPs with lookups that didn't answer are now marked **Incomplete**, with the lists that didn't answer, in the results and CSV.
+- Rate-limit and refusal answers (e.g. Spamhaus 127.255.255.255) were retried immediately, which made the rate limiting worse. Only timeouts and server failures are retried now.
+
+### Changed
+
+- Removed five lists that only added noise. AbuseBox now checks 22 blacklists.
+  - `bogons.cymru.com` lists unallocated address space (including 127.0.0.1), not abusers.
+  - `blackholes.five-ten-sg.com` is retired and lists nothing, so it always reported "clean".
+  - `cbl.abuseat.org` is now Spamhaus XBL, which `zen.spamhaus.org` already includes, so one listing showed twice.
+  - `korea.services.net` blocks most Korean address space by country, not for abuse.
+  - `dnsbl-2.uceprotect.net` and `dnsbl-3.uceprotect.net` list whole networks and providers' ASNs, mostly innocent neighbours. Level 1 (`dnsbl-1`), which lists individual IPs, is kept.
+- Lists AbuseBox stops checking no longer count as delistings. An asset listed only on a removed list is marked clean on its next check without a "No longer listed" alert.
+
 ## [1.2.1] - 2026-10-25
 
 ### Security

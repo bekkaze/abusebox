@@ -52,7 +52,7 @@ Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets a
 Most blacklist tools check one thing at a time. AbuseBox gives you a **single pane of glass** to:
 
 - See **what needs attention** in one list: blacklist listings, expiring certificates and domains, servers down, weak email security
-- Scan **28 DNSBL providers** in seconds
+- Scan **22 DNSBL providers** in seconds
 - Get **AbuseIPDB reputation scores** alongside blacklist results
 - Run **bulk checks** on up to 300 IPs/domains at once (paste or upload TXT/CSV/XLSX)
 - Scan entire **subnets (CIDR /24)** for blacklisted IPs
@@ -76,7 +76,7 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 | **Needs-attention dashboard** | Listings, invalid/expiring SSL, expiring domains, servers down, weak email security, overdue checks, scheduler status | Yes |
 | **Activity log** | Every detected change (listed, delisted, down, recovered, expiring) with severity filters | Yes |
 | **Alerts** | Email and webhook (Slack/Discord formatted) for new listings, removals, outages and expiry warnings, with a test button | Yes |
-| **Blacklist Quick Check** | Scan hostname/IP against 28 DNSBL providers (rate limited for anonymous use) | No |
+| **Blacklist Quick Check** | Scan hostname/IP against 22 DNSBL providers (rate limited for anonymous use) | No |
 | **Bulk Check** | Check up to 300 IPs/domains at once, from a list or a TXT/CSV/XLSX file | Yes |
 | **Subnet / CIDR Check** | Scan an entire IP range (max /24) against key DNSBL providers | Yes |
 | **AbuseIPDB** | IP reputation score, abuse reports, ISP & geolocation | Yes |
@@ -231,7 +231,7 @@ WEBHOOK_URL=
 
 ### Blacklists that show "No answer"
 
-Each check also asks every blacklist about its always-listed test address (127.0.0.2). A blacklist that doesn't answer it, times out or returns a refusal code is shown as **No answer** instead of being counted as clean.
+Each check also asks every blacklist about its test addresses: 127.0.0.2 must be listed and 127.0.0.1 must not be. A blacklist that gets either wrong, times out or returns a refusal code is shown as **No answer**, and its result (clean or listed) is ignored.
 
 The usual cause is the DNS resolver. Spamhaus (`zen.spamhaus.org`, `cbl.abuseat.org`) refuses queries from large public resolvers such as Google, Cloudflare and Quad9, and others rate limit them. Run your own recursive resolver so the blacklists see your server's IP. For Docker, a `docker-compose.override.yml` next to `docker-compose.yml`:
 
@@ -355,6 +355,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.2.2** | October 25, 2026 | Blacklists that list every address (or answer from a parked domain) are ignored instead of reported as listings; subnet scans skip blacklists that fail their test addresses; five noise lists removed (22 remain) |
 | **v1.2.1** | October 25, 2026 | Node.js 22.23.4 security update (CVE-2026-111497), dead blacklists removed, blocked or rate-limited blacklists shown as "No answer" instead of clean, Dependabot for base images |
 | **v1.2.0** | October 7, 2026 | Needs-attention dashboard, activity log, recovery/outage/expiry alerts (Slack, Discord, webhooks), bulk actions and table view, check history, user management, command palette; scheduler fix (#20), security hardening, dependency updates, accessibility and dark mode overhaul |
 | **v1.1.2** | March 26, 2026 | Bulk asset import, CIDR import, auto-refresh auth, persistent DB, DNSBL false positive fix, community bug fixes |
