@@ -2,7 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.1] - 2026-10-26
+
+Email alerts now reach you, and a certificate-store security update.
+
+Upgrading: `docker compose pull && docker compose up -d`. Then open **Settings → Notifications** and check that **Your alert email** is a real address.
+
+### Security
+
+- certifi updated to 2026.10.23. Earlier versions trust emSign intermediate certificates whose private keys were compromised ([GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2)). This affects the outbound HTTPS calls AbuseBox makes (AbuseIPDB, webhooks, server status).
 
 ### Fixed
 

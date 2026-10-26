@@ -340,8 +340,8 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.3.1** | October 26, 2026 | Email alerts reach a real address (each user sets theirs in Settings, #28), SMTP on port 465, certifi security update |
 | **v1.3.0** | October 26, 2026 | Redesigned interface (delivery-report results, table-first assets, self-hosted fonts), decoded blacklist listings with severity, 24 lists, Spamhaus key support, nginx production frontend, Alembic migrations |
-| **v1.2.2** | October 25, 2026 | Blacklists that list every address (or answer from a parked domain) are ignored instead of reported as listings; subnet scans skip blacklists that fail their test addresses; five noise lists removed (22 remain) |
 
 Older releases and full details: [CHANGELOG.md](CHANGELOG.md).
 
