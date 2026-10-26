@@ -66,7 +66,6 @@ yarn dev
 - Don't commit environment-specific values (IPs, hostnames, secrets) to `docker-compose.yml` or examples
 - Follow existing code style and patterns
 - Update documentation if your change affects user-facing behavior
-- Add yourself to [CONTRIBUTORS.txt](CONTRIBUTORS.txt) in your first PR
 
 ## Reporting Issues
 

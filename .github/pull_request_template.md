@@ -11,4 +11,4 @@
 - [ ] Backend tests pass: `cd backend && pytest -m "not network"`
 - [ ] Frontend builds and lints: `cd frontend && yarn lint && yarn build`
 - [ ] User-facing changes are in `CHANGELOG.md` under an "Unreleased" heading
-- [ ] UI changes follow `DESIGN.md` (tokens only, no new colours)
+- [ ] UI changes use the colour tokens in `frontend/src/index.css` (no new colours)
