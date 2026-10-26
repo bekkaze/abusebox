@@ -197,7 +197,7 @@ export default function DmarcReports() {
 /* ---------- Report list ---------- */
 function ReportList({ reports, expandedReport, reportDetail, detailError, onToggle, onDelete }) {
   return (
-    <div className="relative overflow-x-auto rounded-md border border-rule">
+    <div className="table-wrap relative overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead className="bg-sunk">
           <tr className="text-left">
@@ -341,7 +341,7 @@ function SummaryPanel({ data }) {
         {top_senders?.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-ink mb-2">Top senders</h3>
-            <div className="overflow-auto max-h-[40vh] rounded-md border border-rule">
+            <div className="table-wrap relative overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead className="sticky top-0 z-[1] bg-sunk">
                   <tr className="text-left">

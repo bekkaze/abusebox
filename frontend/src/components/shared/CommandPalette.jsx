@@ -86,7 +86,7 @@ export default function CommandPalette({ open, onClose }) {
           <Dialog.Overlay className="fixed inset-0 bg-scrim/50" />
         </Transition.Child>
         <Transition.Child as={Fragment} enter="ease-out duration-150" enterFrom="opacity-0 scale-[0.98]" enterTo="opacity-100 scale-100" leave="ease-in duration-100" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-[0.98]">
-          <div className="relative mx-auto max-w-xl overflow-hidden rounded-md border border-rule bg-paper shadow-[0_12px_32px_rgb(0_0_0/0.18)]">
+          <div className="relative mx-auto max-w-xl overflow-hidden rounded-xl border border-rule bg-paper shadow-e3">
             <Dialog.Title className="sr-only">Search AbuseBox</Dialog.Title>
             <Combobox onChange={select}>
               <div className="relative border-b border-rule">

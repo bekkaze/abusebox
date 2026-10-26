@@ -6,7 +6,7 @@ import { CHECK_TOGGLES } from "./assetForm";
 // Dialog surface and form vocabulary: flat paper, hairline border, one soft shadow.
 const panelClass =
   "inline-block w-full max-w-lg p-5 sm:p-6 my-8 text-left align-middle transition-all transform " +
-  "bg-paper rounded-md border border-rule shadow-[0_12px_32px_rgb(0_0_0/0.18)]";
+  "bg-paper rounded-xl border border-rule shadow-e3";
 const labelClass = "block text-sm font-medium text-ink mb-1.5";
 const checkboxClass = "h-4 w-4 rounded border-rule-strong accent-accent";
 

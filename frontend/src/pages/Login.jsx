@@ -42,7 +42,7 @@ const Login = () => {
   };
 
   return (
-    <main className="min-h-screen bg-paper flex flex-col items-center justify-center px-4 py-12">
+    <main className="min-h-screen bg-canvas flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2.5 mb-6">
           <img src="/logo.png" alt="" className="h-9 w-9 rounded-md object-cover" />

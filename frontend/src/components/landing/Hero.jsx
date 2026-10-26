@@ -24,7 +24,7 @@ function ExampleReport() {
   const listed = EXAMPLE.detected_on.length;
   const hidden = EXAMPLE_TOTAL - EXAMPLE.providers.length;
   return (
-    <figure aria-labelledby='example-report-title' className='min-w-0 lg:border-l lg:border-rule lg:pl-10'>
+    <figure aria-labelledby='example-report-title' className='panel min-w-0 !rounded-2xl p-5 !shadow-e3'>
       <div className='flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-rule pb-2 mb-4'>
         <p id='example-report-title' className='text-sm font-semibold text-ink'>Example report</p>
         <p className='text-xs text-ink-2'>Sample data, not a live check</p>

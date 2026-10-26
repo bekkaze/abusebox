@@ -2,6 +2,7 @@
 name: AbuseBox
 description: Self-hosted threat monitoring for IPs and domains, where every result reads like a mail delivery report.
 colors:
+  canvas: "#f1f3f6"
   paper: "#ffffff"
   rail: "#f3f4f6"
   sunk: "#f8f9fa"
@@ -23,7 +24,8 @@ colors:
   info: "#345488"
   info-soft: "#eef2f9"
   scrim: "#0f1115"
-  paper-dark: "#16191e"
+  canvas-dark: "#0c0e12"
+  paper-dark: "#171a20"
   rail-dark: "#0f1115"
   sunk-dark: "#1c2026"
   ink-dark: "#e7eaee"
@@ -248,7 +250,7 @@ Both themes exist and share every token name. Light leads. Dark swaps the channe
 **Key Characteristics:**
 - A verdict line first: mono reply-class code plus a sentence, coloured by severity.
 - Header-style field rows with grey mono `Field-Name:` keys and ink values.
-- Hairline-ruled sections instead of boxed cards, on one flat paper plane.
+- White panels resting on a tinted canvas, with one soft elevation scale; tables inside a panel run edge to edge, so boxes never nest.
 - Two typefaces with strict jobs: Public Sans for interface, Commit Mono for data.
 - One teal accent; status colour always paired with a code or text label.
 - Shadows only on things that float above the page (dialogs, palette, toasts) and on the active rail item.
@@ -316,7 +318,7 @@ The palette is a restrained paper-and-ink neutral set, one teal accent, and thre
 
 ## Layout
 
-The app is a two-pane shell: a 240px rail on the left (sticky at full height from `lg` 1024px, an off-canvas drawer below it that slides in over a 50% scrim in 200ms ease-out and closes on Escape), and a content column with a 56px sticky top bar (`paper` at 95% opacity with a small backdrop blur). The top bar holds the command-palette trigger (a `sunk` field with a `⌘K` hint, max 28rem), the API status dot and the theme toggle.
+The app is a two-pane shell: a 240px rail on the left (sticky at full height from `lg` 1024px, an off-canvas drawer below it that slides in over a 50% scrim in 200ms ease-out and closes on Escape), and a content column with a 56px sticky top bar (`canvas` at 85% opacity with a backdrop blur). The top bar holds the command-palette trigger (a `paper` field with Elevation 1 and a `⌘K` hint, max 28rem), the API status dot and the theme toggle.
 
 Content sits in a `main` capped at 72rem and centred, with 16px side padding and 20px top padding on mobile, 32px and 28px from `sm` (640px). Settings narrows itself to 64rem with forms capped at 42rem. The public landing and quick-check pages use the same 72rem column with 16px/24px gutters.
 
@@ -328,27 +330,29 @@ Spacing is Tailwind's 4px base. Recurring steps: 4px (icon gaps), 8px (control g
 
 ## Elevation & Depth
 
-The system is flat. Depth comes from tone (rail grey behind paper, sunk grey for heads and insets) and 1px hairlines, not shadows. The page plane carries no shadow at all. Shadows appear in exactly two roles: on surfaces that float above the page (dialogs, the command palette, toasts, chart tooltips), and as a 1px lift on the active item of a grey tab list (the rail and the settings tabs), where it reads as a sheet of paper laid on the rail.
+Depth is layered and soft. The page is a tinted `canvas`; the main regions of every page (dashboard sections, results, forms, the asset report, tab content) are white `.panel`s with a 1px `rule` border at 80% and a 12px radius, lifted by Elevation 1. The rail and the top bar sit on the canvas, so the panels are the brightest things on screen. A data table is its own panel when it stands alone; inside a panel it runs edge to edge with hairlines only (`.panel .table-wrap`), so a box never sits inside a box.
 
 ### Shadow Vocabulary
-- **Overlay** (`box-shadow: 0 12px 32px rgb(0 0 0 / 0.18)`): dialogs and the command palette, always with a `rule` border, `paper` fill and a scrim behind.
-- **Paper Lift** (`box-shadow: 0 1px 2px rgb(20 23 28 / 0.06)` plus a 1px `rule` ring): the active rail link and the active settings tab.
-- **Toast** (`box-shadow: 0 8px 24px rgb(0 0 0 / 0.12)`): react-toastify toasts, with a `rule` border.
-- **Tooltip** (`box-shadow: 0 4px 12px rgb(0 0 0 / 0.08)`): the Recharts tooltip.
+- **Elevation 1** (`--shadow-1`, `shadow-e1`): resting panels, standalone tables, the search field, the settings tab list, asset cards.
+- **Elevation 2** (`--shadow-2`, `shadow-e2`): a clickable card on hover (asset cards, with a 1px lift where motion is allowed).
+- **Elevation 3** (`--shadow-3`, `shadow-e3`): dialogs, the command palette and the landing page's example report.
+- **Toast** (`0 8px 24px rgb(0 0 0 / 0.12)`) and **Tooltip** (`0 4px 12px rgb(0 0 0 / 0.08)`): react-toastify and Recharts.
+
+In dark mode the canvas is darker than the panels and shadows deepen to black, so panels still read as raised.
 
 ### Named Rules
-**The Flat Page Rule.** Nothing that sits on the page casts a shadow: no shadowed cards, tables or panels. If it does not float above the page or sit selected on the rail, it is flat.
+**The Panel Rule.** A main region is one white panel on the canvas. Panels stack; they never nest. Tables, lists and code inside a panel use hairlines, not another frame.
 
 ## Shapes
 
-Corners are gently rounded and nearly uniform. **6px** (`rounded-md`) is the house radius for every control, surface, table frame, alert, dialog, nav item and toast. **4px** (`rounded`) is reserved for small inline marks: status and severity tags, check-type tags, `kbd` hints, code chips, skeleton bars and checkboxes. **Full** rounding is only for dots (status indicators, the timeline node) and the switch. The focus outline draws at 3px radius.
+Corners follow hierarchy. **12px** (`rounded-xl`) for panels, standalone tables, asset cards and dialogs (16px for the landing example report). **6px** (`rounded-md`) for controls, alerts, nav items and toasts. **4px** (`rounded`) is reserved for small inline marks: status and severity tags, check-type tags, `kbd` hints, code chips, skeleton bars and checkboxes. **Full** rounding is only for dots (status indicators, the timeline node) and the switch. The focus outline draws at 3px radius.
 
 Borders are 1px hairlines. `rule` frames passive surfaces and divides rows and sections. `rule-strong` frames things you type into or press (inputs, secondary buttons, segmented groups). A 2px border appears in one place: the selected tab underline on the asset detail page, in teal. The activity feed is a 1px vertical `rule` line with 5px `rule-strong` nodes, drawn like a `Received:` header chain.
 
 ## Components
 
 ### Buttons
-Compact, flat and squared-off, with no shadows and no gradients.
+Compact and squared-off, with no shadows and no gradients; buttons stay flat even on raised panels.
 - **Shape:** gently rounded (6px), 36px tall, 14px inline padding, 14px semibold label, 8px gap to an 18px outline icon.
 - **Primary:** teal fill with white text (`button-primary`). Use one per view, for the main action (Add asset, Re-check, Check, Save changes).
 - **Secondary:** paper fill, ink text, `rule-strong` border. Hover fills `sunk`. Used for Edit, Import, CSV, the refresh button and the scheduler run button.
@@ -364,11 +368,11 @@ Compact, flat and squared-off, with no shadows and no gradients.
 - **Segmented filter / interval chips:** a `rule-strong` framed group of 36px segments. The selected segment takes `accent-soft` with teal text; unselected segments are `ink-2` and fill `sunk` on hover. Counts sit inside in 11px mono.
 
 ### Cards / Containers
-- **Corner Style:** 6px.
-- **Background:** `paper`. A selected card turns `accent-soft` with a 40% teal border.
-- **Shadow Strategy:** none (see The Flat Page Rule).
+- **Corner Style:** 12px.
+- **Background:** `paper` on the `canvas`. A selected card turns `accent-soft` with a 40% teal border.
+- **Shadow Strategy:** Elevation 1 at rest, Elevation 2 on hover for clickable cards (see The Panel Rule).
 - **Border:** 1px `rule`, hardening to `rule-strong` on hover.
-- **Internal Padding:** 16px for asset cards, 8px × 12px for info tiles. The default container is not a card at all: a `Section` is a 14px semibold title over a 1px `rule` with 12px below. Bordered frames are kept for tables, asset cards in grid view, code blocks and dialogs.
+- **Internal Padding:** 16px for asset cards, 8px × 12px for info tiles. The default container is a `Section`: a panel with 20px padding and a 15px semibold title, 16px above its content.
 
 ### Inputs / Fields
 - **Style:** 36px tall, `paper` fill, 1px `rule-strong` border, 6px radius, 12px inline padding, 14px text, `ink-2` placeholder. Inputs that take domains, IPs, selectors or lists switch to mono.
@@ -378,7 +382,7 @@ Compact, flat and squared-off, with no shadows and no gradients.
 - **Switch:** 36 × 20px pill, teal when on and `rule-strong` when off, with a paper knob.
 
 ### Navigation
-- **Rail:** `rail` background, 1px `rule` right border. The logo (28px, 6px radius) sits beside a 15px semibold "AbuseBox" wordmark in a 56px row. Groups ("Monitor", "Check & lookup") have a 12px medium `ink-2` sentence-case label. Items are 32px rows with a 17px outline icon and 14px text in `ink-2`, turning ink over 70% paper on hover. The active item is a paper sheet with ink semibold text, a teal icon, a `rule` ring and the Paper Lift shadow. Footer links (API docs, Sign out) sit below a hairline. Sign out turns red on hover.
+- **Rail:** `canvas` background, 1px `rule` right border at 70%. The logo (28px, 6px radius) sits beside a 15px semibold "AbuseBox" wordmark in a 56px row. Groups ("Monitor", "Check & lookup") have a 12px medium `ink-2` sentence-case label. Items are plain-text 32px rows, 14px `ink-2`, turning ink over 70% paper on hover. The active item is a paper sheet with ink semibold text, a `rule` ring, a soft lift and a 1px teal hairline at its left edge. Footer links (API docs, Sign out) sit below a hairline. Sign out turns red on hover.
 - **Tabs (asset detail):** text tabs on a hairline, 24px apart. The selected tab is ink semibold with a 2px teal underline; the others are `ink-2` medium and show a `rule-strong` underline on hover. Full keyboard roving with the arrow keys.
 - **Tabs (settings):** the rail pattern in miniature: a `rail` box with 4px padding, vertical from `lg` and horizontal-scrolling below.
 - **Mobile:** a hamburger in the top bar opens the rail as a drawer. The landing navbar collapses to a menu with 40px rows.
@@ -407,7 +411,7 @@ One row per blacklist inside a 6px `rule` frame, scrolling at 70vh with a sticky
 ### Do:
 - **Do** open every result with a Verdict Line: mono reply-class code in its status colour, then a sentence that says what is wrong and how much.
 - **Do** write details as `Field-Name: value` rows with mono `ink-2` keys (Hyphenated-Title-Case, trailing colon).
-- **Do** separate regions with a 14px semibold title over a 1px `rule`, and keep the page on one flat paper plane.
+- **Do** give each main region of a page one white panel on the canvas, titled in 15px semibold.
 - **Do** set zones, hostnames, IPs, record values, codes and field names in Commit Mono, and everything else in Public Sans.
 - **Do** pair every status colour with its code or word (`5.x Listed`, `4.x No answer`). Show "No answer", never "Clear", when a list did not respond.
 - **Do** keep teal for the primary action, links, focus and selection. Use one primary button per view.
@@ -416,10 +420,10 @@ One row per blacklist inside a 6px `rule` frame, scrolling at 70vh with a sticky
 
 ### Don't:
 - **Don't** build KPI tiles, big-number stat grids or coloured icon tiles to summarise state. The status line and a summary field row do that job.
-- **Don't** wrap sections in shadowed cards, or put cards inside cards.
+- **Don't** put panels inside panels, or frame a table that already sits in a panel.
 - **Don't** use gradients, glows or coloured shadows on any surface or button.
 - **Don't** use teal for headings, decoration or content icons, and don't introduce a second accent hue.
 - **Don't** fill a status chip with solid colour except Critical severity.
 - **Don't** put an uppercase eyebrow or kicker above a heading.
 - **Don't** set `ink-3` text that a user must read. It is for chevrons, dots and placeholder dashes only.
-- **Don't** add a shadow to anything that sits on the page. Only dialogs, the palette, toasts, tooltips and the active rail item cast one.
+- **Don't** invent shadows: use Elevation 1, 2 or 3 only, and keep buttons flat.

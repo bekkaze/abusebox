@@ -11,6 +11,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        canvas: token('canvas'),
         paper: token('paper'),
         rail: token('rail'),
         sunk: token('sunk'),
@@ -26,6 +27,11 @@ module.exports = {
       fontFamily: {
         sans: ['"Public Sans Variable"', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
         mono: ['"Commit Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      boxShadow: {
+        e1: 'var(--shadow-1)',
+        e2: 'var(--shadow-2)',
+        e3: 'var(--shadow-3)',
       },
       fontSize: {
         '2xs': ['0.6875rem', { lineHeight: '1rem' }],

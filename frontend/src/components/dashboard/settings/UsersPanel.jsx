@@ -21,7 +21,7 @@ function Modal({ open, onClose, title, description, children }) {
           </Transition.Child>
           <span className="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
           <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 translate-y-2" enterTo="opacity-100 translate-y-0" leave="ease-in duration-150" leaveFrom="opacity-100 translate-y-0" leaveTo="opacity-0 translate-y-2">
-            <div className="inline-block w-full max-w-md p-5 my-8 text-left align-middle transition-all transform bg-paper rounded-md border border-rule shadow-[0_12px_32px_rgb(0_0_0/0.18)]">
+            <div className="inline-block w-full max-w-md p-5 my-8 text-left align-middle transition-all transform bg-paper rounded-xl border border-rule shadow-e3">
               <Dialog.Title as="h2" className="text-base font-semibold text-ink">{title}</Dialog.Title>
               {description && <p className="mt-1 text-sm text-ink-2">{description}</p>}
               {children}
@@ -204,7 +204,7 @@ export default function UsersPanel({ currentUserId }) {
           The user list could not be loaded or is empty. Reload the page, or select Add user to give someone access.
         </EmptyState>
       ) : (
-        <div className="relative overflow-x-auto rounded-md border border-rule">
+        <div className="table-wrap relative overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm border-collapse">
             <thead className="bg-sunk">
               <tr>

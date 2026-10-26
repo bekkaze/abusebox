@@ -33,7 +33,7 @@ export default function Header({ onMenuToggle, onSearch }) {
   const api = API_STATUS[useApiStatus()];
 
   return (
-    <header className='sticky top-0 z-30 h-14 px-4 sm:px-6 flex items-center gap-3 border-b border-rule bg-paper/95 backdrop-blur-sm'>
+    <header className='sticky top-0 z-30 h-14 px-4 sm:px-6 flex items-center gap-3 border-b border-rule/70 bg-canvas/85 backdrop-blur-md'>
       <button
         type='button'
         onClick={onMenuToggle}
@@ -46,7 +46,7 @@ export default function Header({ onMenuToggle, onSearch }) {
       <button
         type='button'
         onClick={onSearch}
-        className='flex flex-1 max-w-md items-center gap-2 h-9 rounded-md border border-rule bg-sunk px-3 text-sm text-ink-2 hover:border-rule-strong transition-colors'
+        className='flex flex-1 max-w-md items-center gap-2 h-9 rounded-lg border border-rule bg-paper shadow-e1 px-3 text-sm text-ink-2 hover:border-rule-strong transition-colors'
         aria-label='Search assets and pages, or check a domain or IP'
         aria-keyshortcuts={isMac ? 'Meta+K' : 'Control+K'}
       >

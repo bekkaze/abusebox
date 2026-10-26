@@ -28,7 +28,7 @@ const LandingPage = () => {
   const { token } = useAuth();
 
   return (
-    <div className='min-h-screen bg-paper text-ink'>
+    <div className='min-h-screen bg-canvas text-ink'>
       <Navbar />
       <main>
         <Hero />
@@ -67,7 +67,7 @@ const LandingPage = () => {
         <Band id='install-title' title='Runs on your server'>
           <p>Three commands on any machine with Docker and Compose:</p>
           <div className='relative'>
-            <pre className='overflow-x-auto rounded-md border border-rule bg-sunk py-3 pl-4 pr-12 font-mono text-[13px] leading-6 text-ink'>
+            <pre className='overflow-x-auto rounded-xl border border-rule/80 bg-paper shadow-e1 py-3 pl-4 pr-12 font-mono text-[13px] leading-6 text-ink'>
               <code>{INSTALL.join('\n')}</code>
             </pre>
             <CopyButton text={INSTALL.join('\n')} label='Copy install commands' className='absolute top-3.5 right-4' />
@@ -85,7 +85,7 @@ const LandingPage = () => {
         </Band>
       </main>
 
-      <footer className='border-t border-rule bg-rail'>
+      <footer className='border-t border-rule bg-paper'>
         <div className='max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-wrap items-center justify-between gap-4 text-sm'>
           <p className='flex items-center gap-2 text-ink-2'>
             <img src='/logo.png' alt='' className='h-5 w-5 rounded object-cover' />

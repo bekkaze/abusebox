@@ -50,7 +50,7 @@ export default function DashboardLayout() {
   }, []);
 
   return (
-    <div className='flex flex-row bg-paper min-h-screen w-full'>
+    <div className='flex flex-row bg-canvas min-h-screen w-full'>
       <a
         href='#main-content'
         className='sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-paper focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg focus:ring-1 focus:ring-rule'

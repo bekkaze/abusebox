@@ -201,7 +201,7 @@ export default function Home() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-rule">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-1">
         <div className="min-w-0">
           <StatusLine assets={assets} attention={attention} />
           <Summary assets={assets} listed={listed.length} monitored={monitored} scheduler={scheduler} />

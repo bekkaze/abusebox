@@ -37,7 +37,7 @@ export function ResultVerdict({ data, providers, detailsOnly = false }) {
 /** One row per blacklist: zone, status, and why it lists the target. */
 export function ProviderRows({ data, providers, action }) {
   return (
-    <div className="relative overflow-x-auto rounded-md border border-rule">
+    <div className="table-wrap relative overflow-x-auto">
       <table className="w-full min-w-[34rem] text-sm border-collapse">
         <thead className="bg-sunk">
           <tr className="text-left">

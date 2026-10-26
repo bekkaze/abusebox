@@ -267,7 +267,7 @@ export default function AssetDetail() {
   return (
     <div>
       {/* The asset, its verdict, and its delivery headers */}
-      <div className="pb-6 border-b border-rule">
+      <div>
         <button
           type="button"
           onClick={() => navigate('/dashboard/assets')}
@@ -302,7 +302,7 @@ export default function AssetDetail() {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <div className="mt-5 panel p-5 sm:p-6 grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
           <div className="min-w-0">
             <VerdictLine verdict={verdict} />
             <Fields className="mt-4 sm:grid-cols-[max-content_minmax(0,1fr)_max-content_minmax(0,1fr)] sm:gap-x-5">
@@ -395,7 +395,7 @@ function ResultTabs({ tabs, current, onSelect, children }) {
     document.getElementById(`${baseId}-tab-${tab}`)?.focus();
   };
   return (
-    <div className="min-w-0">
+    <div className="panel p-5 min-w-0">
       <div role="tablist" aria-label="Check results" className="flex gap-x-6 border-b border-rule overflow-x-auto" onKeyDown={onKeyDown}>
         {tabs.map((tab) => {
           const selected = tab === current;
@@ -707,7 +707,7 @@ function DmarcReportsPanel({ summary }) {
       </Fields>
 
       {top_senders?.length > 0 && (
-        <div className="relative overflow-x-auto rounded-md border border-rule">
+        <div className="table-wrap relative overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <caption className="sr-only">Top senders</caption>
             <thead className="sticky top-0 bg-sunk">
@@ -742,7 +742,7 @@ function DmarcReportsPanel({ summary }) {
 /* ---------- Activity & history ---------- */
 function ProviderList({ rows }) {
   return (
-    <ul className="rounded-md border border-rule">
+    <ul className="table-wrap">
       {rows.map(([provider, change]) => (
         <li key={`${provider}-${change}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm border-b border-rule last:border-b-0">
           <span className="font-mono text-[13px] text-ink break-all">{provider}</span>
@@ -840,7 +840,7 @@ function HistoryPanel({ hostnameId, refreshKey }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
       <div className="min-w-0">
         <h3 className="font-mono text-xs text-ink-2 mb-2">Checks, newest first</h3>
-        <ul className="rounded-md border border-rule" aria-label="Past checks">
+        <ul className="table-wrap" aria-label="Past checks">
           {checks.map((check, index) => {
             const selected = check.id === selectedId;
             return (

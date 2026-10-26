@@ -8,12 +8,14 @@
 
 /*
   Delivery Report: results read like a mail delivery report.
+  Depth: white panels sit on a tinted canvas, with one soft elevation scale.
   White paper, ink, hairline rules; status classes borrowed from SMTP
   (5.x listed, 4.x no answer, 2.x clear); the logo's teal is the only accent.
   Colours are RGB channels so Tailwind opacity modifiers work.
 */
 :root {
-  --paper: 255 255 255;        /* content */
+  --canvas: 241 243 246;       /* page background the panels sit on */
+  --paper: 255 255 255;        /* panels and content */
   --rail: 243 244 246;         /* navigation and side panels */
   --sunk: 248 249 250;         /* table heads, inset fields */
   --ink: 20 23 28;
@@ -34,11 +36,16 @@
   --info: 52 84 136;
   --info-soft: 238 242 249;
   --scrim: 15 17 21;           /* behind dialogs; dark in both themes */
+  /* Elevation: 1 resting panel, 2 raised (hover, featured), 3 overlay. */
+  --shadow-1: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.05);
+  --shadow-2: 0 2px 4px -2px rgb(16 24 40 / 0.06), 0 6px 14px -4px rgb(16 24 40 / 0.10);
+  --shadow-3: 0 8px 16px -6px rgb(16 24 40 / 0.10), 0 20px 40px -8px rgb(16 24 40 / 0.20);
   color-scheme: light;
 }
 
 .dark {
-  --paper: 22 25 30;
+  --canvas: 12 14 18;
+  --paper: 23 26 32;
   --rail: 15 17 21;
   --sunk: 28 32 38;
   --ink: 231 234 238;
@@ -59,6 +66,9 @@
   --info: 146 176 226;
   --info-soft: 28 36 54;
   --scrim: 0 0 0;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 4px 12px -2px rgb(0 0 0 / 0.5);
+  --shadow-3: 0 16px 40px -8px rgb(0 0 0 / 0.7);
   color-scheme: dark;
 }
 
@@ -69,7 +79,7 @@ body,
 }
 
 body {
-  background: rgb(var(--paper));
+  background: rgb(var(--canvas));
   color: rgb(var(--ink));
   font-family: theme('fontFamily.sans');
   font-size: 0.875rem;
@@ -110,6 +120,31 @@ code,
 pre,
 kbd {
   font-family: theme('fontFamily.mono');
+}
+
+@layer components {
+  /* A main region of a page: white, rounded, resting on the canvas. */
+  .panel {
+    background: rgb(var(--paper));
+    border: 1px solid rgb(var(--rule) / 0.8);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-1);
+  }
+
+  /* A data table. Standalone it is its own panel; inside a panel it runs
+     edge to edge with hairlines only, so boxes never nest. */
+  .table-wrap {
+    background: rgb(var(--paper));
+    border: 1px solid rgb(var(--rule) / 0.8);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-1);
+  }
+  .panel .table-wrap {
+    border-width: 1px 0;
+    border-radius: 0;
+    box-shadow: none;
+    margin-inline: -1.25rem;
+  }
 }
 
 /* react-toastify, in the same paper-and-ink vocabulary. Set on the container so it

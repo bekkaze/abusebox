@@ -32,7 +32,7 @@ const QuickCheck = () => {
   }, [hostname]);
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen bg-canvas text-ink">
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         <Link to="/" className={`${linkClass} inline-flex items-center gap-1.5 text-sm mb-5`}>

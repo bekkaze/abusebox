@@ -80,7 +80,7 @@ function FormSkeleton() {
 
 /** Save row at the bottom of a settings form: the form's one primary action. */
 function FormFooter({ children }) {
-  return <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-rule">{children}</div>;
+  return <div className="flex flex-wrap items-center gap-2 pt-1">{children}</div>;
 }
 
 function SaveButton({ saving, label = 'Save changes', disabled }) {
@@ -509,7 +509,7 @@ export default function Settings() {
           aria-label="Settings sections"
           aria-orientation={wide ? 'vertical' : 'horizontal'}
           onKeyDown={onKeyDown}
-          className="flex gap-px overflow-x-auto rounded-md border border-rule bg-rail p-1 lg:flex-col lg:w-52 lg:flex-shrink-0 lg:sticky lg:top-20"
+          className="flex gap-px overflow-x-auto rounded-xl border border-rule/80 bg-paper shadow-e1 p-1 lg:flex-col lg:w-52 lg:flex-shrink-0 lg:sticky lg:top-20"
         >
           {tabs.map((tab) => {
             const on = active === tab.key;

@@ -190,7 +190,7 @@ export default function BulkCheck() {
                 />
               </div>
 
-              <div className="overflow-auto max-h-[70vh] rounded-md border border-rule">
+              <div className="table-wrap relative overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead className="sticky top-0 z-[1] bg-sunk">
                     <tr className="text-left">

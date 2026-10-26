@@ -226,7 +226,7 @@ function SelectBox({ checked, onChange, label, indeterminate = false }) {
 function LoadingState({ view }) {
   if (view === 'table') {
     return (
-      <div className="rounded-md border border-rule overflow-hidden" aria-busy="true" aria-label="Loading assets">
+      <div className="table-wrap overflow-hidden" aria-busy="true" aria-label="Loading assets">
         <div className="h-9 bg-sunk border-b border-rule" />
         {[...Array(6)].map((_, i) => (
           <div key={i} className="flex items-center gap-4 px-3 py-3 border-b border-rule last:border-b-0">
@@ -243,7 +243,7 @@ function LoadingState({ view }) {
   return (
     <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading assets">
       {[...Array(6)].map((_, i) => (
-        <div key={i} className="rounded-md border border-rule p-4 space-y-3">
+        <div key={i} className="panel p-4 space-y-3">
           <SkeletonLine className="h-5 w-20" />
           <SkeletonLine className="h-4 w-2/3" />
           <SkeletonLine className="h-3 w-1/2" />
@@ -642,7 +642,7 @@ function AssetCard({ item, selected, onToggle, onDelete }) {
   const meta = [typeLabel(item), item.is_monitor_enabled ? 'Monitored' : 'Not monitored', item.is_alert_enabled && 'Alerts on'].filter(Boolean);
   return (
     <li
-      className={`relative flex flex-col rounded-md border p-4 transition-colors focus-within:border-accent ${selected ? 'bg-accent-soft border-accent/40' : 'bg-paper border-rule hover:border-rule-strong'}`}
+      className={`relative flex flex-col rounded-xl border p-4 shadow-e1 transition-[box-shadow,border-color,transform] duration-200 ease-out focus-within:border-accent hover:shadow-e2 motion-safe:hover:-translate-y-px ${selected ? 'bg-accent-soft border-accent/40' : 'bg-paper border-rule/80 hover:border-rule-strong'}`}
     >
       <div className="flex items-center justify-between gap-3">
         <HealthBadge item={item} />
@@ -699,7 +699,7 @@ function SortHeader({ sortKey, sort, onSort, className = '' }) {
 
 function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSelected, onToggleAll, sort, onSort }) {
   return (
-    <div className="relative overflow-x-auto rounded-md border border-rule">
+    <div className="table-wrap relative overflow-x-auto">
       <table className="w-full min-w-[60rem] text-sm border-collapse">
         <thead className="bg-sunk">
           <tr>

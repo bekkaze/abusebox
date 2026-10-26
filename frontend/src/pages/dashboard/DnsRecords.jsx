@@ -40,7 +40,7 @@ function RecordTable({ type, records }) {
         <span className="font-mono text-sm font-semibold text-ink">{type}</span>
         <span className="text-xs text-ink-2">{plural(records.length, 'record')}</span>
       </h3>
-      <div className="relative overflow-x-auto rounded-md border border-rule">
+      <div className="table-wrap relative overflow-x-auto">
         <table className="w-full text-sm border-collapse" aria-labelledby={headingId}>
           <thead className="bg-sunk">
             <tr className="text-left">

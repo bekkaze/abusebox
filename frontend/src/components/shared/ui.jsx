@@ -3,7 +3,7 @@ import { useId, useState } from 'react';
 /* Shared building blocks: one vocabulary for surfaces, controls and states,
    in the Delivery Report world (paper, ink, hairline rules, one teal accent). */
 
-export const cardClass = 'bg-paper border border-rule rounded-md';
+export const cardClass = 'panel';
 
 export const inputClass =
   'h-9 w-full px-3 rounded-md border border-rule-strong bg-paper text-sm text-ink placeholder:text-ink-2 ' +
@@ -29,7 +29,7 @@ export const linkClass = 'font-medium text-accent hover:underline underline-offs
 /** Page title row. Titles carry their own weight: no eyebrow above them. */
 export function PageHeader({ title, description, actions }) {
   return (
-    <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-4 border-b border-rule">
+    <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-1">
       <div className="min-w-0">
         <h1 className="text-xl font-semibold tracking-tight text-ink">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-2 max-w-prose">{description}</p>}
@@ -39,12 +39,12 @@ export function PageHeader({ title, description, actions }) {
   );
 }
 
-/** A titled region separated by a hairline, instead of a boxed card. */
+/** A main region of a page: a titled panel on the canvas. */
 export function Section({ title, action, children, className = '', id }) {
   return (
-    <section className={className} aria-labelledby={id}>
-      <div className="flex items-baseline justify-between gap-3 border-b border-rule pb-2 mb-3">
-        <h2 id={id} className="text-sm font-semibold text-ink">{title}</h2>
+    <section className={`panel p-5 ${className}`} aria-labelledby={id}>
+      <div className="flex items-center justify-between gap-3 mb-4 min-h-[1.5rem]">
+        <h2 id={id} className="text-[15px] font-semibold tracking-tight text-ink">{title}</h2>
         {action}
       </div>
       {children}

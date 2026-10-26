@@ -28,7 +28,7 @@ const Navbar = () => {
   const themeLabel = dark ? 'Switch to light theme' : 'Switch to dark theme';
 
   return (
-    <header className='sticky top-0 z-20 border-b border-rule bg-paper/95 backdrop-blur-sm'>
+    <header className='sticky top-0 z-20 border-b border-rule/70 bg-canvas/85 backdrop-blur-md'>
       <div className='max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-2'>
         <Link to='/' onClick={close} className='flex items-center gap-2.5 mr-auto rounded-md'>
           <img src='/logo.png' alt='' className='h-7 w-7 rounded-md object-cover' />
