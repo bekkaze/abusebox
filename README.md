@@ -1,71 +1,62 @@
 <div align="center">
 
-<img src="files/logo.png" alt="AbuseBox Logo" width="120" />
+<img src="files/logo.png" alt="" width="96" />
 
 # AbuseBox
 
-**Open-source threat monitoring toolkit for IPs, domains, and servers.**
+**Know your mail server is blacklisted before your users do.**
 
-Check blacklists, query AbuseIPDB, inspect DNS/SSL/DMARC records, scan subnets and verify uptime, then get told when something changes. One self-hosted dashboard.
+Self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/bekkaze/abusebox)](https://github.com/bekkaze/abusebox/releases)
+[Website](https://bekkaze.github.io/abusebox/) &nbsp;|&nbsp; [Quick start](#quick-start) &nbsp;|&nbsp; [Changelog](CHANGELOG.md)
+
+[![Release](https://img.shields.io/github/v/release/bekkaze/abusebox)](https://github.com/bekkaze/abusebox/releases)
+[![CI](https://github.com/bekkaze/abusebox/actions/workflows/ci.yml/badge.svg)](https://github.com/bekkaze/abusebox/actions/workflows/ci.yml)
+[![Docker images](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-0d757f?logo=docker&logoColor=white)](https://github.com/bekkaze?tab=packages&repo_name=abusebox)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/bekkaze/abusebox?style=social)](https://github.com/bekkaze/abusebox/stargazers)
 
 </div>
+
+![AbuseBox dashboard: three assets need action, with the reason for each](files/dashboard.png)
+
+## Quick start
+
+```bash
+git clone https://github.com/bekkaze/abusebox.git && cd abusebox
+docker compose up -d
+```
+
+Open `http://localhost:3000` and sign in as `admin` / `password123`, then change the password in Settings. More options under [Installation](#installation).
+
+## Why AbuseBox
+
+- **Results you can trust.** Before trusting a blacklist, AbuseBox checks it against its test addresses (RFC 5782). A list that refuses your resolver shows **No answer**, not a false "clean". Try it: through Google DNS, Spamhaus says "not listed" for everything.
+- **Every listing explained.** Spamhaus SBL (a spam source) and PBL (an end-user range) are not the same problem. Each listing comes with its meaning and a severity, so you know what to fix first.
+- **Mail-server health in one place.** 24 blacklists, AbuseIPDB, SSL and domain expiry, SPF/DKIM/DMARC grades, DMARC reports and uptime.
+- **Tells you what changed.** Scheduled checks, an activity log, and alerts by email, Slack, Discord or webhook when something is listed, delisted, goes down or is about to expire.
+- **Yours.** Self-hosted, MIT licensed, no telemetry, no paid tier.
+
+If AbuseBox saves you a bounce, a star helps other mail operators find it.
 
 ---
 
 ## Screenshots
 
-**Dashboard**: everything that needs attention across your assets, scheduler status, recent activity and listing history
-
-![Dashboard](files/dashboard.png)
-
-**Assets**: health at a glance, filters, sorting, card or table view, and bulk actions
-
-![Assets](files/assets.png)
-
-**Asset detail**: results for every check, plus the asset's activity and a check-by-check history
-
-![Asset detail](files/asset_details.png)
-
-**Landing page**: anyone can run a quick blacklist check, no account needed
-
-![Landing page](files/landing.png)
-
 <table>
   <tr>
+    <td width="50%"><b>Assets</b>: health at a glance, filters, bulk actions<br><img src="files/assets.png" alt="Assets table"></td>
+    <td width="50%"><b>Asset report</b>: every check, with history<br><img src="files/asset_details.png" alt="One asset's report"></td>
+  </tr>
+  <tr>
     <td width="50%"><b>Activity log</b>: every change, with severity filters<br><img src="files/activity.png" alt="Activity log"></td>
-    <td width="50%"><b>Alerts</b>: email, Slack, Discord or any webhook, with a test button<br><img src="files/notifications.png" alt="Notification settings"></td>
+    <td width="50%"><b>Alerts</b>: email, Slack, Discord or any webhook<br><img src="files/notifications.png" alt="Notification settings"></td>
   </tr>
   <tr>
     <td width="50%"><b>Dark mode</b><br><img src="files/dashboard_dark.png" alt="Dashboard in dark mode"></td>
-    <td width="50%"><b>Command palette</b> (Ctrl/Cmd + K): jump to any asset or page<br><img src="files/command_palette.png" alt="Command palette"></td>
+    <td width="50%"><b>Public quick check</b>: no account needed<br><img src="files/landing.png" alt="Public landing page with a quick check"></td>
   </tr>
 </table>
-
----
-
-## Why AbuseBox?
-
-Most blacklist tools check one thing at a time. AbuseBox gives you a **single pane of glass** to:
-
-- See **what needs attention** in one list: blacklist listings, expiring certificates and domains, servers down, weak email security
-- Scan **24 DNSBL providers** in seconds, each listing decoded with a severity
-- Get **AbuseIPDB reputation scores** alongside blacklist results
-- Run **bulk checks** on up to 300 IPs/domains at once (paste or upload TXT/CSV/XLSX)
-- Scan entire **subnets (CIDR /24)** for blacklisted IPs
-- Pull **WHOIS**, **DNS records**, and **SSL certificate** details with one click
-- Validate **SPF / DKIM / DMARC** email authentication
-- Check if a server is **up or down** with DNS, port, and HTTP checks
-- **Register assets** and run all checks with configurable toggles
-- **Schedule periodic checks** with email, Slack, Discord or webhook alerts for listings, recoveries, outages and expiry
-- Keep an **activity log** of every change and compare any two checks
-- Export results to **CSV** and track history with **charts**
-- Switch between **light and dark mode**
-
-No vendor lock-in. No paid tiers. Self-host it and own your data.
 
 ---
 
@@ -110,18 +101,18 @@ No vendor lock-in. No paid tiers. Self-host it and own your data.
 
 ---
 
-## Quick Start
+## Installation
 
 ### Docker (recommended)
 
 ```bash
-git clone https://github.com/bekkaze/abusebox
+git clone https://github.com/bekkaze/abusebox.git
 cd abusebox
-cp backend/.env.example .env    # configure your settings
-docker compose up --build
+cp backend/.env.example .env    # optional: alerts, API keys, admin account
+docker compose up -d            # pulls the prebuilt images (add --build to build from source)
 ```
 
-Open `http://localhost:3000` and you're ready to go.
+Open `http://localhost:3000` and you're ready to go. To update later: `docker compose pull && docker compose up -d`.
 
 > Default login: `admin` / `password123`. **Change it in Settings right after the first sign-in.**
 >
