@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AbuseBox: self-hosted blacklist and email security monitor</title>
+  <meta name="description" content="AbuseBox watches your own IPs and domains: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime. Self-hosted, MIT licensed, and honest about blacklists that refuse to answer.">
+  <meta name="theme-color" content="#f1f3f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0c0e12" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AbuseBox">
+  <meta property="og:description" content="Self-hosted monitor for your IPs and domains: blacklists, certificates, email authentication and uptime.">
+  <meta property="og:url" content="https://bekkaze.github.io/abusebox/">
+  <meta property="og:image" content="https://bekkaze.github.io/abusebox/screens/dashboard.png">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+  <!-- Project site for AbuseBox, in the app's Delivery Report world: the example
+       report leads, install is the action, and claims stay to what the product does. -->
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="logo.png" alt="" width="28" height="28"> AbuseBox</a>
+      <nav aria-label="Main">
+        <a class="opt" href="#honest">How it checks</a>
+        <a class="opt" href="#install">Install</a>
+        <a class="btn btn-secondary" href="https://github.com/bekkaze/abusebox">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap">
+        <div>
+          <h1 id="hero-title">Find the blacklist listing before your users find the bounce.</h1>
+          <p class="lede">AbuseBox is a self-hosted monitor for the IPs and domains you run. It checks them on a schedule against 24 DNS blacklists, SSL and domain expiry, SPF, DKIM and DMARC, and uptime, then tells you what changed and why.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="#install">Install with Docker</a>
+            <a class="btn btn-secondary" href="https://github.com/bekkaze/abusebox">View on GitHub</a>
+          </div>
+          <p class="facts">MIT licensed, no telemetry. Runs with Docker Compose on amd64 and arm64.</p>
+        </div>
+
+        <figure class="panel report" aria-labelledby="report-title">
+          <div class="report-head">
+            <strong id="report-title">Example report</strong>
+            <span>Sample data, not a live check</span>
+          </div>
+          <dl class="fields">
+            <dt>Target</dt><dd class="mono">203.0.113.25</dd>
+            <dt>Checked</dt><dd>24 blacklists, each verified against its test addresses</dd>
+          </dl>
+          <p class="verdict"><span class="code c5" aria-hidden="true">5.x</span> Listed on 2 of 24 blacklists</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">List</th><th scope="col">Status</th><th scope="col">Reason</th></tr></thead>
+              <tbody>
+                <tr><td class="zone">zen.spamhaus.org</td><td><span class="tag t5"><span class="k" aria-hidden="true">5.x</span>Listed</span></td><td><span class="sev">HIGH</span>PBL: end-user range, listed by its ISP</td></tr>
+                <tr><td class="zone">b.barracudacentral.org</td><td><span class="tag t5"><span class="k" aria-hidden="true">5.x</span>Listed</span></td><td><span class="sev">HIGH</span>poor sending reputation</td></tr>
+                <tr><td class="zone">bl.spamcop.net</td><td><span class="tag t2"><span class="k" aria-hidden="true">2.x</span>Clear</span></td><td></td></tr>
+                <tr><td class="zone">ips.backscatterer.org</td><td><span class="tag t2"><span class="k" aria-hidden="true">2.x</span>Clear</span></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <figcaption class="report-foot">20 more lists answered clear and are not shown here.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band" id="honest" aria-labelledby="honest-title">
+      <div class="wrap">
+        <div>
+          <h2 id="honest-title">A clean result you can trust</h2>
+          <p class="intro">Ask Spamhaus through Google or Cloudflare DNS and it answers "not listed" or an error code for everything. Many tools show that as clean.</p>
+        </div>
+        <div class="body">
+          <p>Try it: 127.0.0.2 is Spamhaus's test address and should always come back listed.</p>
+<pre class="term"><button class="copy" type="button" data-copy="dig +short 2.0.0.127.zen.spamhaus.org @8.8.8.8">Copy</button><span class="p">$ </span>dig +short 2.0.0.127.zen.spamhaus.org @8.8.8.8
+<span class="out">(nothing, which looks like "not listed")</span></pre>
+          <p>Before AbuseBox trusts a blacklist, it asks about the list's test addresses. A list that refuses, rate-limits or times out shows as <span class="tag t4"><span class="k" aria-hidden="true">4.x</span>No answer</span>, never as a false <span class="tag t2"><span class="k" aria-hidden="true">2.x</span>Clear</span>. A dead list that starts listing everything is ignored.</p>
+          <dl class="fields">
+            <dt class="mono">127.0.0.2</dt><dd>Must be listed. If not, the list is refusing to answer.</dd>
+            <dt class="mono">127.0.0.1</dt><dd>Must not be listed. If it is, the list is listing everything.</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="checks-title">
+      <div class="wrap">
+        <div>
+          <h2 id="checks-title">What it checks</h2>
+          <p class="intro">Add your IPs and domains once. AbuseBox re-checks them on a schedule, keeps a history of every check, and alerts you by email, Slack, Discord or webhook when something is listed, delisted, goes down or is about to expire.</p>
+        </div>
+        <dl class="fields body">
+          <dt>Blacklists</dt><dd>24 DNS blacklists, each listing decoded with its meaning and a severity.</dd>
+          <dt>AbuseIPDB</dt><dd>Abuse confidence score, reports, ISP and country for an IP, with your free API key.</dd>
+          <dt>SSL</dt><dd>Validity, issuer, expiry and the names the certificate covers.</dd>
+          <dt>WHOIS</dt><dd>Registrar, name servers and when the domain expires.</dd>
+          <dt>DNS</dt><dd>A, AAAA, MX, TXT, CNAME, NS, SOA and PTR records.</dd>
+          <dt>Email-Auth</dt><dd>SPF, DKIM and DMARC, graded A to F, plus DMARC report parsing.</dd>
+          <dt>Server-Status</dt><dd>DNS resolution, ports 80 and 443, HTTP status and response time.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="shots" aria-label="Screenshots">
+      <div class="wrap">
+        <figure class="panel shot">
+          <img src="screens/dashboard.png" alt="AbuseBox dashboard: a status line saying three assets need action, the attention list, scheduler and blacklist history" width="1440" height="900">
+          <figcaption>The dashboard opens on what needs action, with the reason for each.</figcaption>
+        </figure>
+        <div class="shot-grid">
+          <figure class="panel shot">
+            <img src="screens/asset_details.png" alt="One asset's report: verdict, header fields and the blacklist table" width="1440" height="900" loading="lazy">
+            <figcaption>Every asset gets a full report and a history of its checks.</figcaption>
+          </figure>
+          <figure class="panel shot">
+            <img src="screens/dashboard_dark.png" alt="The dashboard in dark mode" width="1440" height="900" loading="lazy">
+            <figcaption>Light and dark themes.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="install" aria-labelledby="install-title">
+      <div class="wrap">
+        <div>
+          <h2 id="install-title">Runs on your server</h2>
+          <p class="intro">Three commands on any machine with Docker and Compose. Your asset list, check history and API keys stay in its database; only the lookups themselves leave it.</p>
+        </div>
+        <div class="body">
+<pre class="term"><button class="copy" type="button" data-copy="git clone https://github.com/bekkaze/abusebox.git&#10;cd abusebox&#10;docker compose up -d">Copy</button><span class="p">$ </span>git clone https://github.com/bekkaze/abusebox.git
+<span class="p">$ </span>cd abusebox
+<span class="p">$ </span>docker compose up -d</pre>
+          <p>Then open <code>http://localhost:3000</code> and sign in with the default account from the <a href="https://github.com/bekkaze/abusebox#quick-start">README</a>. Change its password right away.</p>
+          <p>To update later: <code>docker compose pull &amp;&amp; docker compose up -d</code>. Configuration, the Spamhaus key for commercial use and running your own DNS resolver are covered in the <a href="https://github.com/bekkaze/abusebox#configuration">README</a>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="./"><img src="logo.png" alt="" width="28" height="28"> AbuseBox</a>
+      <span>Open source, MIT licensed.</span>
+      <nav aria-label="Footer">
+        <a href="https://github.com/bekkaze/abusebox">GitHub</a>
+        <a href="https://github.com/bekkaze/abusebox/releases">Releases</a>
+        <a href="https://github.com/bekkaze/abusebox/issues">Issues</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    // Copy buttons on the command blocks.
+    document.querySelectorAll('.copy').forEach((button) => {
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(button.dataset.copy);
+          button.textContent = 'Copied';
+          setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+        } catch {
+          button.textContent = 'Select and copy';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -31,3 +31,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .SECURITY.md
+
+# Project site: screenshots are copied in at deploy time
+site/screens/
