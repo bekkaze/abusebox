@@ -186,7 +186,7 @@ SCHEDULER_INTERVAL_MINUTES=360
 
 # Email alerts (optional)
 SMTP_HOST=
-SMTP_PORT=587
+SMTP_PORT=587                  # 587 uses STARTTLS; 465 uses TLS from the start
 SMTP_USERNAME=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
@@ -205,7 +205,7 @@ WEBHOOK_URL=
 | `ABUSEIPDB_API_KEY` | Enables AbuseIPDB reputation checks | No |
 | `SCHEDULER_ENABLED` | Run periodic background checks (default: `true`; can also be changed in Settings) | No |
 | `SCHEDULER_INTERVAL_MINUTES` | Check interval in minutes (default: 360) | No |
-| `SMTP_HOST` | SMTP server for email alerts | No |
+| `SMTP_HOST` | SMTP server for email alerts. Alerts go to the email address of the asset's owner; each user sets theirs in **Settings → Notifications** | No |
 | `WEBHOOK_URL` | Webhook URL for alerts (Slack and Discord URLs get chat messages). A URL set in Settings → Notifications takes precedence | No |
 | `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers (IPs or hostnames) for blacklist lookups. Spamhaus and some others refuse public resolvers; see [Blacklists that show "No answer"](#blacklists-that-show-no-answer) | No |
 | `SPAMHAUS_DQS_KEY` | Spamhaus [Data Query Service](https://www.spamhaus.com/data-access/free-data-query-service/) key. When set, Spamhaus lookups use your key instead of the public mirror. Spamhaus's free public mirror is for non-commercial use only; ISPs and commercial users need a paid key | No |

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Email alerts went to the default admin's placeholder address (`admin@abusebox.local`), which can't receive mail, and there was no way to change it (#28). Each user now sets their alert email in **Settings → Notifications**, a warning shows while it's still a placeholder, and alerts and the test notification report the problem instead of sending into the void.
+- SMTP on port 465 (TLS from the start) now works; previously only STARTTLS on 587 did.
+
 ## [1.3.0] - 2026-10-26
 
 A redesigned interface, decoded blacklist results, and a production-grade frontend.

@@ -24,6 +24,15 @@ def email_configured() -> bool:
     return bool(settings.smtp_host and settings.smtp_from_email)
 
 
+def deliverable_address(address: str | None) -> bool:
+    """False for addresses no mail server delivers to, such as the default admin@abusebox.local."""
+    domain = (address or "").rpartition("@")[2].lower()
+    return bool(domain) and "." in domain and not domain.endswith((".local", ".localhost", ".invalid", ".test"))
+
+
+UNDELIVERABLE_HINT = "can't receive mail. Set your email address in Settings → Notifications."
+
+
 def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str | None]:
     if not email_configured():
         return False, "SMTP is not configured (set SMTP_HOST and SMTP_FROM_EMAIL)."
@@ -33,9 +42,12 @@ def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str | None
     msg["From"] = settings.smtp_from_email
     msg["To"] = to_email
 
+    # Port 465 speaks TLS from the first byte; other ports upgrade with STARTTLS.
+    implicit_tls = settings.smtp_port == 465
+    smtp_class = smtplib.SMTP_SSL if implicit_tls else smtplib.SMTP
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as server:
-            if settings.smtp_use_tls:
+        with smtp_class(settings.smtp_host, settings.smtp_port, timeout=10) as server:
+            if settings.smtp_use_tls and not implicit_tls:
                 server.starttls()
             if settings.smtp_username and settings.smtp_password:
                 server.login(settings.smtp_username, settings.smtp_password)
@@ -135,7 +147,9 @@ def notify_events(
     if not to_send:
         return
 
-    if user_email and email_configured():
+    if user_email and email_configured() and not deliverable_address(user_email):
+        logger.warning("Email alert for %s not sent: %s %s", hostname, user_email, UNDELIVERABLE_HINT)
+    elif user_email and email_configured():
         worst = min(to_send, key=lambda e: {"critical": 0, "warning": 1, "success": 2, "info": 3}.get(e["severity"], 9))
         subject = f"[AbuseBox] {hostname}: {worst['title']}"
         body = "\n".join(_event_line(hostname, event) for event in to_send)
@@ -156,6 +170,8 @@ def send_test_notifications(user_email: str | None, webhook_url: str) -> dict[st
         results["email"] = {"status": "not_configured", "detail": "Set SMTP_HOST and SMTP_FROM_EMAIL in the environment."}
     elif not user_email:
         results["email"] = {"status": "failed", "detail": "Your account has no email address."}
+    elif not deliverable_address(user_email):
+        results["email"] = {"status": "failed", "detail": f"{user_email} {UNDELIVERABLE_HINT}"}
     else:
         ok, error = send_email(user_email, "[AbuseBox] Test notification", "Alerts from AbuseBox will arrive at this address.")
         results["email"] = {"status": "sent" if ok else "failed", "detail": user_email if ok else error}

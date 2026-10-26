@@ -24,6 +24,7 @@ from app.schemas import (
     ChangePasswordRequest,
     LoginRequest,
     MeResponse,
+    ProfileUpdateRequest,
     RefreshRequest,
     TokenResponse,
     UserCreateRequest,
@@ -149,6 +150,23 @@ def me(user: User = Depends(get_current_user)):
         and verify_password(settings.default_admin_password, user.hashed_password)
     )
     return MeResponse(**UserResponse.model_validate(user).model_dump(), using_default_password=using_default)
+
+
+@router.patch("/me/", response_model=MeResponse)
+def update_me(
+    payload: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Change your own email address, which is where alerts for your assets go."""
+    email = payload.email.strip()
+    if email != user.email:
+        if db.query(User).filter(User.email == email, User.id != user.id).first():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use")
+        user.email = email
+        db.commit()
+        db.refresh(user)
+    return me(user)
 
 
 @router.get("/list/", response_model=list[AdminUserItem])

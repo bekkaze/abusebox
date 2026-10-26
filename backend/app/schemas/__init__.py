@@ -7,6 +7,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserCreateRequest,
     UserResponse,
+    ProfileUpdateRequest,
     UserUpdateRequest,
 )
 from app.schemas.blacklist import DelistRequest
@@ -25,6 +26,7 @@ from app.schemas.hostname import (
 __all__ = [
     "AdminUserItem",
     "MeResponse",
+    "ProfileUpdateRequest",
     "UserUpdateRequest",
     "ChangePasswordRequest",
     "LoginRequest",

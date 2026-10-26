@@ -228,3 +228,12 @@ def test_admin_cannot_lock_themselves_out(client, admin_headers):
     admin_id = client.get("/user/me/", headers=admin_headers).json()["id"]
     assert client.patch(f"/user/{admin_id}/", json={"is_superuser": False}, headers=admin_headers).status_code == 400
     assert client.patch(f"/user/{admin_id}/", json={"is_active": False}, headers=admin_headers).status_code == 400
+
+
+def test_users_can_change_their_own_alert_email(client, admin_headers):
+    res = client.patch("/user/me/", json={"email": "ops@example.com"}, headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json()["email"] == "ops@example.com"
+    assert client.get("/user/me/", headers=admin_headers).json()["email"] == "ops@example.com"
+    assert client.patch("/user/me/", json={"email": "not-an-address"}, headers=admin_headers).status_code == 422
+    assert client.patch("/user/me/", json={"email": "x@example.com"}).status_code == 401

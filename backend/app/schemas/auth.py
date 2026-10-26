@@ -47,6 +47,12 @@ class AdminUserItem(UserResponse):
     asset_count: int = 0
 
 
+class ProfileUpdateRequest(BaseModel):
+    """What any signed-in user may change about their own account."""
+
+    email: str = Field(min_length=3, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class UserUpdateRequest(BaseModel):
     """Admin-only partial update. Omitted fields are left unchanged."""
 

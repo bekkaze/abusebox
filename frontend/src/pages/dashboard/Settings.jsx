@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import axios from 'axios';
 import { useAuth } from '../../services/auth/authProvider';
 import useCurrentUser, { invalidateCurrentUser } from '../../services/users/useCurrentUser';
+import { updateMe } from '../../services/users';
 import {
   getNotificationSettings, getSchedulerSettings, sendTestNotification, updateNotificationSettings, updateSchedulerSettings,
 } from '../../services/settings';
@@ -249,6 +250,84 @@ function ChannelState({ ok }) {
   );
 }
 
+// Mirrors deliverable_address() in the backend: these domains never receive mail.
+const UNDELIVERABLE_DOMAIN = /\.(local|localhost|invalid|test)$/i;
+const isDeliverable = (email) => {
+  const domain = (email || '').split('@')[1] || '';
+  return domain.includes('.') && !UNDELIVERABLE_DOMAIN.test(domain);
+};
+
+/** Every user's own alert address: alerts for the assets they own go here. */
+function AlertEmailSection() {
+  const id = useId();
+  const me = useCurrentUser();
+  const [saved, setSaved] = useState(null);
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (me && saved === null) {
+      setSaved(me.email);
+      setValue(me.email);
+    }
+  }, [me, saved]);
+
+  if (saved === null) return <FormSkeleton />;
+
+  const dirty = value.trim() !== saved;
+  const onSubmit = async (event) => {
+    event.preventDefault();
+    if (!dirty || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      const user = await updateMe({ email: value.trim() });
+      invalidateCurrentUser();
+      setSaved(user.email);
+      setValue(user.email);
+      toast.success('Alert email saved');
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Enter a full email address, like you@example.com.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Section title="Your alert email" id={`${id}-me`}>
+      <form onSubmit={onSubmit} noValidate>
+        {!isDeliverable(saved) && (
+          <Alert tone="warning" className="mb-4">
+            Alerts for your assets go to <span className="font-mono">{saved}</span>, which can&apos;t receive mail. Enter your real address below.
+          </Alert>
+        )}
+        <label htmlFor={`${id}-email`} className={labelClass}>Email address</label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            id={`${id}-email`}
+            type="email"
+            autoComplete="email"
+            spellCheck="false"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className={`${inputClass} sm:flex-1`}
+            aria-describedby={`${id}-email-help`}
+            aria-invalid={error ? 'true' : undefined}
+          />
+          <button type="submit" disabled={!dirty || saving} className={primaryButtonClass}>
+            {saving && <Spinner />} Save email
+          </button>
+        </div>
+        {error
+          ? <p role="alert" className="mt-1.5 text-xs text-s5">{error}</p>
+          : <p id={`${id}-email-help`} className={helpClass}>Alerts for the assets you own are sent here.</p>}
+      </form>
+    </Section>
+  );
+}
+
 function NotificationsTab({ isAdmin }) {
   const id = useId();
   const [form, setForm] = useState(null);
@@ -315,101 +394,104 @@ function NotificationsTab({ isAdmin }) {
     : form.webhook_source === 'environment' ? 'Using WEBHOOK_URL from the server environment. A URL below overrides it.' : 'Add a URL below (Slack and Discord webhooks are formatted automatically).';
 
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-6 max-w-2xl">
-      {!isAdmin && <Alert tone="info">Only admins can change notification settings.</Alert>}
+    <div className="space-y-6 max-w-2xl">
+      <AlertEmailSection />
+      <form onSubmit={onSubmit} noValidate className="space-y-6">
+        {!isAdmin && <Alert tone="info">Only admins can change notification settings.</Alert>}
 
-      <Section title="Channels" id={`${id}-channels`}>
-        <p className="text-xs text-ink-2 -mt-1 mb-3">
-          Alerts go to the asset owner&apos;s email address and to the webhook. Each asset also needs alerts turned on.
-        </p>
-        <Fields className="gap-y-2.5">
-          <Field name="Email">
-            <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <ChannelState ok={form.email_configured} />
-              <span className="text-xs text-ink-2">
-                {form.email_configured
-                  ? <>Sent from <span className="font-mono">{form.smtp_from}</span>.</>
-                  : <>Set <span className="font-mono">SMTP_HOST</span> and <span className="font-mono">SMTP_FROM_EMAIL</span> in the server environment.</>}
+        <Section title="Channels" id={`${id}-channels`}>
+          <p className="text-xs text-ink-2 -mt-1 mb-3">
+            Alerts go to the asset owner&apos;s email address and to the webhook. Each asset also needs alerts turned on.
+          </p>
+          <Fields className="gap-y-2.5">
+            <Field name="Email">
+              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <ChannelState ok={form.email_configured} />
+                <span className="text-xs text-ink-2">
+                  {form.email_configured
+                    ? <>Sent from <span className="font-mono">{form.smtp_from}</span>.</>
+                    : <>Set <span className="font-mono">SMTP_HOST</span> and <span className="font-mono">SMTP_FROM_EMAIL</span> in the server environment.</>}
+                </span>
               </span>
-            </span>
-          </Field>
-          <Field name="Webhook">
-            <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <ChannelState ok={form.webhook_configured} />
-              <span className="text-xs text-ink-2">{webhookDetail}</span>
-            </span>
-          </Field>
-        </Fields>
+            </Field>
+            <Field name="Webhook">
+              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <ChannelState ok={form.webhook_configured} />
+                <span className="text-xs text-ink-2">{webhookDetail}</span>
+              </span>
+            </Field>
+          </Fields>
 
-        <div className="mt-5">
-          <label htmlFor={`${id}-webhook`} className={labelClass}>Webhook URL</label>
-          <input
-            id={`${id}-webhook`}
-            type="url"
-            inputMode="url"
-            autoComplete="off"
-            spellCheck="false"
-            placeholder="https://hooks.slack.com/services/…"
-            value={form.webhook_url || ''}
-            onChange={(e) => update({ webhook_url: e.target.value })}
-            disabled={!isAdmin}
-            className={`${inputClass} font-mono`}
-            aria-describedby={`${id}-webhook-help`}
-          />
-          <p id={`${id}-webhook-help`} className={helpClass}>Slack and Discord URLs receive a chat message. Any other URL receives a JSON payload.</p>
-        </div>
-
-        {isAdmin && (
-          <div className="mt-3">
-            <button type="button" onClick={test} disabled={testing || saving} className={secondaryButtonClass}>
-              {testing && <Spinner />} {webhookDirty ? 'Save and send test' : 'Send test notification'}
-            </button>
+          <div className="mt-5">
+            <label htmlFor={`${id}-webhook`} className={labelClass}>Webhook URL</label>
+            <input
+              id={`${id}-webhook`}
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck="false"
+              placeholder="https://hooks.slack.com/services/…"
+              value={form.webhook_url || ''}
+              onChange={(e) => update({ webhook_url: e.target.value })}
+              disabled={!isAdmin}
+              className={`${inputClass} font-mono`}
+              aria-describedby={`${id}-webhook-help`}
+            />
+            <p id={`${id}-webhook-help`} className={helpClass}>Slack and Discord URLs receive a chat message. Any other URL receives a JSON payload.</p>
           </div>
-        )}
-        {testResult && (
-          <div aria-live="polite" className="mt-3">
-            <Fields>
-              {Object.entries(testResult).map(([channel, outcome]) => (
-                <Field key={channel} name={channel.charAt(0).toUpperCase() + channel.slice(1)}>
-                  <span className="inline-flex flex-wrap items-baseline gap-x-2">
-                    <SeverityCode severity={outcome.status === 'sent' ? 'success' : 'warning'} />
-                    <span>{outcome.status.replace('_', ' ')}</span>
-                    {outcome.detail && <span className="text-xs text-ink-2 break-words">{outcome.detail}</span>}
-                  </span>
-                </Field>
-              ))}
-            </Fields>
-          </div>
-        )}
-      </Section>
 
-      <Section title="What to alert on" id={`${id}-events`}>
-        <p className="text-xs text-ink-2 -mt-1 mb-2">
-          Changes are always recorded on the Activity page; these settings decide which ones also send an alert.
-        </p>
-        <div>
-          <SwitchRow title="Newly listed on a blacklist" description="Always on for assets with alerts enabled." checked onChange={() => {}} disabled />
-          <SwitchRow title="Removed from all blacklists" checked={form.notify_on_delisted} onChange={(v) => update({ notify_on_delisted: v })} disabled={!isAdmin} />
-          <SwitchRow title="Server down and recovered" description="Needs the Server status check on the asset." checked={form.notify_on_server_down} onChange={(v) => update({ notify_on_server_down: v })} disabled={!isAdmin} />
-        </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {isAdmin && (
+            <div className="mt-3">
+              <button type="button" onClick={test} disabled={testing || saving} className={secondaryButtonClass}>
+                {testing && <Spinner />} {webhookDirty ? 'Save and send test' : 'Send test notification'}
+              </button>
+            </div>
+          )}
+          {testResult && (
+            <div aria-live="polite" className="mt-3">
+              <Fields>
+                {Object.entries(testResult).map(([channel, outcome]) => (
+                  <Field key={channel} name={channel.charAt(0).toUpperCase() + channel.slice(1)}>
+                    <span className="inline-flex flex-wrap items-baseline gap-x-2">
+                      <SeverityCode severity={outcome.status === 'sent' ? 'success' : 'warning'} />
+                      <span>{outcome.status.replace('_', ' ')}</span>
+                      {outcome.detail && <span className="text-xs text-ink-2 break-words">{outcome.detail}</span>}
+                    </span>
+                  </Field>
+                ))}
+              </Fields>
+            </div>
+          )}
+        </Section>
+
+        <Section title="What to alert on" id={`${id}-events`}>
+          <p className="text-xs text-ink-2 -mt-1 mb-2">
+            Changes are always recorded on the Activity page; these settings decide which ones also send an alert.
+          </p>
           <div>
-            <label htmlFor={`${id}-ssl`} className={labelClass}>SSL certificate expiry warning</label>
-            <select id={`${id}-ssl`} value={form.ssl_expiry_warning_days} disabled={!isAdmin} onChange={(e) => update({ ssl_expiry_warning_days: Number(e.target.value) })} className={selectClass}>
-              {[0, 7, 14, 21, 30].map((d) => <option key={d} value={d}>{d ? `${d} days before` : 'Off'}</option>)}
-            </select>
+            <SwitchRow title="Newly listed on a blacklist" description="Always on for assets with alerts enabled." checked onChange={() => {}} disabled />
+            <SwitchRow title="Removed from all blacklists" checked={form.notify_on_delisted} onChange={(v) => update({ notify_on_delisted: v })} disabled={!isAdmin} />
+            <SwitchRow title="Server down and recovered" description="Needs the Server status check on the asset." checked={form.notify_on_server_down} onChange={(v) => update({ notify_on_server_down: v })} disabled={!isAdmin} />
           </div>
-          <div>
-            <label htmlFor={`${id}-domain`} className={labelClass}>Domain expiry warning</label>
-            <select id={`${id}-domain`} value={form.domain_expiry_warning_days} disabled={!isAdmin} onChange={(e) => update({ domain_expiry_warning_days: Number(e.target.value) })} className={selectClass}>
-              {[0, 14, 30, 60, 90].map((d) => <option key={d} value={d}>{d ? `${d} days before` : 'Off'}</option>)}
-            </select>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor={`${id}-ssl`} className={labelClass}>SSL certificate expiry warning</label>
+              <select id={`${id}-ssl`} value={form.ssl_expiry_warning_days} disabled={!isAdmin} onChange={(e) => update({ ssl_expiry_warning_days: Number(e.target.value) })} className={selectClass}>
+                {[0, 7, 14, 21, 30].map((d) => <option key={d} value={d}>{d ? `${d} days before` : 'Off'}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={`${id}-domain`} className={labelClass}>Domain expiry warning</label>
+              <select id={`${id}-domain`} value={form.domain_expiry_warning_days} disabled={!isAdmin} onChange={(e) => update({ domain_expiry_warning_days: Number(e.target.value) })} className={selectClass}>
+                {[0, 14, 30, 60, 90].map((d) => <option key={d} value={d}>{d ? `${d} days before` : 'Off'}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
-      </Section>
+        </Section>
 
-      {isAdmin && <FormFooter><SaveButton saving={saving} /></FormFooter>}
-    </form>
+        {isAdmin && <FormFooter><SaveButton saving={saving} /></FormFooter>}
+      </form>
+    </div>
   );
 }
 

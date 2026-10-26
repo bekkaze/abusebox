@@ -187,3 +187,34 @@ def test_notify_events_posts_one_webhook_per_alerting_event():
                                     webhook_url="https://hooks.example.com/x", prefs={})
     assert post.call_count == 1  # blacklist.changed is log-only
     email.assert_not_called()  # SMTP isn't configured in tests
+
+
+def test_undeliverable_addresses():
+    assert notifications.deliverable_address("ops@example.com")
+    for address in ("admin@abusebox.local", "root@localhost", "a@mail.test", "", None, "no-at-sign"):
+        assert not notifications.deliverable_address(address)
+
+
+def test_alerts_skip_an_address_that_cannot_receive_mail():
+    with mock.patch.object(notifications, "email_configured", return_value=True), \
+            mock.patch.object(notifications, "send_email") as email:
+        notifications.notify_events(hostname="h", ip="1.2.3.4", events=[EVENT], user_email="admin@abusebox.local",
+                                    webhook_url="", prefs={})
+        email.assert_not_called()
+        notifications.notify_events(hostname="h", ip="1.2.3.4", events=[EVENT], user_email="ops@example.com",
+                                    webhook_url="", prefs={})
+        email.assert_called_once()
+        assert email.call_args.args[0] == "ops@example.com"
+
+
+def test_port_465_uses_implicit_tls():
+    smtp = SimpleNamespace(smtp_host="mail.example.com", smtp_port=465, smtp_from_email="ab@example.com",
+                           smtp_use_tls=True, smtp_username="", smtp_password="")
+    with mock.patch.object(notifications, "settings", smtp), \
+            mock.patch.object(notifications.smtplib, "SMTP_SSL") as ssl, \
+            mock.patch.object(notifications.smtplib, "SMTP") as plain:
+        ok, _ = notifications.send_email("ops@example.com", "s", "b")
+    assert ok
+    ssl.assert_called_once_with("mail.example.com", 465, timeout=10)
+    plain.assert_not_called()
+    ssl.return_value.__enter__.return_value.starttls.assert_not_called()
