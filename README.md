@@ -43,42 +43,29 @@ If AbuseBox saves you a bounce, a star helps other mail operators find it.
 
 ## Features
 
-| Feature | Description | Auth required |
-|---|---|---|
-| **Needs-attention dashboard** | Listings, invalid/expiring SSL, expiring domains, servers down, weak email security, overdue checks, scheduler status | Yes |
-| **Activity log** | Every detected change (listed, delisted, down, recovered, expiring) with severity filters | Yes |
-| **Alerts** | Email and webhook (Slack/Discord formatted) for new listings, removals, outages and expiry warnings, with a test button | Yes |
-| **Blacklist Quick Check** | Scan hostname/IP against 24 DNSBL providers (rate limited for anonymous use) | No |
-| **Bulk Check** | Check up to 300 IPs/domains at once, from a list or a TXT/CSV/XLSX file | Yes |
-| **Subnet / CIDR Check** | Scan an entire IP range (max /24) against key DNSBL providers | Yes |
-| **AbuseIPDB** | IP reputation score, abuse reports, ISP & geolocation | Yes |
-| **WHOIS Lookup** | Domain registrar, dates, name servers, registrant info | Yes |
-| **DNS Record Viewer** | A, AAAA, MX, TXT, CNAME, NS, SOA, PTR records | Yes |
-| **SSL Certificate Checker** | Validity, expiry, issuer, cipher, SAN list | Yes |
-| **SPF / DKIM / DMARC** | Email authentication validation with A-F grading, custom DKIM selectors | Yes |
-| **Is Server Up?** | DNS resolution, port scan (80/443), HTTP status & response time | Yes |
-| **CSV Export** | Download blacklist and subnet results as CSV | - |
-| **Bulk Asset Import** | Add up to 300 assets at once from a pasted list or TXT/CSV/XLSX file | Yes |
-| **CIDR Import** | Import an IP range (max /24) as monitored assets from the UI | Yes |
-| **Assets** | Register domains/IPs, run all checks with per-asset toggles, edit them later | Yes |
-| **Bulk Actions** | Select many assets to re-check (in the background), toggle monitoring/alerts or delete; table view, sorting, CSV export | Yes |
-| **Check History** | Browse past checks and see which blacklists were added or removed | Yes |
-| **Asset Detail View** | Tabbed results for every check type with summary cards | Yes |
-| **Scheduled Monitoring** | Automatic re-checks on a global or per-asset interval, with a "check due assets now" button | Yes |
-| **Historical Charts** | Visual blacklist history per monitored asset | Yes |
-| **Re-check Asset** | Re-run all enabled checks on any asset with one click | Yes |
-| **Delist Tracking** | Links to each provider's removal page and tracks requested removals | Yes |
-| **Search & Filter** | Search assets by hostname, type or description; filter by needs attention, listed or clean | Yes |
-| **Auto-refresh** | Configurable auto-refresh (30s/1m/5m) on Dashboard and Assets | Yes |
-| **Copy to Clipboard** | One-click copy on IPs, DNS records, WHOIS data, SSL details | - |
-| **Relative Timestamps** | "2 hours ago" with full datetime tooltip on hover | - |
-| **Dark Mode** | Toggle between light and dark themes, persisted to localStorage | - |
-| **Responsive Layout** | Collapsible sidebar with hamburger menu on mobile | - |
-| **Favicon Alert** | Red badge on favicon when any asset is blacklisted | - |
-| **Users** | Admins add users, grant admin, deactivate and reset passwords; everyone can change their own password | Yes |
-| **Data Retention** | Optionally delete history older than 30–365 days | Yes |
-| **Command Palette** | Ctrl/Cmd + K to jump to any asset, page or setting, or check a domain/IP | Yes |
-| **API Documentation** | Swagger UI & ReDoc for all endpoints | No |
+**Monitoring**
+- Add IPs and domains as assets (one by one, a list of up to 300, or a whole /24) and choose which checks run on each
+- Scheduled re-checks on a global or per-asset interval, plus a "check due assets now" button
+- A dashboard that opens on what needs action: listings, invalid or expiring certificates, expiring domains, servers down, weak email security
+- An activity log of every change, check history with what changed between checks, and blacklist history charts
+- Alerts by email, Slack, Discord or webhook for new listings, removals, outages, recoveries and expiry warnings
+
+**Checks**
+- **Blacklists:** 24 DNS blacklists, each listing decoded with its meaning and a severity, and each list verified against its test addresses
+- **AbuseIPDB:** abuse confidence score, reports, ISP and country (free API key)
+- **SSL:** validity, issuer, expiry, cipher and covered names
+- **WHOIS:** registrar, dates and name servers
+- **DNS:** A, AAAA, MX, TXT, CNAME, NS, SOA and PTR records
+- **SPF / DKIM / DMARC:** graded A to F, with custom DKIM selectors, plus DMARC aggregate report parsing
+- **Server status:** DNS resolution, ports 80 and 443, HTTP status and response time
+- **Bulk and subnet checks:** up to 300 targets at once, or every address in a /24
+
+**Day to day**
+- Delist tracking with links to each blacklist's removal page
+- Table or card view, search, filters, sorting, bulk actions and CSV export
+- Command palette (Ctrl/Cmd + K), light and dark themes, a mobile layout
+- Multiple users with admin roles, optional history retention, and a REST API with Swagger docs
+- A public quick-check page (rate limited) that needs no account; everything else requires sign-in
 
 ---
 
@@ -128,15 +115,24 @@ Open `http://localhost:3000`.
 
 </details>
 
-### Upgrading to v1.3.0
+<a id="upgrading-to-v130"></a>
 
-`docker compose pull && docker compose up -d` (or `git pull && docker compose up -d --build`). The database is migrated automatically on start, and data is kept.
+### Upgrading
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+The database is migrated automatically on start, and your data is kept. (Built from source? `git pull && docker compose up -d --build`.)
+
+**Notes for v1.3.0**
 
 - **The frontend is now a production build served by nginx**, not the Vite dev server. `VITE_ALLOWED_HOSTS`, `VITE_BASE_URL` and `VITE_API_DOCS_URL` in `.env` are no longer used and can be removed. The API docs moved to `http://localhost:3000/api/swagger/`.
 - **Database migrations now use Alembic.** Existing databases are detected and upgraded on the first start.
 - **ISPs and other commercial users need a Spamhaus key.** Set `SPAMHAUS_DQS_KEY` (see [Configuration](#configuration)).
 
-### Upgrading from v1.1.x
+<details>
+<summary>Upgrading from v1.1.x</summary>
 
 Back up your data first, then pull the new version. The database is migrated automatically on start.
 
@@ -150,10 +146,12 @@ docker compose up -d --build
 Things that changed:
 
 - **Everyone is signed out once.** Older Docker setups used a published JWT secret; v1.2.0 generates a private one (or uses your `APP_SECRET_KEY`).
-- **Change the admin password.** Older Docker setups ignored `DEFAULT_ADMIN_PASSWORD` from `.env`, so the admin account probably still uses `password123`. A banner reminds you until you change it in **Settings → Security**.
+- **Change the admin password.** Older Docker setups ignored `DEFAULT_ADMIN_PASSWORD` from `.env`, so the admin account probably still uses `password123`. A banner reminds you until you change it in **Settings → Password**.
 - **The `/tools/*` API needs a token.** Only `/blacklist/quick-check/` stays public. See [API Endpoints](#api-endpoints).
 - **No public sign-up.** Admins add users in **Settings → Users**.
 - **The scheduler is on by default** unless you turned it off in Settings before.
+
+</details>
 
 ---
 
@@ -218,7 +216,7 @@ WEBHOOK_URL=
 
 Each check also asks every blacklist about its test addresses: 127.0.0.2 must be listed and 127.0.0.1 must not be. A blacklist that gets either wrong, times out or returns a refusal code is shown as **No answer**, and its result (clean or listed) is ignored.
 
-The usual cause is the DNS resolver. Spamhaus (`zen.spamhaus.org`) refuses queries from large public resolvers such as Google, Cloudflare and Quad9, and others rate limit them. Run your own recursive resolver so the blacklists see your server's IP. For Docker, a `docker-compose.override.yml` next to `docker-compose.yml`:
+The usual cause is the DNS resolver. Spamhaus (`zen.spamhaus.org`) does not answer large public resolvers honestly: through Google DNS it says "not listed" for everything, and through Cloudflare it returns an error code. Other lists rate limit public resolvers. Run your own recursive resolver so the blacklists see your server's IP. For Docker, a `docker-compose.override.yml` next to `docker-compose.yml`:
 
 ```yaml
 services:
@@ -313,7 +311,7 @@ abusebox/
 │   ├── app/
 │   │   ├── api/routers/       # auth, blacklist, dmarc, events, hostname, settings, tools
 │   │   ├── core/              # config, JWT security, SSRF guards, client IP, UTC helpers
-│   │   ├── db/                # SQLAlchemy session, seed data
+│   │   ├── db/                # SQLAlchemy session, Alembic migrations, seed data
 │   │   ├── models/            # users, assets, check history, events, DMARC, settings
 │   │   ├── schemas/           # Pydantic schemas
 │   │   └── services/          # checks: dnsbl, abuseipdb, dns, ssl, whois, email security,
@@ -329,7 +327,9 @@ abusebox/
 │       │                      # dashboard, blacklist tables, dialogs
 │       ├── services/          # API clients, auth, theme, current user
 │       └── routes/            # React Router config
-├── files/                     # logo and README screenshots
+│   ├── nginx/                 # production web server config (serves the UI, proxies /api)
+├── site/                      # project website (GitHub Pages)
+├── files/                     # logo, demo GIF and screenshots
 ├── docker-compose.yml
 └── .env                       # your configuration (not committed)
 ```
@@ -342,32 +342,19 @@ abusebox/
 |---|---|---|
 | **v1.3.0** | October 26, 2026 | Redesigned interface (delivery-report results, table-first assets, self-hosted fonts), decoded blacklist listings with severity, 24 lists, Spamhaus key support, nginx production frontend, Alembic migrations |
 | **v1.2.2** | October 25, 2026 | Blacklists that list every address (or answer from a parked domain) are ignored instead of reported as listings; subnet scans skip blacklists that fail their test addresses; five noise lists removed (22 remain) |
-| **v1.2.1** | October 25, 2026 | Node.js 22.23.4 security update (CVE-2026-111497), dead blacklists removed, blocked or rate-limited blacklists shown as "No answer" instead of clean, Dependabot for base images |
-| **v1.2.0** | October 7, 2026 | Needs-attention dashboard, activity log, recovery/outage/expiry alerts (Slack, Discord, webhooks), bulk actions and table view, check history, user management, command palette; scheduler fix (#20), security hardening, dependency updates, accessibility and dark mode overhaul |
-| **v1.1.2** | March 26, 2026 | Bulk asset import, CIDR import, auto-refresh auth, persistent DB, DNSBL false positive fix, community bug fixes |
-| **v1.1.1** | March 25, 2026 | UX polish, responsive mobile layout, asset re-check, code splitting, security fixes |
-| **v1.1.0** | March 23, 2026 | Asset management, DNS/SSL/DMARC tools, bulk & subnet check, scheduled monitoring, dark mode, 60+ DNSBL providers |
-| **v1.0.1** | March 19, 2026 | AbuseIPDB, WHOIS lookup, server status checker, security hardening |
-| **v1.0.0** | March 2, 2026 | Initial release — DNSBL monitoring, dashboard, delist workflow |
 
-See [CHANGELOG.md](CHANGELOG.md) for full details.
+Older releases and full details: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR.
+Issues and pull requests are welcome. Issues labelled [good first issue](https://github.com/bekkaze/abusebox/labels/good%20first%20issue) are a good way in; read [CONTRIBUTING.md](CONTRIBUTING.md) for the setup and checks. Questions and ideas go to [Discussions](https://github.com/bekkaze/abusebox/discussions).
+
+## Security
+
+Found a vulnerability? Please report it privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-**If AbuseBox helps you, consider giving it a star!**
-
-[![GitHub stars](https://img.shields.io/github/stars/bekkaze/abusebox?style=social)](https://github.com/bekkaze/abusebox/stargazers)
-
-</div>
+MIT. See [LICENSE](LICENSE).
