@@ -1,0 +1,61 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
+  "entity": {
+    "type": "individual",
+    "role": "owner",
+    "name": "bekkaze",
+    "email": "bekkaze7@gmail.com",
+    "description": "Creator and sole maintainer of AbuseBox, a free, self-hosted monitor that tells mail and network operators when their IPs and domains land on DNS blacklists, and why. I build and maintain it in my own time: ten releases between March and October 2026, including the security and correctness fixes that came out of user bug reports.",
+    "webpageUrl": {
+      "url": "https://bekkaze.github.io/abusebox/"
+    }
+  },
+  "projects": [
+    {
+      "guid": "abusebox",
+      "name": "AbuseBox",
+      "description": "AbuseBox re-checks the IPs and domains an operator runs against 24 DNS blacklists, AbuseIPDB, SSL and domain expiry, SPF/DKIM/DMARC and uptime, and alerts by email, Slack, Discord or webhook when something changes. It is honest about blacklists: every list is verified against its RFC 5782 test addresses on each check, so a list that refuses to answer (Spamhaus does this for Google and Cloudflare DNS) shows as 'No answer' instead of a false 'clean', and every listing is decoded into its meaning and a severity. Hosted monitoring tools charge per IP for this; AbuseBox is MIT licensed, runs with Docker Compose on amd64 and arm64, and keeps the asset list and results on the operator's own server. Version 2 extends it from single mail servers to the small ISPs, hosting providers and network operators who handle abuse for whole address ranges, so they can find and clean up compromised customers before their space is blacklisted.",
+      "webpageUrl": {
+        "url": "https://bekkaze.github.io/abusebox/"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/bekkaze/abusebox",
+        "wellKnown": "https://github.com/bekkaze/abusebox/blob/main/.well-known/funding-manifest-urls"
+      },
+      "licenses": ["spdx:MIT"],
+      "tags": ["dnsbl", "email-security", "network-security", "abuse-handling", "monitoring", "self-hosted", "spam", "dmarc", "isp", "internet-hygiene"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "bank",
+        "type": "bank",
+        "description": "International bank transfer (SWIFT). Account details on request by email."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "abusebox-v2",
+        "status": "active",
+        "name": "AbuseBox 2.0: abuse handling for network operators",
+        "description": "About six months of focused development, released in public milestones: (1) accurate results out of the box: a bundled recursive resolver, IPv6 blacklist checks and domain blacklists (Spamhaus DBL, SURBL, URIBL); (2) prefixes, ASNs and customers as first-class objects, with scheduled scans of whole address ranges; (3) import of Shadowserver's free daily network reports, so operators see compromised and exposed hosts in their own space; (4) cases: findings grouped per customer, customer notification, and a case that closes only when the evidence clears. Each milestone ships as a tagged release with documentation and tests.",
+        "amount": 10000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["bank"]
+      },
+      {
+        "guid": "maintenance",
+        "status": "active",
+        "name": "Maintenance and security releases",
+        "description": "Keeps AbuseBox safe and accurate after 2.0: dependency and base-image security updates, re-checking which blacklists are alive and how they answer, fixing user-reported bugs, and timely patch releases.",
+        "amount": 3000,
+        "currency": "USD",
+        "frequency": "yearly",
+        "channels": ["bank"]
+      }
+    ]
+  }
+}
