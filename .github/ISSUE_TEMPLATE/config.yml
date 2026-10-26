@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/bekkaze/abusebox/discussions
+    about: Ask how to set something up, or share how you use AbuseBox.
+  - name: Report a security vulnerability
+    url: https://github.com/bekkaze/abusebox/security/advisories/new
+    about: Please report security problems privately, not as an issue.

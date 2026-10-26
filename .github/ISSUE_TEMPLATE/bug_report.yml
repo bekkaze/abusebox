@@ -1,0 +1,51 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add 203.0.113.10 as an asset
+        2. Click Re-check
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AbuseBox version
+      description: Shown at the top of the API docs (/api/swagger/), or run `docker compose images`.
+      placeholder: "1.3.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker Compose (prebuilt images)
+        - Docker Compose (built from source)
+        - Manual (Python + Node)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of `docker compose logs backend --tail 100` if relevant. Remove anything private (hosts, keys).
+      render: shell
+  - type: textarea
+    id: dnsbl
+    attributes:
+      label: Blacklist results (if this is about a listing)
+      description: Which list, which IP or domain, and what AbuseBox showed. Do you use your own DNS resolver (DNSBL_NAMESERVERS)?

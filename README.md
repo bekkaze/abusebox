@@ -18,7 +18,7 @@ Self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL a
 
 </div>
 
-![AbuseBox dashboard: three assets need action, with the reason for each](files/dashboard.png)
+![AbuseBox in 18 seconds: the dashboard, a blacklist check with every listing explained, an asset's report, and dark mode](files/demo.gif)
 
 ## Quick start
 
@@ -38,25 +38,6 @@ Open `http://localhost:3000` and sign in as `admin` / `password123`, then change
 - **Yours.** Self-hosted, MIT licensed, no telemetry, no paid tier.
 
 If AbuseBox saves you a bounce, a star helps other mail operators find it.
-
----
-
-## Screenshots
-
-<table>
-  <tr>
-    <td width="50%"><b>Assets</b>: health at a glance, filters, bulk actions<br><img src="files/assets.png" alt="Assets table"></td>
-    <td width="50%"><b>Asset report</b>: every check, with history<br><img src="files/asset_details.png" alt="One asset's report"></td>
-  </tr>
-  <tr>
-    <td width="50%"><b>Activity log</b>: every change, with severity filters<br><img src="files/activity.png" alt="Activity log"></td>
-    <td width="50%"><b>Alerts</b>: email, Slack, Discord or any webhook<br><img src="files/notifications.png" alt="Notification settings"></td>
-  </tr>
-  <tr>
-    <td width="50%"><b>Dark mode</b><br><img src="files/dashboard_dark.png" alt="Dashboard in dark mode"></td>
-    <td width="50%"><b>Public quick check</b>: no account needed<br><img src="files/landing.png" alt="Public landing page with a quick check"></td>
-  </tr>
-</table>
 
 ---
 

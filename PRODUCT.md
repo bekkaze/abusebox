@@ -42,7 +42,7 @@ Evidence-honest monitoring. Every blacklist answer is verified against the list'
 
 ## Evidence on Hand
 
-- Real product screenshots in files/ (dashboard, assets, asset detail, landing, activity, notifications, command palette).
+- A demo GIF (files/demo.gif) and screenshots in files/ (dashboard, dark dashboard, asset report) used by the README and the project site.
 - No customer logos, testimonials, user counts or benchmarks exist; none may be invented.
 
 ## Product Principles
