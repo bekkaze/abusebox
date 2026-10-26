@@ -23,8 +23,21 @@
         "url": "https://github.com/bekkaze/abusebox",
         "wellKnown": "https://github.com/bekkaze/abusebox/blob/main/.well-known/funding-manifest-urls"
       },
-      "licenses": ["spdx:MIT"],
-      "tags": ["dnsbl", "email-security", "network-security", "abuse-handling", "monitoring", "self-hosted", "spam", "dmarc", "isp", "internet-hygiene"]
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "tags": [
+        "dnsbl",
+        "email-security",
+        "network-security",
+        "abuse-handling",
+        "monitoring",
+        "self-hosted",
+        "spam",
+        "dmarc",
+        "isp",
+        "internet-hygiene"
+      ]
     }
   ],
   "funding": {
@@ -40,11 +53,13 @@
         "guid": "abusebox-v2",
         "status": "active",
         "name": "AbuseBox 2.0: abuse handling for network operators",
-        "description": "About six months of focused development, released in public milestones: (1) accurate results out of the box: a bundled recursive resolver, IPv6 blacklist checks and domain blacklists (Spamhaus DBL, SURBL, URIBL); (2) prefixes, ASNs and customers as first-class objects, with scheduled scans of whole address ranges; (3) import of Shadowserver's free daily network reports, so operators see compromised and exposed hosts in their own space; (4) cases: findings grouped per customer, customer notification, and a case that closes only when the evidence clears. Each milestone ships as a tagged release with documentation and tests.",
+        "description": "About six months of work in four public milestones: (1) accurate results by default: a bundled resolver, IPv6 and domain blacklists; (2) prefixes, ASNs and customers, with scheduled range scans; (3) import of Shadowserver's free network reports; (4) cases per customer that close only when the evidence clears. Each milestone ships as a tagged release with docs and tests.",
         "amount": 10000,
         "currency": "USD",
         "frequency": "one-time",
-        "channels": ["bank"]
+        "channels": [
+          "bank"
+        ]
       },
       {
         "guid": "maintenance",
@@ -54,7 +69,9 @@
         "amount": 3000,
         "currency": "USD",
         "frequency": "yearly",
-        "channels": ["bank"]
+        "channels": [
+          "bank"
+        ]
       }
     ]
   }
