@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.2] - Unreleased
+## [1.3.2] - 2026-10-28
 
 A security release, and blacklist lookups that work out of the box.
 
