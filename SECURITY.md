@@ -4,12 +4,14 @@ AbuseBox runs on your own server, holds the list of hosts you monitor and makes 
 
 ## Supported versions
 
-Security fixes go into the latest release. Upgrade with `docker compose pull && docker compose up -d`.
+Security fixes go into the latest release. Upgrade with `git pull && docker compose pull && docker compose up -d`.
 
 | Version | Supported |
 |---|---|
-| 1.3.x | Yes |
-| < 1.3 | No |
+| 1.3.2 and later | Yes |
+| 1.3.1 and earlier | No |
+
+Reports are only accepted for 1.3.2 or later. Please reproduce the issue on the latest release first: 1.3.1 and earlier have known, already-fixed issues ([GHSA-gccc-7w6h-jvhm](https://github.com/bekkaze/abusebox/security/advisories/GHSA-gccc-7w6h-jvhm)).
 
 ## Reporting a vulnerability
 
