@@ -21,6 +21,20 @@ if (isSafeToken(initToken)) {
   localStorage.removeItem('token');
 }
 
+// FastAPI reports invalid input (422) as a list of field errors; turn it into
+// one readable sentence, since the UI shows `detail` as a message.
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const data = error.response?.data;
+    if (Array.isArray(data?.detail)) {
+      const messages = data.detail.map((item) => String(item?.msg || '').replace(/^Value error, /, '')).filter(Boolean);
+      data.detail = [...new Set(messages)].join(' ') || 'Some of the values are not valid.';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Axios interceptor: auto-refresh on 401
 let isRefreshing = false;
 let failedQueue = [];

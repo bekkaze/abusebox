@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { HiXMark } from 'react-icons/hi2'
 import classNames from 'classnames'
 import { useAuth } from '../../services/auth/authProvider'
+import { logoutUser } from '../../services/auth/authService'
 
 const linkClass =
   'relative flex items-center h-8 px-2.5 rounded-md text-sm transition-colors hover:no-underline'
@@ -12,7 +13,8 @@ export default function Sidebar({ open, onClose }) {
   const navigate = useNavigate();
   const { setToken } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutUser();
     setToken(null, null);
     navigate('/', { replace: true });
   }

@@ -27,7 +27,7 @@ git clone https://github.com/bekkaze/abusebox.git && cd abusebox
 docker compose up -d
 ```
 
-Open `http://localhost:3000` and sign in as `admin` / `password123`, then change the password in Settings. More options under [Installation](#installation).
+Open `http://localhost:3000` and sign in as `admin` with the password from `docker compose logs backend | grep password`, then change it in Settings. More options under [Installation](#installation).
 
 ## Why AbuseBox
 
@@ -82,7 +82,7 @@ docker compose up -d            # pulls the prebuilt images (add --build to buil
 
 Open `http://localhost:3000` and you're ready to go. To update later: `docker compose pull && docker compose up -d`.
 
-> Default login: `admin` / `password123`. **Change it in Settings right after the first sign-in.**
+> **First sign-in:** the user is `admin`, and the first start generates a random password. It's in the logs (`docker compose logs backend | grep password`) and in the data volume (`docker compose exec backend cat /app/data/initial_admin_password`). **Change it in Settings right after signing in**; the saved copy is deleted when you do. To choose it yourself, set `DEFAULT_ADMIN_PASSWORD` in `.env` before the first start.
 >
 > The UI answers on any hostname, so you can open it from another machine right away. Put it behind your own HTTPS reverse proxy before exposing it to a network you don't trust.
 
@@ -99,8 +99,10 @@ Open `http://localhost:3000` and you're ready to go. To update later: `docker co
 cd backend
 cp .env.example .env
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8100 --reload
 ```
+
+The admin password is printed in this terminal on the first start.
 
 **Frontend** (new terminal):
 
@@ -124,6 +126,13 @@ docker compose pull && docker compose up -d
 ```
 
 The database is migrated automatically on start, and your data is kept. (Built from source? `git pull && docker compose up -d --build`.)
+
+**Notes for v1.3.2**
+
+- **Pull the repository too** (`git pull`), not only the images: `docker-compose.yml` now adds a small DNS resolver (Unbound) for blacklist lookups. See [Blacklists that show "No answer"](#blacklists-that-show-no-answer).
+- **Still on `password123`?** Sign in with it as before; a banner asks you to change it. New installs get a random password instead.
+- **The backend's port 8100 now listens on this machine only.** The UI and the API docs at `http://localhost:3000/api/` are unchanged. Scripts on other machines should call the API through port 3000 (`http://your-server:3000/api/...`).
+- **The backend container runs as an unprivileged user.** On the first start it takes ownership of the existing data volume, so no action is needed.
 
 **Notes for v1.3.0**
 
@@ -166,9 +175,10 @@ APP_DEBUG=false
 APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
 DATABASE_URL=sqlite:///./app.db   # ignored by Docker Compose (always uses the data volume)
 
-# Default admin, created on first start only
+# Default admin, created on first start only. Leave the password empty to
+# generate a random one (printed in the logs).
 DEFAULT_ADMIN_USERNAME=admin
-DEFAULT_ADMIN_PASSWORD=password123
+DEFAULT_ADMIN_PASSWORD=
 DEFAULT_ADMIN_EMAIL=admin@abusebox.local
 DEFAULT_ADMIN_PHONE=11111111
 
@@ -177,8 +187,12 @@ ABUSEIPDB_API_KEY=
 
 # Optional: Spamhaus Data Query Service key (required for commercial use, including ISPs)
 SPAMHAUS_DQS_KEY=
-# Optional: your own DNS resolver for blacklist lookups
+# Optional: your own DNS resolver for blacklist lookups (Docker Compose uses its bundled one)
 DNSBL_NAMESERVERS=
+
+# Optional: limits
+MAX_ASSETS_PER_USER=1000       # per non-admin user
+DISABLE_API_DOCS=false         # true hides /swagger/, /redoc/ and /openapi.json
 
 # Scheduled monitoring
 SCHEDULER_ENABLED=true
@@ -202,12 +216,15 @@ WEBHOOK_URL=
 | `APP_DEBUG` | Show error tracebacks (development only) | No |
 | `APP_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the API | No |
 | `DATABASE_URL` | Database connection string (SQLite default) | No |
+| `DEFAULT_ADMIN_PASSWORD` | Password for the admin account created on the first start. If empty, a random one is generated, printed in the logs and saved as `initial_admin_password` next to the database | No |
 | `ABUSEIPDB_API_KEY` | Enables AbuseIPDB reputation checks | No |
 | `SCHEDULER_ENABLED` | Run periodic background checks (default: `true`; can also be changed in Settings) | No |
 | `SCHEDULER_INTERVAL_MINUTES` | Check interval in minutes (default: 360) | No |
 | `SMTP_HOST` | SMTP server for email alerts. Alerts go to the email address of the asset's owner; each user sets theirs in **Settings → Notifications** | No |
 | `WEBHOOK_URL` | Webhook URL for alerts (Slack and Discord URLs get chat messages). A URL set in Settings → Notifications takes precedence | No |
-| `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers (IPs or hostnames) for blacklist lookups. Spamhaus and some others refuse public resolvers; see [Blacklists that show "No answer"](#blacklists-that-show-no-answer) | No |
+| `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers (IPs or hostnames) for blacklist lookups. Docker Compose sets it to its bundled resolver, `unbound`. Spamhaus and some others refuse public resolvers; see [Blacklists that show "No answer"](#blacklists-that-show-no-answer) | No |
+| `MAX_ASSETS_PER_USER` | How many assets each non-admin user can add (default: 1000) | No |
+| `DISABLE_API_DOCS` | `true` hides the Swagger and ReDoc pages and the OpenAPI schema | No |
 | `SPAMHAUS_DQS_KEY` | Spamhaus [Data Query Service](https://www.spamhaus.com/data-access/free-data-query-service/) key. When set, Spamhaus lookups use your key instead of the public mirror. Spamhaus's free public mirror is for non-commercial use only; ISPs and commercial users need a paid key | No |
 
 > DNS Records, SSL Checker, WHOIS, SPF/DKIM/DMARC, and Server Status work out of the box with no API keys.
@@ -216,23 +233,23 @@ WEBHOOK_URL=
 
 Each check also asks every blacklist about its test addresses: 127.0.0.2 must be listed and 127.0.0.1 must not be. A blacklist that gets either wrong, times out or returns a refusal code is shown as **No answer**, and its result (clean or listed) is ignored.
 
-The usual cause is the DNS resolver. Spamhaus (`zen.spamhaus.org`) does not answer large public resolvers honestly: through Google DNS it says "not listed" for everything, and through Cloudflare it returns an error code. Other lists rate limit public resolvers. Run your own recursive resolver so the blacklists see your server's IP. For Docker, a `docker-compose.override.yml` next to `docker-compose.yml`:
+The usual cause is the DNS resolver. Spamhaus (`zen.spamhaus.org`) does not answer large public resolvers honestly: through Google DNS it says "not listed" for everything, and through Cloudflare it returns an error code. Other lists rate limit public resolvers. Resolvers with DNS rebinding protection (dnsmasq's `stop-dns-rebind`, pfSense) drop the `127.0.0.x` answers blacklists use, with the same result. When this happens the dashboard shows a warning.
 
-```yaml
-services:
-  unbound:
-    image: klutchell/unbound
-    restart: unless-stopped
-  backend:
-    depends_on:
-      - unbound
+Test the resolver your mail server or AbuseBox uses; `127.0.0.2` should come back:
+
+```bash
+dig +short 2.0.0.127.zen.spamhaus.org
 ```
 
-and in `.env`:
+**Docker Compose already handles this.** It runs a small recursive resolver ([Unbound](https://nlnetlabs.nl/projects/unbound/about/), the `unbound` service) and sends blacklist lookups through it, so the lists see your server's IP. Some networks block the direct DNS traffic a recursive resolver needs; then AbuseBox falls back to the server's normal resolver and logs that it did.
+
+To use a resolver you already run instead, set it in `.env`:
 
 ```env
-DNSBL_NAMESERVERS=unbound
+DNSBL_NAMESERVERS=192.0.2.53
 ```
+
+For a manual install, point `DNSBL_NAMESERVERS` at a local Unbound or another recursive resolver that isn't a large public one. If you use dnsmasq, add `rebind-localhost-ok`.
 
 Frontend: the Docker image serves the built UI with nginx and proxies `/api` to `BACKEND_URL` (default `http://backend:8100`). For the development server (`yarn dev`), `frontend/.env` sets:
 
@@ -245,10 +262,11 @@ Frontend: the Docker image serves the built UI with nginx and proxies `/api` to 
 
 ## API Endpoints
 
-Only the blacklist quick check is public (rate limited to 10 requests per minute per IP). Every other endpoint needs a bearer token from `POST /user/login/`:
+Only the blacklist quick check is public (rate limited to 10 requests per minute per IP, and public addresses only). Every other endpoint needs a bearer token from `POST /user/login/`:
 
 ```
 GET  /blacklist/quick-check/?hostname=example.com      # public
+GET  /blacklist/resolver-health/        # does Spamhaus answer AbuseBox's resolver?
 GET  /tools/abuseipdb/?hostname=8.8.8.8
 GET  /tools/whois/?hostname=example.com
 GET  /tools/dns/?hostname=example.com
@@ -273,20 +291,21 @@ POST /settings/scheduler/run/            # admin only: check due assets now
 PUT  /settings/notifications/            # admin only
 POST /settings/notifications/test/       # admin only
 POST /user/change-password/
+POST /user/logout/                       # revokes every token of this account
 POST /user/create/                       # admin only
 GET  /user/list/                         # admin only
 PATCH /user/{id}/                        # admin only
 ```
 
 ```bash
-TOKEN=$(curl -s -X POST localhost:8100/user/login/ -H 'Content-Type: application/json' \
+TOKEN=$(curl -s -X POST localhost:3000/api/user/login/ -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"your-password"}' | jq -r .access)
-curl -s -H "Authorization: Bearer $TOKEN" "localhost:8100/tools/dns/?hostname=example.com"
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:3000/api/tools/dns/?hostname=example.com"
 ```
 
 Full interactive docs available after startup:
 
-- **Swagger UI:** `http://localhost:3000/api/swagger/` (or `http://localhost:8100/swagger/` on the backend directly)
+- **Swagger UI:** `http://localhost:3000/api/swagger/` (or `http://localhost:8100/swagger/` on the server itself)
 - **ReDoc:** `http://localhost:3000/api/redoc/`
 
 ---
@@ -328,6 +347,7 @@ abusebox/
 │       ├── services/          # API clients, auth, theme, current user
 │       └── routes/            # React Router config
 │   ├── nginx/                 # production web server config (serves the UI, proxies /api)
+├── unbound/                   # settings for the bundled DNS resolver
 ├── site/                      # project website (GitHub Pages)
 ├── files/                     # logo, demo GIF and screenshots
 ├── docker-compose.yml

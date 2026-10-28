@@ -5,6 +5,7 @@ import { HiOutlinePlay, HiOutlineServerStack } from "react-icons/hi2";
 import HistoryChart from "../../components/dashboard/home/HistoryChart";
 import { SkeletonLine } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
+import ResolverWarning from "../../components/shared/ResolverWarning";
 import TimeAgo from "../../components/shared/TimeAgo";
 import { EventList, IssueRow } from "../../components/shared/activity";
 import { groupIssuesByAsset } from "../../components/shared/severity";
@@ -201,6 +202,7 @@ export default function Home() {
 
   return (
     <div>
+      <ResolverWarning className="mb-5" />
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-1">
         <div className="min-w-0">
           <StatusLine assets={assets} attention={attention} />

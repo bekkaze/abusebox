@@ -47,6 +47,10 @@ def _default_secret_key_file(database_url: str) -> str:
     return os.path.abspath(".secret_key")
 
 
+def secret_key_file(database_url: str) -> str:
+    return os.getenv("SECRET_KEY_FILE") or _default_secret_key_file(database_url)
+
+
 def load_secret_key(database_url: str) -> str:
     """Return APP_SECRET_KEY, or a random secret persisted to SECRET_KEY_FILE.
 
@@ -58,7 +62,7 @@ def load_secret_key(database_url: str) -> str:
     if env_value:
         logger.warning("APP_SECRET_KEY is set to a published placeholder value; ignoring it and using a generated secret.")
 
-    path = os.getenv("SECRET_KEY_FILE") or _default_secret_key_file(database_url)
+    path = secret_key_file(database_url)
     try:
         with open(path, encoding="utf-8") as handle:
             existing = handle.read().strip()
@@ -89,9 +93,13 @@ def load_secret_key(database_url: str) -> str:
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "AbuseBox API")
-    app_debug: bool = parse_bool("APP_DEBUG", True)
+    app_debug: bool = parse_bool("APP_DEBUG", False)
+    # Hide /swagger/, /redoc/ and /openapi.json.
+    disable_api_docs: bool = parse_bool("DISABLE_API_DOCS", False)
 
     app_secret_key: str = ""
+    # The data directory's secret file; the generated admin password is kept beside it.
+    secret_key_file: str = ""
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     access_token_minutes: int = parse_int("ACCESS_TOKEN_MINUTES", 30)
     refresh_token_days: int = parse_int("REFRESH_TOKEN_DAYS", 14)
@@ -101,8 +109,14 @@ class Settings:
 
     default_admin_username: str = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")
     default_admin_email: str = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@abusebox.local")
-    default_admin_password: str = os.getenv("DEFAULT_ADMIN_PASSWORD", "password123")
+    # Empty: a random password is generated on first start (see init_data.py).
+    default_admin_password: str = os.getenv("DEFAULT_ADMIN_PASSWORD", "")
     default_admin_phone: str = os.getenv("DEFAULT_ADMIN_PHONE", "11111111")
+
+    # Per non-admin user, so one account can't overload the scheduler.
+    max_assets_per_user: int = parse_int("MAX_ASSETS_PER_USER", 1000)
+    # PBKDF2-SHA256 rounds for new password hashes (OWASP recommends 600,000).
+    password_hash_rounds: int = parse_int("PASSWORD_HASH_ROUNDS", 600_000)
 
     abuseipdb_api_key: str = os.getenv("ABUSEIPDB_API_KEY", "")
 
@@ -123,6 +137,7 @@ class Settings:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "cors_allowed_origins", parse_csv("APP_CORS_ALLOWED_ORIGINS", "http://localhost:3000"))
+        object.__setattr__(self, "secret_key_file", secret_key_file(self.database_url))
         object.__setattr__(self, "app_secret_key", load_secret_key(self.database_url))
 
 

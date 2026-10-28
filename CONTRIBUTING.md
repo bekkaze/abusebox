@@ -24,7 +24,7 @@ Thanks for your interest in contributing! Here's how to get started.
 cd backend
 cp .env.example .env
 pip install -r requirements-dev.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8100 --reload
 ```
 
 ### Frontend

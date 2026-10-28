@@ -59,3 +59,6 @@ const handleRequestError = (error, customErrorMessage) => {
     throw new Error(error.message || customErrorMessage || 'Error setting up the request');
   }
 };
+
+// Whether Spamhaus answers the server's DNS resolver (signed-in users only).
+export const getResolverHealth = async () => (await axios.get('/api/blacklist/resolver-health/', { timeout: 30000 })).data;

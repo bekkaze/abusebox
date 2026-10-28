@@ -1,9 +1,11 @@
 import socket
 import time
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
+from requests.adapters import HTTPAdapter
+
 from app.core.network_safety import UnsafeDestinationError, resolve_public_ipv4, validate_public_url
 
 _MAX_REDIRECTS = 5
@@ -25,6 +27,47 @@ def _normalize_url(value: str) -> tuple[str, str]:
     return target, hostname
 
 
+class _PinnedAdapter(HTTPAdapter):
+    """Sends HTTPS to an address that was already checked, while TLS still
+    verifies the certificate against the real hostname."""
+
+    def __init__(self, hostname: str) -> None:
+        self._hostname = hostname
+        super().__init__()
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["server_hostname"] = self._hostname
+        kwargs["assert_hostname"] = self._hostname
+        super().init_poolmanager(*args, **kwargs)
+
+
+def _pinned_get(url: str) -> tuple[requests.Session, requests.Response]:
+    """GET *url* from the address its hostname resolved to when it was checked.
+
+    Connecting by name would resolve it a second time, and a DNS server that
+    answers with a public address first and 127.0.0.1 next (DNS rebinding)
+    would get past the check.
+    """
+    parsed = urlparse(url)
+    hostname = parsed.hostname or ""
+    if parsed.scheme not in ("http", "https") or not hostname:
+        raise UnsafeDestinationError("Only absolute HTTP(S) URLs are allowed.")
+    ip = resolve_public_ipv4(hostname)
+    port = f":{parsed.port}" if parsed.port else ""
+    pinned = urlunparse(parsed._replace(netloc=f"{ip}{port}"))
+    session = requests.Session()
+    session.mount("https://", _PinnedAdapter(hostname))
+    try:
+        resp = session.get(
+            pinned, timeout=10, allow_redirects=False, stream=True,
+            headers={**_HEADERS, "Host": f"{hostname}{port}"},
+        )
+    except Exception:
+        session.close()
+        raise
+    return session, resp
+
+
 def _safe_get(url: str) -> tuple[requests.Response, str, int]:
     """GET *url*, following redirects manually so every hop is re-validated.
 
@@ -35,22 +78,21 @@ def _safe_get(url: str) -> tuple[requests.Response, str, int]:
     """
     current = url
     for _ in range(_MAX_REDIRECTS + 1):
-        validate_public_url(current)
-        resp = requests.get(current, timeout=10, allow_redirects=False, stream=True, headers=_HEADERS)
-        location = resp.headers.get("Location")
-        if resp.is_redirect and location:
-            resp.close()
-            current = urljoin(current, location)
-            continue
-        size = 0
+        session, resp = _pinned_get(current)
         try:
+            location = resp.headers.get("Location")
+            if resp.is_redirect and location:
+                current = urljoin(current, location)
+                continue
+            size = 0
             for chunk in resp.iter_content(chunk_size=65536):
                 size += len(chunk)
                 if size >= _MAX_BODY_BYTES:
                     break
+            return resp, current, size
         finally:
             resp.close()
-        return resp, current, size
+            session.close()
     raise requests.exceptions.TooManyRedirects(f"Exceeded {_MAX_REDIRECTS} redirects.")
 
 

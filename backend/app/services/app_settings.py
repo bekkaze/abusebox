@@ -1,5 +1,6 @@
 """Access to the single AppSettings row, created from env defaults on first use."""
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings as env_settings
@@ -15,7 +16,13 @@ def get_app_settings(db: Session) -> AppSettings:
             scheduler_interval_minutes=env_settings.scheduler_interval_minutes,
         )
         db.add(row)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # The dashboard's first page load sends several requests at once;
+            # another one created the row first.
+            db.rollback()
+            return db.query(AppSettings).filter(AppSettings.id == 1).one()
         db.refresh(row)
     return row
 

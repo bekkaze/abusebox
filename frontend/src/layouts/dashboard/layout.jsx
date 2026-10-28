@@ -23,7 +23,7 @@ function DefaultPasswordBanner() {
     <div role="alert" className='flex items-start gap-3 border-b border-s4/30 bg-s4-soft px-4 sm:px-6 py-2 text-sm text-s4'>
       <HiOutlineExclamationTriangle className='mt-0.5 flex-shrink-0 text-base' aria-hidden='true' />
       <p className='flex-1'>
-        You&apos;re signed in with the default password from the install guide.{' '}
+        You&apos;re still using this account&apos;s initial password.{' '}
         <Link to='/dashboard/settings?tab=security' className='font-semibold underline'>Change it now</Link>
       </p>
       <button type='button' onClick={dismiss} className='p-1 -m-1 rounded hover:bg-s4/10' aria-label='Dismiss for this session'>

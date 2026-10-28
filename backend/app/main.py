@@ -60,9 +60,10 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        version="1.3.1",
+        version="1.3.2",
         debug=settings.app_debug,
-        docs_url="/swagger/",
+        docs_url=None if settings.disable_api_docs else "/swagger/",
+        openapi_url=None if settings.disable_api_docs else "/openapi.json",
         redoc_url=None,
         lifespan=lifespan,
     )
@@ -84,13 +85,14 @@ def create_app() -> FastAPI:
     app.include_router(settings_router)
     app.include_router(tools_router)
 
-    @app.get("/redoc/", include_in_schema=False)
-    def redoc(request: Request):
-        return get_redoc_html(
-            openapi_url=request.scope.get("root_path", "") + app.openapi_url,
-            title=f"{settings.app_name} - ReDoc",
-            redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@2.1.5/bundles/redoc.standalone.js",
-        )
+    if not settings.disable_api_docs:
+        @app.get("/redoc/", include_in_schema=False)
+        def redoc(request: Request):
+            return get_redoc_html(
+                openapi_url=request.scope.get("root_path", "") + app.openapi_url,
+                title=f"{settings.app_name} - ReDoc",
+                redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@2.1.5/bundles/redoc.standalone.js",
+            )
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:

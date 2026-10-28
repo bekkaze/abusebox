@@ -17,7 +17,7 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
         hostname = parsed.hostname or hostname
     hostname = hostname.split("/")[0].split(":")[0]
     try:
-        resolve_public_ipv4(hostname)
+        ip = resolve_public_ipv4(hostname)
     except ValueError as exc:
         return {"hostname": hostname, "error": str(exc)}
 
@@ -25,7 +25,9 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
     context = ssl.create_default_context()
 
     try:
-        with socket.create_connection((hostname, port), timeout=10) as sock:
+        # Connect to the address that was checked, not the name: resolving it
+        # again would let a rebinding DNS server point us at an internal host.
+        with socket.create_connection((ip, port), timeout=10) as sock:
             with context.wrap_socket(sock, server_hostname=hostname) as ssock:
                 cert = ssock.getpeercert()
                 cipher = ssock.cipher()

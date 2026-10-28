@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Integer, String
+from sqlalchemy import Boolean, Integer, String, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -17,5 +17,7 @@ class User(Base):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Embedded in issued JWTs; bumping it (on password change) revokes all of them.
     token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Set while the account still has its initial or a published default password.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 
     hostnames = relationship("Hostname", back_populates="user", cascade="all, delete-orphan")

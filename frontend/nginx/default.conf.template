@@ -18,11 +18,13 @@ server {
 
     # The API, on the same origin as the UI. The prefix is stripped; the
     # backend uses X-Forwarded-Prefix only to link its API docs correctly,
-    # and X-Forwarded-For to rate limit per client.
+    # and X-Real-IP to rate limit per client. Both client-IP headers are
+    # replaced, never appended to, so a client can't choose its own.
     location /api/ {
         proxy_pass ${BACKEND_URL}/;
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Prefix /api;
         # Bulk checks of 300 targets can take minutes.
@@ -35,8 +37,16 @@ server {
         try_files $uri =404;
     }
 
-    # Client-side routes all load the single-page app.
+    # Client-side routes all load the single-page app. Everything it loads
+    # comes from this origin; charts set inline styles, hence 'unsafe-inline'
+    # for styles only. (The API docs under /api/ load Swagger from a CDN, so
+    # the policy is set here rather than for the whole server.) A location
+    # with its own add_header drops the server's, so they are repeated.
     location / {
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
         try_files $uri /index.html;
     }
 }

@@ -2,6 +2,7 @@ import ipaddress
 import logging
 import os
 import socket
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -117,19 +118,64 @@ def _nameserver_address(value: str) -> str | None:
         return None
 
 
-def _make_resolver() -> dns.resolver.Resolver:
+def _configured_nameservers() -> list[str]:
+    """DNSBL_NAMESERVERS, resolved to addresses (empty: use the system resolver)."""
+    nameservers = os.environ.get("DNSBL_NAMESERVERS", "").strip()
+    addresses = [_nameserver_address(ns.strip()) for ns in nameservers.split(",") if ns.strip()]
+    return [address for address in addresses if address]
+
+
+def _build_resolver(nameservers: list[str] | None) -> dns.resolver.Resolver:
     resolver = dns.resolver.Resolver()
     resolver.lifetime = _DNSBL_TIMEOUT
     resolver.timeout = _DNSBL_TIMEOUT
-
-    nameservers = os.environ.get("DNSBL_NAMESERVERS", "").strip()
     if nameservers:
-        addresses = [_nameserver_address(ns.strip()) for ns in nameservers.split(",") if ns.strip()]
-        addresses = [address for address in addresses if address]
-        if addresses:
-            resolver.nameservers = addresses
-
+        resolver.nameservers = nameservers
     return resolver
+
+
+# Which resolver blacklist lookups use, re-decided every half hour.
+_RESOLVER_CHOICE_TTL = 1800.0
+_resolver_choice: dict[str, Any] = {"until": 0.0, "configured": None, "nameservers": None, "source": "system"}
+_resolver_choice_lock = threading.Lock()
+
+
+def _answers_spamhaus(resolver: dns.resolver.Resolver) -> bool:
+    codes, failure = _lookup(_TEST_POINT_LISTED, "zen.spamhaus.org", resolver)
+    return bool(codes) and failure is None
+
+
+def _make_resolver() -> dns.resolver.Resolver:
+    """The resolver for blacklist lookups: DNSBL_NAMESERVERS when it works.
+
+    The Docker setup points DNSBL_NAMESERVERS at its bundled Unbound. Some
+    networks block the direct DNS traffic a recursive resolver needs, so when
+    the configured resolver can't get Spamhaus's test answer but the system
+    resolver can, the system resolver is used instead. When neither works the
+    configured one is kept, and checks report "No answer".
+    """
+    configured = _configured_nameservers()
+    if not configured:
+        return _build_resolver(None)
+    with _resolver_choice_lock:
+        now = time.monotonic()
+        if _resolver_choice["configured"] != configured or _resolver_choice["until"] <= now:
+            chosen, source = configured, "configured"
+            if not _answers_spamhaus(_build_resolver(configured)) and _answers_spamhaus(_build_resolver(None)):
+                logger.warning(
+                    "DNSBL_NAMESERVERS (%s) can't get answers from Spamhaus but the system resolver can; "
+                    "using the system resolver for blacklist lookups.", ", ".join(configured),
+                )
+                chosen, source = None, "system"
+            _resolver_choice.update(until=now + _RESOLVER_CHOICE_TTL, configured=configured, nameservers=chosen, source=source)
+        return _build_resolver(_resolver_choice["nameservers"])
+
+
+def resolver_source() -> str:
+    """"configured" (DNSBL_NAMESERVERS) or "system", for the resolver last chosen."""
+    if not _configured_nameservers():
+        return "system"
+    return _resolver_choice["source"]
 
 
 def _resolve_ipv4(value: str) -> str | None:
@@ -253,8 +299,32 @@ def _answers_test_points(provider: str, resolver: dns.resolver.Resolver) -> bool
     return healthy
 
 
-def check_dnsbl_providers(hostname_or_ip: str) -> dict[str, Any]:
-    resolved_ip = _resolve_ipv4(hostname_or_ip)
+_RESOLVER_FAILURE_TTL = 300.0
+_resolver_health: dict[str, Any] = {"until": 0.0, "result": None}
+
+
+def resolver_health() -> dict[str, Any]:
+    """Whether Spamhaus answers the resolver AbuseBox uses.
+
+    Spamhaus refuses public resolvers (Google, Cloudflare), and resolvers with
+    DNS rebinding protection drop its 127.0.0.x answers, so this is the most
+    common reason blacklist results can't be trusted.
+    """
+    now = time.monotonic()
+    if _resolver_health["result"] is not None and _resolver_health["until"] > now:
+        return _resolver_health["result"]
+    provider = "zen.spamhaus.org"
+    ok = _answers_test_points(provider, _make_resolver())
+    result = {"ok": ok, "provider": provider, "resolver": resolver_source()}
+    # A failure is re-tested after a few minutes, not on every page load.
+    _resolver_health.update(until=now + (_TEST_POINT_TTL if ok else _RESOLVER_FAILURE_TTL), result=result)
+    return result
+
+
+def check_dnsbl_providers(hostname_or_ip: str, resolved_ip: str | None = None) -> dict[str, Any]:
+    """Check *hostname_or_ip* on every list. Pass *resolved_ip* when the caller
+    already resolved (and vetted) the address, so it isn't resolved again."""
+    resolved_ip = resolved_ip or _resolve_ipv4(hostname_or_ip)
     if not resolved_ip:
         return {
             "detected_on": [],

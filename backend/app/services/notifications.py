@@ -79,13 +79,20 @@ def _event_line(hostname: str, event: dict[str, Any]) -> str:
     return line
 
 
+def _slack_escape(text: str) -> str:
+    # Slack reads <...> as links and mentions (<!channel>, <https://x|label>).
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def build_webhook_payload(url: str, hostname: str, ip: str, event: dict[str, Any]) -> dict[str, Any]:
     kind = _webhook_kind(url)
+    # Asset names come from any user, and the webhook is shared by the whole
+    # instance, so the text must never ping a channel or hide a link.
     text = f"[AbuseBox] {_event_line(hostname, event)}"
     if kind == "slack":
-        return {"text": text}
+        return {"text": _slack_escape(text)}
     if kind == "discord":
-        return {"content": text}
+        return {"content": text, "allowed_mentions": {"parse": []}}
 
     details = event.get("details") or {}
     payload: dict[str, Any] = {

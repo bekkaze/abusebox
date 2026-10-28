@@ -12,7 +12,7 @@ from starlette.requests import Request
 
 from app.core import network_safety
 from app.core.client_ip import get_client_ip
-from app.services import dmarc_parser, dnsbl, server_status
+from app.services import dmarc_parser, dnsbl, server_status, ssl_checker, whois_lookup
 from app.services.target_file_parser import parse_target_file
 
 
@@ -42,12 +42,38 @@ def test_server_status_does_not_follow_redirect_to_metadata_endpoint():
     redirect = mock.Mock(is_redirect=True, headers={"Location": "http://metadata.test/latest/meta-data"})
     hosts = {"public.test": "93.184.216.34", "metadata.test": "169.254.169.254"}
     with mock.patch("socket.getaddrinfo", _fake_getaddrinfo(hosts)), \
-            mock.patch.object(server_status.requests, "get", return_value=redirect) as get, \
+            mock.patch.object(server_status.requests.Session, "get", return_value=redirect) as get, \
             mock.patch("socket.socket"):
         result = server_status.check_server_status("https://public.test")
     assert get.call_count == 1  # never requested the internal hop
     assert result["is_up"] is False
     assert result["reason"].startswith("Redirect blocked")
+
+
+def test_server_status_connects_to_the_checked_address():
+    # DNS rebinding: the name resolves to a public address when checked and to
+    # an internal one afterwards. The request must go to the checked address.
+    answers = iter(["93.184.216.34"] * 4)
+
+    def rebinding(host, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (next(answers, "127.0.0.1"), 0))]
+
+    response = mock.Mock(is_redirect=False, headers={}, status_code=200, iter_content=lambda chunk_size: [b"ok"])
+    with mock.patch("socket.getaddrinfo", rebinding), \
+            mock.patch.object(server_status.requests.Session, "get", return_value=response) as get, \
+            mock.patch("socket.socket"):
+        result = server_status.check_server_status("https://rebind.test/")
+    url = get.call_args.args[0]
+    assert url == "https://93.184.216.34/"
+    assert get.call_args.kwargs["headers"]["Host"] == "rebind.test"
+    assert result["status_code"] == 200
+
+
+def test_ssl_check_connects_to_the_checked_address():
+    with mock.patch("socket.getaddrinfo", _fake_getaddrinfo({"rebind.test": "93.184.216.34"})), \
+            mock.patch("socket.create_connection", side_effect=OSError("stop")) as connect:
+        ssl_checker.check_ssl_certificate("rebind.test")
+    assert connect.call_args.args[0] == ("93.184.216.34", 443)
 
 
 def test_server_status_reports_private_target_clearly():
@@ -60,23 +86,33 @@ def test_server_status_reports_private_target_clearly():
 
 # --- client IP ------------------------------------------------------------------
 
-def _request(peer, forwarded=None):
+def _request(peer, forwarded=None, real_ip=None):
     headers = [(b"x-forwarded-for", forwarded.encode())] if forwarded else []
+    if real_ip:
+        headers.append((b"x-real-ip", real_ip.encode()))
     return Request({"type": "http", "client": (peer, 1234), "headers": headers})
 
 
 # Note: Python treats the RFC 5737 documentation ranges as private, so these
 # tests use real public addresses.
 def test_client_ip_ignores_spoofed_header_from_public_peer():
-    assert get_client_ip(_request("8.8.8.8", "1.2.3.4")) == "8.8.8.8"
+    assert get_client_ip(_request("8.8.8.8", "1.2.3.4", real_ip="1.2.3.4")) == "8.8.8.8"
 
 
-def test_client_ip_uses_forwarded_for_from_internal_proxy():
-    # Client sent a fake header; the proxy appended the real address last.
-    assert get_client_ip(_request("172.18.0.3", "1.2.3.4, 9.9.9.9")) == "9.9.9.9"
-    # Extra internal hops (e.g. nginx in front of the frontend) are skipped.
-    assert get_client_ip(_request("172.18.0.3", "9.9.9.9, 10.0.0.2")) == "9.9.9.9"
+def test_client_ip_uses_real_ip_from_internal_proxy():
+    # The bundled nginx sets X-Real-IP to the address that connected to it.
+    assert get_client_ip(_request("172.18.0.3", real_ip="9.9.9.9")) == "9.9.9.9"
+    # LAN clients are told apart too.
+    assert get_client_ip(_request("172.18.0.3", real_ip="192.168.1.50")) == "192.168.1.50"
     assert get_client_ip(_request("172.18.0.3")) == "172.18.0.3"
+    assert get_client_ip(_request("172.18.0.3", real_ip="not-an-ip")) == "172.18.0.3"
+
+
+def test_client_ip_never_trusts_forwarded_for():
+    # A LAN client's own X-Forwarded-For used to pick its rate-limit key, so
+    # rotating it bypassed the login lockout.
+    for spoofed in ("1.1.1.1", "8.8.8.8, 192.168.1.50", "9.9.9.9, 10.0.0.2"):
+        assert get_client_ip(_request("172.18.0.3", spoofed, real_ip="192.168.1.50")) == "192.168.1.50"
 
 
 # --- DNSBL response codes ---------------------------------------------------------
@@ -256,8 +292,42 @@ def test_dnsbl_nameservers_accept_hostnames(monkeypatch):
             raise OSError(name)
         return lookup[name]
     with mock.patch.object(dnsbl.socket, "gethostbyname", fake_gethostbyname):
+        assert dnsbl._configured_nameservers() == ["192.0.2.53", "172.18.0.5"]
+
+
+def _resolver_answering(working):
+    """A fake _lookup: Spamhaus's test point answers only through *working* nameservers."""
+    def lookup(reversed_ip, provider, resolver=None):
+        if working is not None and resolver.nameservers == working:
+            return ["127.0.0.2"], None
+        if working is None and resolver.nameservers != ["172.18.0.5"]:
+            return ["127.0.0.2"], None
+        return [], dnsbl.UNREACHABLE
+    return lookup
+
+
+@pytest.mark.parametrize("working,expected", [
+    (["172.18.0.5"], ["172.18.0.5"]),  # the bundled resolver works: use it
+    (None, None),                      # it can't recurse but the system resolver can: fall back
+])
+def test_dnsbl_falls_back_to_the_system_resolver(monkeypatch, working, expected):
+    monkeypatch.setenv("DNSBL_NAMESERVERS", "172.18.0.5")
+    monkeypatch.setitem(dnsbl._resolver_choice, "until", 0.0)
+    with mock.patch.object(dnsbl, "_lookup", _resolver_answering(working)):
         resolver = dnsbl._make_resolver()
-    assert resolver.nameservers == ["192.0.2.53", "172.18.0.5"]
+    if expected is None:
+        assert resolver.nameservers != ["172.18.0.5"]
+        assert dnsbl.resolver_source() == "system"
+    else:
+        assert resolver.nameservers == expected
+        assert dnsbl.resolver_source() == "configured"
+
+
+def test_dnsbl_keeps_the_configured_resolver_when_nothing_works(monkeypatch):
+    monkeypatch.setenv("DNSBL_NAMESERVERS", "172.18.0.5")
+    monkeypatch.setitem(dnsbl._resolver_choice, "until", 0.0)
+    with mock.patch.object(dnsbl, "_lookup", return_value=([], dnsbl.REFUSED)):
+        assert dnsbl._make_resolver().nameservers == ["172.18.0.5"]
 
 
 # --- target file parsing -----------------------------------------------------------

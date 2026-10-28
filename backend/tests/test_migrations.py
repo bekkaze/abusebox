@@ -25,7 +25,7 @@ def test_fresh_database_is_created_at_head(tmp_path):
     tables = set(inspect(engine).get_table_names())
     assert {"users", "hostnames", "check_histories", "asset_events", "app_settings"} <= tables
     assert "blacklisted_hostnames" not in tables
-    assert _version(engine) == "0002"
+    assert _version(engine) == "0003"
     assert _schema_drift(engine) == []
 
 
@@ -50,9 +50,9 @@ def test_pre_1_3_database_is_upgraded_without_losing_data(tmp_path):
     assert "token_version" in {col["name"] for col in inspector.get_columns("users")}
     assert "hostnames" in inspector.get_table_names()
     assert "blacklisted_hostnames" not in inspector.get_table_names()
-    assert _version(engine) == "0002"
+    assert _version(engine) == "0003"
     with engine.connect() as conn:
         assert conn.execute(text("SELECT username, token_version FROM users")).one() == ("admin", 0)
 
     run_migrations(engine)  # a second start is a no-op
-    assert _version(engine) == "0002"
+    assert _version(engine) == "0003"

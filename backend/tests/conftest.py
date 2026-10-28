@@ -11,6 +11,9 @@ _TMP = tempfile.mkdtemp(prefix="abusebox-tests-")
 os.environ["DATABASE_URL"] = f"sqlite:///{os.path.join(_TMP, 'test.db')}"
 os.environ["SECRET_KEY_FILE"] = os.path.join(_TMP, ".secret_key")
 os.environ["SCHEDULER_ENABLED"] = "false"
+os.environ["DEFAULT_ADMIN_PASSWORD"] = "password123"
+# Fewer PBKDF2 rounds keep the suite fast; production uses 600,000.
+os.environ["PASSWORD_HASH_ROUNDS"] = "1000"
 os.environ.pop("APP_SECRET_KEY", None)
 
 import pytest  # noqa: E402

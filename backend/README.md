@@ -5,7 +5,7 @@ Run locally:
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8100 --reload
 ```
 
 Run tests:
@@ -19,7 +19,7 @@ Default seeded admin user:
 
 - Username: `admin`
 - Email: `admin@abusebox.local`
-- Password: `password123` (change it in Settings after the first sign-in)
+- Password: `DEFAULT_ADMIN_PASSWORD`, or if that's empty a random one printed on the first start (change it in Settings after the first sign-in)
 
 Project structure:
 

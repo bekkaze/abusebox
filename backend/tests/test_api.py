@@ -74,13 +74,29 @@ def test_login_lockout_is_per_client_behind_proxy(client):
     proxied = TestClient(app, client=("172.18.0.3", 40000))
     for _ in range(5):
         proxied.post("/user/login/", json={"username": "admin", "password": "wrong-password"},
-                     headers={"X-Forwarded-For": "1.2.3.4"})
+                     headers={"X-Real-IP": "1.2.3.4"})
     blocked = proxied.post("/user/login/", json={"username": "admin", "password": "password123"},
-                           headers={"X-Forwarded-For": "1.2.3.4"})
+                           headers={"X-Real-IP": "1.2.3.4"})
     assert blocked.status_code == 429
     victim = proxied.post("/user/login/", json={"username": "admin", "password": "password123"},
-                          headers={"X-Forwarded-For": "9.9.9.9"})
+                          headers={"X-Real-IP": "9.9.9.9"})
     assert victim.status_code == 200
+
+
+def test_rotating_forwarded_for_does_not_bypass_lockout(client):
+    # nginx sets X-Real-IP from the connection; whatever the client puts in
+    # X-Forwarded-For must not give it a fresh rate-limit key.
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    proxied = TestClient(app, client=("172.18.0.3", 40000))
+    codes = [
+        proxied.post("/user/login/", json={"username": "admin", "password": "wrong-password"},
+                     headers={"X-Forwarded-For": f"203.0.113.{i}", "X-Real-IP": "192.168.1.50"}).status_code
+        for i in range(7)
+    ]
+    assert codes[:5] == [401] * 5 and codes[5:] == [429, 429]
 
 
 def test_tool_endpoints_require_auth(client):

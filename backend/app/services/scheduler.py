@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from app.core.timeutil import as_utc, to_utc_iso
 from app.db.session import SessionLocal
 from app.models import AppSettings, Hostname
+from app.schemas.hostname import MIN_CHECK_INTERVAL_MINUTES
 from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
 from app.services.monitoring import prune_history, queued_recheck_ids, record_check
 
@@ -30,7 +31,10 @@ def _is_asset_due(hostname: Hostname, global_interval_minutes: int) -> bool:
     """Check if an asset is due for a scheduled check."""
     if not hostname.last_checked:
         return True
-    interval = hostname.check_interval_minutes or global_interval_minutes
+    interval = global_interval_minutes
+    if hostname.check_interval_minutes:
+        # Releases before 1.3.2 stored any number here, even negative ones.
+        interval = max(hostname.check_interval_minutes, MIN_CHECK_INTERVAL_MINUTES)
     # SQLite returns naive datetimes even though values are stored in UTC.
     last_checked = as_utc(hostname.last_checked)
     elapsed = (datetime.now(timezone.utc) - last_checked).total_seconds()

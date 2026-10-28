@@ -17,12 +17,27 @@ services:
       - DATABASE_URL=sqlite:////app/data/app.db
       - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
       - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL:-admin@abusebox.local}
-      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-password123}
+      # Empty: the first start generates a password, prints it in the logs and
+      # saves it in the data volume (see "Quick start" in the README).
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-}
       - DEFAULT_ADMIN_PHONE=${DEFAULT_ADMIN_PHONE:-11111111}
+      # Blacklist lookups go through the bundled resolver below, so Spamhaus and
+      # others see this server's IP rather than a public resolver they refuse.
+      # If it can't reach the internet's DNS directly, the system resolver is used.
+      - DNSBL_NAMESERVERS=${DNSBL_NAMESERVERS:-unbound}
+    depends_on:
+      - unbound
     volumes:
       - abusebox-data:/app/data
+    # The UI reaches the API through nginx at /api; this port is only for
+    # scripts on this machine (README: "API").
     ports:
-      - 8100:8100
+      - 127.0.0.1:8100:8100
+  unbound:
+    # Recursive resolver for blacklist lookups (only reachable inside this network).
+    image: klutchell/unbound:1.26.2@sha256:50cbeb32b5838a829a7226b19cb151f9535bd7f9f3190f950780f452fe807478
+    volumes:
+      - ./unbound:/etc/unbound/custom.conf.d:ro
   frontend:
     image: ghcr.io/${GHCR_REPO:-bekkaze/abusebox}-frontend:latest
     build: ./frontend

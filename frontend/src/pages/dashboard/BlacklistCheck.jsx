@@ -5,6 +5,7 @@ import { checkBlacklist } from '../../services/blacklist/checkService';
 import { downloadBlacklistCsv } from '../../services/tools';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
 import { SkeletonLine } from '../../components/shared/Skeleton';
+import ResolverWarning from '../../components/shared/ResolverWarning';
 import { EmptyState, LookupForm, PageHeader, Section, secondaryButtonClass } from '../../components/shared/ui';
 
 export default function BlacklistCheck() {
@@ -49,6 +50,8 @@ export default function BlacklistCheck() {
         title="Blacklist check"
         description="Checks one IPv4 address or domain against every DNS blacklist and says why each one lists it."
       />
+
+      <ResolverWarning className="mb-5" />
 
       <LookupForm
         label="IPv4 address or domain"

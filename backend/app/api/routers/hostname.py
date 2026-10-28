@@ -19,6 +19,7 @@ from app.schemas import (
     HostnameResponse,
     HostnameUpdateRequest,
 )
+from app.core.config import settings
 from app.core.timeutil import to_utc_iso
 from app.services.app_settings import get_app_settings
 from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
@@ -64,6 +65,18 @@ def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
     )
 
 
+def _enforce_asset_limit(db: Session, user: User, adding: int) -> None:
+    """Keep one account from loading the scheduler (and the blacklists) with assets."""
+    if user.is_superuser:
+        return
+    owned = db.query(Hostname).filter(Hostname.user_id == user.id).count()
+    if owned + adding > settings.max_assets_per_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Asset limit reached: each account can have up to {settings.max_assets_per_user} assets.",
+        )
+
+
 @router.post("/", response_model=HostnameResponse)
 def create_hostname(
     payload: HostnameCreateRequest,
@@ -73,6 +86,7 @@ def create_hostname(
     existing = db.query(Hostname).filter(Hostname.user_id == user.id, Hostname.hostname == payload.hostname).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hostname already exists")
+    _enforce_asset_limit(db, user, 1)
 
     hostname = Hostname(
         user_id=user.id,
@@ -121,6 +135,7 @@ def create_hostnames_bulk(
         h.hostname
         for h in db.query(Hostname.hostname).filter(Hostname.user_id == user.id).all()
     }
+    _enforce_asset_limit(db, user, len({item.hostname for item in payload.hostnames} - existing_set))
 
     for item in payload.hostnames:
         if item.hostname in existing_set:
@@ -174,6 +189,7 @@ def import_cidr(
         h.hostname
         for h in db.query(Hostname.hostname).filter(Hostname.user_id == user.id).all()
     }
+    _enforce_asset_limit(db, user, len({str(ip) for ip in network.hosts()} - existing_set))
 
     created = 0
     skipped = 0

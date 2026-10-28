@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.client_ip import get_client_ip
 from app.core.security import (
+    burn_password_check,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -14,11 +15,11 @@ from app.core.security import (
     hash_password,
     is_token_revoked,
     require_superuser,
-    verify_password,
+    verify_and_update_password,
 )
+from app.db.init_data import forget_initial_password
 from app.db.session import get_db
 from app.models import Hostname, User
-from app.core.config import settings
 from app.schemas import (
     AdminUserItem,
     ChangePasswordRequest,
@@ -112,14 +113,30 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     key = _login_key(request, payload.username)
     _check_login_limit(key)
     user = db.query(User).filter(User.username == payload.username).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if user:
+        valid, new_hash = verify_and_update_password(payload.password, user.hashed_password)
+    else:
+        burn_password_check(payload.password)
+        valid, new_hash = False, None
+    if not valid:
         _record_login_failure(key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
 
+    if new_hash:
+        # Stored with an older, weaker setting: re-hash now that we know the password.
+        user.hashed_password = new_hash
+        db.commit()
     _clear_login_failures(key)
     return _issue_tokens(user)
+
+
+@router.post("/logout/", status_code=status.HTTP_204_NO_CONTENT)
+def logout(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Sign out everywhere: every access and refresh token issued so far stops working."""
+    user.token_version = (user.token_version or 0) + 1
+    db.commit()
 
 
 @router.post("/token/refresh/", response_model=TokenResponse)
@@ -145,11 +162,7 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
 
 @router.get("/me/", response_model=MeResponse)
 def me(user: User = Depends(get_current_user)):
-    using_default = (
-        user.username == settings.default_admin_username
-        and verify_password(settings.default_admin_password, user.hashed_password)
-    )
-    return MeResponse(**UserResponse.model_validate(user).model_dump(), using_default_password=using_default)
+    return MeResponse(**UserResponse.model_validate(user).model_dump(), using_default_password=user.must_change_password)
 
 
 @router.patch("/me/", response_model=MeResponse)
@@ -220,11 +233,14 @@ def change_password(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if not verify_password(payload.current_password, user.hashed_password):
+    if not verify_and_update_password(payload.current_password, user.hashed_password)[0]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect.")
     if payload.new_password == payload.current_password:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different from the current one.")
     user.hashed_password = hash_password(payload.new_password)
+    if user.must_change_password:
+        user.must_change_password = False
+        forget_initial_password()
     # Revoke every token issued so far, then hand back a fresh pair so this
     # session stays signed in.
     user.token_version = (user.token_version or 0) + 1

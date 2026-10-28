@@ -1,4 +1,5 @@
 import copy
+import ipaddress
 from datetime import datetime, timezone
 from threading import Lock
 from time import monotonic
@@ -12,7 +13,7 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models import CheckHistory, Hostname, User
 from app.schemas import DelistRequest
-from app.services.dnsbl import check_dnsbl_providers
+from app.services.dnsbl import _resolve_ipv4, check_dnsbl_providers, resolver_health
 
 router = APIRouter(prefix="/blacklist", tags=["blacklist"])
 
@@ -47,10 +48,24 @@ def quick_check(request: Request, hostname: str | None = None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please provide a Hostname")
 
     _enforce_public_check_limit(request)
-    result = check_dnsbl_providers(hostname)
+    # Anyone can use this endpoint, so it only checks public addresses: an
+    # internal name would otherwise reveal whether it resolves, and its private
+    # IP would be sent to two dozen outside blacklist operators.
+    resolved = _resolve_ipv4(hostname)
+    if not resolved:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve hostname to IPv4 address")
+    if not ipaddress.ip_address(resolved).is_global:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only public IP addresses and domains can be checked.")
+    result = check_dnsbl_providers(hostname, resolved)
     if result.get("error"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
     return result
+
+
+@router.get("/resolver-health/")
+def get_resolver_health(user: User = Depends(get_current_user)):
+    """Whether blacklist lookups work: Spamhaus answers its test address through our DNS resolver."""
+    return resolver_health()
 
 
 @router.post("/delist/")

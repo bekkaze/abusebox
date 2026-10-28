@@ -8,6 +8,7 @@ pydantic==2.13.5
 requests==2.34.2
 # certifi >= 2026.10.19 drops the emSign intermediates with compromised keys (GHSA-6q48-6c7w-9gw2)
 certifi==2026.10.23
-dnspython==2.8.0
+# dnspython >= 2.9.0 fixes excessive CPU use on crafted DNS names (GHSA-45c3-73f7-pv4m)
+dnspython==2.9.0
 python-multipart==0.0.32
 alembic==1.20.1

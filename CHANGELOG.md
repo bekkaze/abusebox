@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.2] - Unreleased
+
+A security release, and blacklist lookups that work out of the box.
+
+Upgrading: `git pull && docker compose pull && docker compose up -d`. Pull the repository too: `docker-compose.yml` adds a DNS resolver service. See [Upgrading](README.md#upgrading).
+
+### Security
+
+Found in a security review of 1.3.1. None were reported as exploited.
+
+- **Login rate limit could be bypassed** from a private network. A client could set its own `X-Forwarded-For` header and get a fresh limit for every password guess. nginx now sets the client address itself and the API ignores `X-Forwarded-For`.
+- **Random first admin password.** New installs no longer start with the published `admin` / `password123`: a random password is generated, printed in the logs and saved in the data volume until you change it. Existing installs still using `password123` get the banner asking to change it.
+- **Regular users could overload the server.** The per-asset check interval accepted any number, including negative ones, so an asset could be checked every minute and get the server's IP rate-limited by the blacklists. Intervals are now 15 minutes to 7 days, and each non-admin user can add up to `MAX_ASSETS_PER_USER` assets (default 1000).
+- **Alert messages could be abused.** Asset names went into Slack and Discord messages as-is, so a user could make the shared webhook ping `@everyone` or post a disguised link. Asset names are now validated (domain, IPv4 or URL), Slack markup is escaped and Discord mentions are turned off.
+- **Server-status and SSL checks could reach internal hosts through DNS rebinding.** They now connect to the address that was checked instead of resolving the name a second time.
+- **dnspython updated to 2.9.0** ([GHSA-45c3-73f7-pv4m](https://github.com/advisories/GHSA-45c3-73f7-pv4m): excessive CPU use on crafted DNS names).
+- The public quick check only checks public addresses (internal names could be probed, and private IPs were sent to outside blacklists).
+- Passwords are hashed with 600,000 PBKDF2 rounds (was 29,000); existing hashes are upgraded at the next sign-in.
+- Signing in with an unknown username takes as long as with a known one, so usernames can't be guessed from response times.
+- WHOIS only follows referrals from IANA, only to public servers, and stops reading after 256 KB.
+- **Sign out now ends the session on the server**, on every device. Before, a copied token kept working until it expired.
+- The UI sends a Content-Security-Policy. The backend container runs as an unprivileged user, and its port (8100) only listens on the machine itself.
+- `APP_DEBUG` now defaults to `false` outside Docker too. `DISABLE_API_DOCS=true` hides the API docs.
+
+### Added
+
+- **Bundled DNS resolver.** Docker Compose now runs Unbound and sends blacklist lookups through it, so Spamhaus and others see your server's IP instead of a public resolver they refuse. If your network blocks the direct DNS traffic it needs, AbuseBox falls back to the system resolver.
+- **A warning when Spamhaus doesn't answer your resolver**, on the dashboard and the blacklist check, with a link to the fix.
+
+### Fixed
+
+- Opening the dashboard right after a fresh install could fail once with a server error (two requests creating the settings at the same time).
+- Invalid values in forms (asset name, interval) now show a readable message instead of a blank or garbled error.
+
 ## [1.3.1] - 2026-10-26
 
 Email alerts now reach you, and a certificate-store security update.

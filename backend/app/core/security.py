@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -13,7 +14,14 @@ from app.models import User
 
 
 # Use PBKDF2-SHA256 to avoid bcrypt backend/runtime incompatibilities in minimal containers.
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# Hashes made with fewer rounds (releases before 1.3.2 used 29,000) still verify
+# and are upgraded at the next sign-in.
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256"],
+    deprecated="auto",
+    pbkdf2_sha256__default_rounds=settings.password_hash_rounds,
+    pbkdf2_sha256__min_rounds=settings.password_hash_rounds,
+)
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -28,6 +36,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
+
+
+def verify_and_update_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
+    """Verify, and return a new hash when the stored one uses outdated settings."""
+    return pwd_context.verify_and_update(plain_password, hashed_password)
+
+
+# Checked when a username doesn't exist, so a failed sign-in takes as long
+# either way and response times don't reveal which usernames exist.
+_DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
+
+
+def burn_password_check(plain_password: str) -> None:
+    pwd_context.verify(plain_password, _DUMMY_HASH)
 
 
 def _build_token(subject: str, token_type: str, expires_delta: timedelta, version: int) -> str:
