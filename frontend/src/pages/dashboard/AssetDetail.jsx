@@ -8,10 +8,11 @@ import {
 import HistoryChart from '../../components/dashboard/home/HistoryChart';
 import ResultTable from '../../components/blacklist/ResultTable';
 import { ResultVerdict } from '../../components/blacklist/ResultTableQuick';
+import { blacklistReportText } from '../../components/blacklist/reportText';
 import { sortProviders } from '../../components/blacklist/providerStatus';
 import AddNewMonitorDialog from '../../components/dashboard/blacklistMonitor/AddNewMonitorDialog';
 import { SkeletonLine } from '../../components/shared/Skeleton';
-import CopyButton from '../../components/shared/CopyButton';
+import CopyButton, { CopyTextButton } from '../../components/shared/CopyButton';
 import TimeAgo from '../../components/shared/TimeAgo';
 import {
   Alert, EmptyState, Field, Fields, Section, Spinner, StatusTag, linkClass, primaryButtonClass, secondaryButtonClass,
@@ -349,7 +350,7 @@ export default function AssetDetail() {
         {/* Tabbed results */}
         {tabs.length > 0 ? (
           <ResultTabs tabs={tabs} current={currentTab} onSelect={setActiveTab}>
-            {currentTab === 'blacklist' && <BlacklistPanel data={results.blacklist} checkId={checkId} onChange={() => fetchAsset({ quiet: true })} />}
+            {currentTab === 'blacklist' && <BlacklistPanel data={results.blacklist} checkId={checkId} hostname={asset.hostname} checked={asset.checked} onChange={() => fetchAsset({ quiet: true })} />}
             {currentTab === 'abuseipdb' && <AbuseIPDBPanel data={results.abuseipdb} />}
             {currentTab === 'dns' && <DnsPanel data={results.dns} />}
             {currentTab === 'ssl' && <SslPanel data={results.ssl} />}
@@ -458,11 +459,16 @@ function WithCopy({ text, label, children }) {
   );
 }
 
-function BlacklistPanel({ data, checkId, onChange }) {
+function BlacklistPanel({ data, checkId, hostname, checked, onChange }) {
   if (!data || data.error) return <ErrorMsg msg={data?.error} />;
   return (
     <div className="space-y-4">
-      <ResultVerdict data={data} providers={sortProviders(data)} detailsOnly />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <ResultVerdict data={data} providers={sortProviders(data)} detailsOnly />
+        </div>
+        <CopyTextButton text={blacklistReportText(data, { target: hostname, checked })} label="Copy report" />
+      </div>
       <ResultTable data={data} checkId={checkId} onDelistRecorded={onChange} />
     </div>
   );

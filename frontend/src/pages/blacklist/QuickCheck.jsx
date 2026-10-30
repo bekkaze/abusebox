@@ -5,6 +5,8 @@ import { checkBlacklist } from '../../services/blacklist/checkService';
 import { downloadBlacklistCsv } from '../../services/tools';
 import Navbar from '../../components/landing/Navbar';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
+import { blacklistReportText } from '../../components/blacklist/reportText';
+import { CopyTextButton } from '../../components/shared/CopyButton';
 import { SkeletonLine } from '../../components/shared/Skeleton';
 import { LookupForm, PageHeader, linkClass, secondaryButtonClass } from '../../components/shared/ui';
 
@@ -15,6 +17,7 @@ const QuickCheck = () => {
   const hostname = (searchParams.get('hostname') || location.state?.hostname || '').trim();
   const [input, setInput] = useState(hostname);
   const [data, setData] = useState(null);
+  const [checkedAt, setCheckedAt] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +28,11 @@ const QuickCheck = () => {
     setError('');
     setData(null);
     checkBlacklist(hostname)
-      .then((result) => active && setData(result))
+      .then((result) => {
+        if (!active) return;
+        setData(result);
+        setCheckedAt(new Date().toISOString());
+      })
       .catch((err) => active && setError(err.message || 'Blacklist check failed. Try again.'))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
@@ -63,9 +70,12 @@ const QuickCheck = () => {
                 {loading ? 'Checking ' : 'Report for '}<span className="font-mono">{hostname}</span>
               </h2>
               {!loading && (
-                <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
-                  <HiOutlineArrowDownTray className="text-base" aria-hidden="true" /> Export CSV
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CopyTextButton text={blacklistReportText(data, { target: hostname, checked: checkedAt })} label="Copy report" />
+                  <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
+                    <HiOutlineArrowDownTray className="text-base" aria-hidden="true" /> Export CSV
+                  </button>
+                </div>
               )}
             </div>
             {loading ? (

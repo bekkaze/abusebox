@@ -4,6 +4,8 @@ import { HiOutlineArrowDownTray, HiOutlineShieldCheck } from 'react-icons/hi2';
 import { checkBlacklist } from '../../services/blacklist/checkService';
 import { downloadBlacklistCsv } from '../../services/tools';
 import ResultTableQuick from '../../components/blacklist/ResultTableQuick';
+import { blacklistReportText } from '../../components/blacklist/reportText';
+import { CopyTextButton } from '../../components/shared/CopyButton';
 import { SkeletonLine } from '../../components/shared/Skeleton';
 import ResolverWarning from '../../components/shared/ResolverWarning';
 import { EmptyState, LookupForm, PageHeader, Section, secondaryButtonClass } from '../../components/shared/ui';
@@ -12,6 +14,7 @@ export default function BlacklistCheck() {
   const [searchParams] = useSearchParams();
   const [hostname, setHostname] = useState(searchParams.get('hostname') || '');
   const [checked, setChecked] = useState('');
+  const [checkedAt, setCheckedAt] = useState(null);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -24,6 +27,7 @@ export default function BlacklistCheck() {
     try {
       setData(await checkBlacklist(target));
       setChecked(target);
+      setCheckedAt(new Date().toISOString());
     } catch (err) {
       setData(null);
       setError(err.message || 'Blacklist check failed. Try again.');
@@ -71,9 +75,12 @@ export default function BlacklistCheck() {
             id="blacklist-report"
             title={<>Report for <span className="font-mono font-semibold break-all">{checked}</span></>}
             action={(
-              <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
-                <HiOutlineArrowDownTray className="text-base text-ink-2" aria-hidden="true" /> Export CSV
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <CopyTextButton text={blacklistReportText(data, { target: checked, checked: checkedAt })} label="Copy report" />
+                <button type="button" className={secondaryButtonClass} onClick={() => downloadBlacklistCsv(data)}>
+                  <HiOutlineArrowDownTray className="text-base text-ink-2" aria-hidden="true" /> Export CSV
+                </button>
+              </div>
             )}
           >
             <ResultTableQuick data={data} />
