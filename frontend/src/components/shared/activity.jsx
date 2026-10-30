@@ -5,11 +5,11 @@ import { SEVERITY } from './severity';
 
 // Health and event severities, written as the SMTP reply class they resemble.
 const CODES = {
-  critical: { code: '5.x', text: 'text-s5' },
-  warning: { code: '4.x', text: 'text-s4' },
-  info: { code: '3.x', text: 'text-info' },
-  success: { code: '2.x', text: 'text-s2' },
-  ok: { code: '2.x', text: 'text-s2' },
+  critical: { code: '5.x', text: 'text-s5', dot: 'bg-s5' },
+  warning: { code: '4.x', text: 'text-s4', dot: 'bg-s4' },
+  info: { code: '3.x', text: 'text-info', dot: 'bg-info' },
+  success: { code: '2.x', text: 'text-s2', dot: 'bg-s2' },
+  ok: { code: '2.x', text: 'text-s2', dot: 'bg-s2' },
 };
 
 // Long provider lists are summarized; the asset page has the full table.
@@ -85,9 +85,10 @@ export function EventList({ events, showHostname = true, emptyText = 'No activit
     return <p className="text-sm text-ink-2 py-4">{emptyText}</p>;
   }
   return (
-    <ol className="border-l border-rule">
+    <ol className="border-l border-rule-strong">
       {events.map((event) => {
         const details = event.details || {};
+        const code = CODES[event.severity] || CODES.info;
         const extra = details.added?.length
           ? listPreview(details.added)
           : details.removed?.length && event.event_type !== 'blacklist.delisted'
@@ -95,7 +96,7 @@ export function EventList({ events, showHostname = true, emptyText = 'No activit
             : details.reason || details.error || null;
         return (
           <li key={event.id} className="relative pl-4 pb-3.5 last:pb-0">
-            <span className="absolute -left-[3px] top-[7px] h-[5px] w-[5px] rounded-full bg-rule-strong" aria-hidden="true" />
+            <span className={`absolute -left-[4px] top-[5px] h-[7px] w-[7px] rounded-full ring-2 ring-paper ${code.dot}`} aria-hidden="true" />
             <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-ink-2">
               <SeverityCode severity={event.severity} />
               <TimeAgo date={event.created} className="font-mono" />
