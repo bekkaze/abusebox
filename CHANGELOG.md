@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2026-10-30
+
+Small fixes, no upgrade steps.
+
+Upgrading: `docker compose pull && docker compose up -d`.
+
+### Added
+
+- **Copy report.** When an IP or domain is listed, the next step is usually a ticket or an email to the blacklist operator. **Copy report** puts the result on the clipboard as plain text, in the header style the UI uses: the target, when it was checked, the verdict, one line per list with its severity and why it lists you, and the lists that did not answer. It sits next to **Export CSV** on the blacklist check, the public quick check and the Blacklist tab of an asset (#29).
+
+### Fixed
+
+- **The activity timeline was hard to see.** Its line was drawn in the faintest hairline colour and every dot was the same grey, so events on the dashboard and the Activity page read as stray bullets. The line is stronger now and each dot carries its event's severity colour (#30).
+- **Copying over plain HTTP did nothing.** Browsers only give a page the clipboard in a secure context, so the copy buttons silently failed on installs reached over `http://` on a LAN address. They now fall back to the older copy method, and say so if the browser blocks copying outright.
+
 ## [1.3.2] - 2026-10-28
 
 A security release, and blacklist lookups that work out of the box.

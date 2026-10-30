@@ -60,7 +60,7 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        version="1.3.2",
+        version="1.3.3",
         debug=settings.app_debug,
         docs_url=None if settings.disable_api_docs else "/swagger/",
         openapi_url=None if settings.disable_api_docs else "/openapi.json",
