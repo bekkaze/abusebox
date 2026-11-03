@@ -65,6 +65,35 @@ _FIELD_MAP = {
     "abuse contact": "abuse_email",
     "domain nameservers": "name_servers",
     "dnssec": "dnssec",
+    # Shorter spellings used by .it and others.
+    "domain": "domain_name",
+    "created": "creation_date",
+    "last update": "updated_date",
+    "expire date": "expiry_date",
+    "expiry date": "expiry_date",
+    "signed": "dnssec",
+}
+
+# Some registries (.it among them) write a bare heading with no colon and put
+# the block's fields underneath it, indented:
+#
+#     Registrar
+#       Organization:     MarkMonitor International Limited
+#     Nameservers
+#       ns1.google.com
+#
+# Inside such a block only the mappings below apply. A field there describes
+# that sub-entity, not the domain, so "Created" under "Admin Contact" must not
+# become the domain's creation date and the registrar's "DNSSEC" must not
+# become the domain's.
+_SECTION_FIELDS: dict[str, dict[str, str]] = {
+    "registrar": {"organization": "registrar", "name": "registrar", "web": "registrar_url"},
+    "registrant": {"organization": "registrant_org", "country": "registrant_country"},
+}
+# Headings whose indented lines are bare values rather than "key: value".
+_SECTION_LISTS: dict[str, str] = {
+    "nameservers": "name_servers",
+    "name servers": "name_servers",
 }
 
 
@@ -213,39 +242,56 @@ def _parse_whois(raw: str) -> dict[str, Any]:
         elif not result.get(mapped):
             result[mapped] = value
 
-    # Field whose indented continuation lines we are currently collecting.
+    # Field whose indented continuation lines we are currently collecting
+    # ("Registrar:" with nothing after it), and the bare heading we are under.
     pending: str | None = None
+    section: str | None = None
 
     for source_line in raw.splitlines():
         line = source_line.strip()
-        if not line or line.startswith(("%", "#", ">")):
+        if not line or line.startswith(("%", "#", ">", "*")):
             pending = None
+            section = None
             continue
 
-        match = re.match(r"^([^:]+):\s*(.*)", line)
         indented = source_line[:1].isspace()
+        match = re.match(r"^([^:]+):\s*(.*)", line)
+        key = match.group(1).strip().lower() if match else ""
+        val = match.group(2).strip() if match else ""
 
-        # A continuation line belonging to the header above it.
-        if pending and indented and not match:
-            store(pending, line)
-            continue
+        if not indented:
+            # Any top-level line closes the block above it.
+            pending = None
+            section = None
+            if not match:
+                # A bare heading. Unknown ones are tracked too, so the fields
+                # under "Admin Contact" are ignored rather than read as the
+                # domain's own.
+                section = line.lower()
+                continue
+        else:
+            if section is not None:
+                if match:
+                    mapped = _SECTION_FIELDS.get(section, {}).get(key)
+                    if mapped:
+                        store(mapped, val)
+                elif section in _SECTION_LISTS:
+                    store(_SECTION_LISTS[section], line)
+                continue
+            if pending and not match:
+                store(pending, line)
+                continue
 
         if not match:
-            pending = None
             continue
 
-        key = match.group(1).strip().lower()
-        val = match.group(2).strip()
         mapped = _FIELD_MAP.get(key)
         if not mapped:
-            pending = None
             continue
-
         if val:
             store(mapped, val)
-            pending = None
         else:
-            # Header with no inline value: take the indented lines that follow.
+            # Heading with no inline value: take the indented lines below it.
             pending = mapped
 
     return result

@@ -796,3 +796,70 @@ def test_whois_serves_stale_when_the_server_is_unreachable(monkeypatch):
         result = whois_lookup.whois_lookup("theyosh.nl")
         whois_lookup.clear_whois_cache()
     assert result["registrar"] == "Quickhost B.V." and result["stale"] is True
+
+
+# Issue #36: .it writes bare headings with no colon and indents the block's
+# fields under them, at varying widths.
+IT_ANSWER = """*********************************************************************
+* Please note that the following result could be a subgroup of      *
+*********************************************************************
+
+Domain:             google.it
+Status:             ok
+Signed:             no
+Created:            1999-12-10 00:00:00
+Last Update:        2026-06-09 23:13:34
+Expire Date:        2027-04-21
+
+Registrant
+  Organization:     Google Ireland Holdings Unlimited Company
+  Address:          70 Sir John Rogerson's Quay
+                    Dublin
+                    IE
+  Created:          2018-03-02 19:04:02
+
+Admin Contact
+  Name:             Jared Oberhaus
+  Organization:     Google LLC
+  Created:          2026-06-09 19:22:56
+
+Registrar
+  Organization:     MarkMonitor International Limited
+  Name:             MARKMONITOR-REG
+  Web:              https://www.markmonitor.com/
+  DNSSEC:           no
+
+Nameservers
+  ns1.google.com
+  ns2.google.com
+"""
+
+
+def test_whois_parses_bare_headings_and_short_field_names():
+    parsed = whois_lookup._parse_whois(IT_ANSWER)
+    assert parsed["domain_name"] == "google.it"
+    assert parsed["registrar"] == "MarkMonitor International Limited"
+    assert parsed["registrar_url"] == "https://www.markmonitor.com/"
+    assert parsed["registrant_org"] == "Google Ireland Holdings Unlimited Company"
+    assert parsed["expiry_date"] == "2027-04-21"
+    assert parsed["updated_date"] == "2026-06-09 23:13:34"
+    assert parsed["name_servers"] == ["ns1.google.com", "ns2.google.com"]
+
+
+def test_whois_ignores_dates_belonging_to_a_contact_block():
+    """"Created" under "Admin Contact" is that contact's, not the domain's."""
+    parsed = whois_lookup._parse_whois(IT_ANSWER)
+    assert parsed["creation_date"] == "1999-12-10 00:00:00"
+
+
+def test_whois_does_not_take_a_contact_organisation_as_the_registrar():
+    # "Admin Contact" has Organization: Google LLC, which must not win.
+    assert whois_lookup._parse_whois(IT_ANSWER)["registrar"] == "MarkMonitor International Limited"
+
+
+def test_whois_takes_dnssec_from_the_domain_not_the_registrar():
+    # The registrar block also carries "DNSSEC: no"; the domain's own flag is
+    # the top-level "Signed".
+    assert whois_lookup._parse_whois(IT_ANSWER)["dnssec"] == "no"
+    signed_yes = IT_ANSWER.replace("Signed:             no", "Signed:             yes")
+    assert whois_lookup._parse_whois(signed_yes)["dnssec"] == "yes"
