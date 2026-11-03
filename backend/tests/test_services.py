@@ -719,3 +719,80 @@ def test_whois_gives_the_leftover_budget_to_the_next_family(monkeypatch):
         whois_lookup._raw_whois("theyosh.nl", "whois.sidn.nl", timeout=30.0)
     assert 14.0 <= timeouts[0] <= 15.0      # half the budget offered
     assert timeouts[1] >= 29.0              # the instant failure handed its share over
+
+
+def test_whois_serves_the_last_good_answer_when_the_registry_refuses(monkeypatch):
+    """SIDN refuses a second query soon after the first; a monitored asset
+    should keep its last good record instead of flipping to an error."""
+    replies = ["Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n",
+               "Error: ratelimit exceeded\r\n"]
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: replies.pop(0))
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        fresh = whois_lookup.whois_lookup("theyosh.nl")
+        clock[0] += 90 * 60                      # past the cache window
+        refused = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+
+    assert "stale" not in fresh and fresh["registrar"] == "Quickhost B.V."
+    assert refused["registrar"] == "Quickhost B.V."
+    assert refused["stale"] is True
+    assert refused["stale_age_minutes"] == 90
+    assert refused["stale_reason"] == "WHOIS query failed: ratelimit exceeded"
+
+
+def test_whois_stale_answer_eventually_expires(monkeypatch):
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: "Error: ratelimit exceeded\r\n")
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        whois_lookup._cache_put("theyosh.nl", {"domain": "theyosh.nl", "registrar": "Quickhost B.V.", "raw": "x"})
+        clock[0] += 5 * 60 * 60                  # past 4x the cache window
+        result = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+
+    assert result == {"error": "WHOIS query failed: ratelimit exceeded"}
+
+
+def test_whois_does_not_serve_stale_after_a_safety_refusal(monkeypatch):
+    def _unsafe(domain, server, timeout=None):
+        raise whois_lookup.UnsafeDestinationError("Private, loopback, link-local, reserved, or mixed DNS destinations are not allowed.")
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _unsafe)
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        whois_lookup._cache_put("theyosh.nl", {"domain": "theyosh.nl", "registrar": "Quickhost B.V.", "raw": "x"})
+        clock[0] += 90 * 60              # past the fresh window, inside the stale one
+        result = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+    assert "error" in result and "stale" not in result
+
+
+def test_whois_serves_stale_when_the_server_is_unreachable(monkeypatch):
+    calls = []
+
+    def _flaky(domain, server, timeout=None):
+        calls.append(domain)
+        if len(calls) == 1:
+            return "Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n"
+        raise socket.timeout("timed out")
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _flaky)
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        whois_lookup.whois_lookup("theyosh.nl")
+        clock[0] += 2 * 60 * 60
+        result = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+    assert result["registrar"] == "Quickhost B.V." and result["stale"] is True

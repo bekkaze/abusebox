@@ -262,11 +262,24 @@ _MAX_CACHE_ENTRIES = 256
 _MAX_CACHED_RESPONSE_BYTES = 64 * 1024
 
 
+# An answer older than the cache window is still worth serving when the registry
+# refuses outright: registries rate limit hard (SIDN answers "ratelimit
+# exceeded" to a second query made soon after the first), so a monitored asset
+# would otherwise flip to an error on most cycles while nothing about the
+# domain actually changed. A registration does not change by the hour.
+_STALE_FACTOR = 4
+
+
 def _cache_ttl() -> float:
     return max(settings.whois_cache_minutes, 0) * 60.0
 
 
+def _stale_window() -> float:
+    return _cache_ttl() * _STALE_FACTOR
+
+
 def _cache_get(domain: str) -> dict[str, Any] | None:
+    """A fresh answer, or None. An expired entry is kept for _stale_or_error."""
     ttl = _cache_ttl()
     if ttl <= 0:
         return None
@@ -276,22 +289,54 @@ def _cache_get(domain: str) -> dict[str, Any] | None:
             return None
         stored_at, value = entry
         if time.monotonic() - stored_at >= ttl:
-            del _cache[domain]
             return None
         return dict(value)
 
 
+def _cache_get_stale(domain: str) -> tuple[dict[str, Any], float] | None:
+    """The last good answer and its age, even past the cache window."""
+    window = _stale_window()
+    if window <= 0:
+        return None
+    with _cache_lock:
+        entry = _cache.get(domain)
+        if entry is None:
+            return None
+        stored_at, value = entry
+        age = time.monotonic() - stored_at
+        if age >= window:
+            del _cache[domain]
+            return None
+        return dict(value), age
+
+
 def _cache_put(domain: str, value: dict[str, Any]) -> None:
-    ttl = _cache_ttl()
-    if ttl <= 0 or len(value.get("raw", "")) > _MAX_CACHED_RESPONSE_BYTES:
+    window = _stale_window()
+    if window <= 0 or len(value.get("raw", "")) > _MAX_CACHED_RESPONSE_BYTES:
         return
     now = time.monotonic()
     with _cache_lock:
-        for key in [k for k, (at, _) in _cache.items() if now - at >= ttl]:
+        for key in [k for k, (at, _) in _cache.items() if now - at >= window]:
             del _cache[key]
         while len(_cache) >= _MAX_CACHE_ENTRIES:
             del _cache[min(_cache, key=lambda k: _cache[k][0])]
         _cache[domain] = (now, dict(value))
+
+
+def _stale_or_error(domain: str, message: str) -> dict[str, Any]:
+    """Serve the last good answer when the registry refuses, rather than nothing.
+
+    The answer is marked so a caller can tell it apart from a fresh one. It is
+    not written back to the cache, so it still ages out of the stale window.
+    """
+    stale = _cache_get_stale(domain)
+    if stale is None:
+        return {"error": message}
+    value, age = stale
+    value["stale"] = True
+    value["stale_age_minutes"] = int(age // 60)
+    value["stale_reason"] = message
+    return value
 
 
 def clear_whois_cache() -> None:
@@ -312,12 +357,14 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
     try:
         raw = _raw_whois(domain, server)
     except UnsafeDestinationError as exc:
+        # A safety refusal means the name now resolves somewhere it should not;
+        # say so rather than papering over it with an older answer.
         return {"error": f"WHOIS query failed: {exc}"}
     except (socket.timeout, socket.error, OSError) as exc:
-        return {"error": f"WHOIS query failed: {exc}"}
+        return _stale_or_error(domain, f"WHOIS query failed: {exc}")
 
     if not raw.strip():
-        return {"error": "Empty response from WHOIS server."}
+        return _stale_or_error(domain, "Empty response from WHOIS server.")
 
     # IANA answers with a referral to the TLD's own server. Referrals from other
     # servers aren't followed: their text can include registrant-supplied data.
@@ -335,7 +382,7 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
         # the registry is refusing right now, not describing the domain.
         failure = _response_error(raw)
         if failure:
-            return {"error": f"WHOIS query failed: {failure}"}
+            return _stale_or_error(domain, f"WHOIS query failed: {failure}")
 
     result = {
         "domain": domain,
