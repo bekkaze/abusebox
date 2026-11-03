@@ -23,6 +23,10 @@ Upgrading: `docker compose pull && docker compose up -d`.
 - **Assets could show "Scheduled check overdue" forever.** Releases before 1.3.2 accepted any per-asset interval, including negative ones. The scheduler ignores those and checks on time, but the health summary took them at face value and warned on every page load.
 - **Saving the scheduler settings during a check cycle threw that cycle's results away.** The checks had already run; only saving them was skipped.
 
+### Security
+
+- **Vite updated to 6.4.5** ([GHSA-8g5g-mxqh-grgj](https://github.com/advisories/GHSA-8g5g-mxqh-grgj), CVE-2026-118662: `server.fs.deny` bypassed with queries). A development dependency: the published frontend image serves the built files with nginx and never runs Vite's dev server, so installs were not affected.
+
 ## [1.3.3] - 2026-10-30
 
 Small fixes, no upgrade steps.
