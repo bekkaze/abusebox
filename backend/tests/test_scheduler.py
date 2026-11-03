@@ -1,6 +1,8 @@
 """Scheduler due-time logic (regression tests for issue #20)."""
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest import mock
 
 from app.db.session import Base, SessionLocal, engine
 from app.models import Hostname, User
@@ -50,3 +52,29 @@ def test_per_asset_interval_overrides_global():
     assert _is_asset_due(hostname, 360) is True
     hostname = _stored_hostname(datetime.now(timezone.utc) - timedelta(minutes=20), interval=30)
     assert _is_asset_due(hostname, 1) is False
+
+
+def test_cycle_saves_results_even_when_a_stop_is_requested(monkeypatch):
+    """A settings change sets the stop event briefly; the checks have already
+    run by then, so their results must still be saved rather than discarded."""
+    from app.services import scheduler
+
+    assets = [SimpleNamespace(id=1, hostname="a.example"), SimpleNamespace(id=2, hostname="b.example")]
+    saved = []
+
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: mock.MagicMock())
+    monkeypatch.setattr(scheduler, "_get_global_interval", lambda db: 360)
+    monkeypatch.setattr(scheduler, "due_hostnames", lambda db, interval: assets)
+    monkeypatch.setattr(scheduler, "get_toggles_from_hostname", lambda h: {"check_blacklist": True})
+    monkeypatch.setattr(scheduler, "run_enabled_checks", lambda value, toggles: {"blacklist": {}})
+    monkeypatch.setattr(scheduler, "_maybe_prune", lambda db: None)
+    monkeypatch.setattr(scheduler, "record_check", lambda db, h, result: saved.append(h.hostname) or [])
+
+    scheduler._stop_event.set()
+    try:
+        checked = scheduler.run_cycle()
+    finally:
+        scheduler._stop_event.clear()
+
+    assert checked == 2
+    assert saved == ["a.example", "b.example"]

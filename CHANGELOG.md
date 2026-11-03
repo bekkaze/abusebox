@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2026-11-03
+
+WHOIS fixes and install templates. No upgrade steps.
+
+Upgrading: `docker compose pull && docker compose up -d`.
+
+### Added
+
+- **Install templates** for Unraid, Portainer and CasaOS, in `templates/`. The Portainer and CasaOS files are self-contained, with the bundled resolver's configuration inlined, so they install from a pasted copy without a clone of the repository (#31, #32).
+- **`WHOIS_TIMEOUT_SECONDS`** (default 30) and **`WHOIS_CACHE_MINUTES`** (default 360). The timeout was fixed at 10 seconds before. Successful answers are now reused for a while, which keeps the scheduler from asking a registry again for every monitored asset; failures are never cached.
+
+### Fixed
+
+- **WHOIS failed where the `whois` command worked.** Lookups only ever used IPv4, so a registry that blocks a server's IPv4 address made the check time out even when the same query answered over IPv6. WHOIS now tries both, in the order the system prefers, the way the `whois` command does. The time budget is split between them, so a blocked address cannot use up the time the other one needs (#36).
+- **`.nl` lookups came back almost empty.** SIDN writes a record as indented blocks under a bare heading rather than as `key: value` lines, so the registrar was read as empty and the name servers and abuse contact were dropped. Those fields are filled in now. An expiry date stays blank for `.nl`: SIDN does not publish one (#36).
+- **A refused WHOIS query looked like an empty record.** Registries answer "rate limit exceeded" and similar as plain text on port 43, with nothing to mark it as an error, and SIDN does so after as little as one query. Such a reply is now reported as a failed check instead of an empty but successful one, and is kept out of the cache.
+- **A failed WHOIS check said nothing.** Blacklist, SSL and server checks all report their failures on the dashboard and the asset page; WHOIS was the one that did not.
+- **Assets could show "Scheduled check overdue" forever.** Releases before 1.3.2 accepted any per-asset interval, including negative ones. The scheduler ignores those and checks on time, but the health summary took them at face value and warned on every page load.
+- **Saving the scheduler settings during a check cycle threw that cycle's results away.** The checks had already run; only saving them was skipped.
+
 ## [1.3.3] - 2026-10-30
 
 Small fixes, no upgrade steps.

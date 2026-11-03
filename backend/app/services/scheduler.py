@@ -111,9 +111,11 @@ def _run_cycle_locked() -> int:
                 except Exception:
                     logger.exception("Error checking hostname %s", hostname.hostname)
 
+        # Every check above has already finished; saving is a handful of local
+        # writes. Stopping here would throw that network work away, so a stop
+        # (including the brief one a settings change causes) is not honoured
+        # until the results are persisted.
         for hostname, _, _ in work:
-            if _stop_event.is_set():
-                break
             result = results.get(hostname.id)
             if not result:
                 continue

@@ -1,0 +1,111 @@
+# AbuseBox for CasaOS.
+#
+# Self-contained on purpose: CasaOS installs from this file alone, so the
+# resolver's config is inlined below instead of bind-mounted from the repo.
+name: abusebox
+
+services:
+  backend:
+    image: ghcr.io/bekkaze/abusebox-backend:latest
+    container_name: abusebox-backend
+    restart: unless-stopped
+    environment:
+      - APP_DEBUG=false
+      # Leave empty: a secret key is generated and kept in the data volume.
+      - APP_SECRET_KEY=
+      - APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
+      # Must stay in the volume, or the database is lost on an update.
+      - DATABASE_URL=sqlite:////app/data/app.db
+      - DEFAULT_ADMIN_USERNAME=admin
+      - DEFAULT_ADMIN_EMAIL=admin@abusebox.local
+      # Empty: the first start generates a password, prints it in the log and
+      # saves it as initial_admin_password in the data volume.
+      - DEFAULT_ADMIN_PASSWORD=
+      - DEFAULT_ADMIN_PHONE=11111111
+      # Blacklist lookups go through the bundled resolver, so Spamhaus and
+      # others see this server's IP rather than a public resolver they refuse.
+      - DNSBL_NAMESERVERS=unbound
+    depends_on:
+      - unbound
+    volumes:
+      - /DATA/AppData/abusebox/data:/app/data
+    x-casaos:
+      envs:
+        - container: APP_CORS_ALLOWED_ORIGINS
+          description:
+            en_us: "Origins the UI is opened from, comma separated. Must match the address you type in the browser, for example http://192.168.1.10:3000"
+        - container: DEFAULT_ADMIN_PASSWORD
+          description:
+            en_us: "Admin password. Leave empty to have one generated and written to the log on the first start."
+        - container: ABUSEIPDB_API_KEY
+          description:
+            en_us: "Optional. Enables AbuseIPDB reputation checks."
+      volumes:
+        - container: /app/data
+          description:
+            en_us: "Database, secret key and the generated admin password. Back this up."
+
+  unbound:
+    image: klutchell/unbound:1.26.2@sha256:50cbeb32b5838a829a7226b19cb151f9535bd7f9f3190f950780f452fe807478
+    container_name: abusebox-unbound
+    restart: unless-stopped
+    configs:
+      - source: unbound_abusebox
+        target: /etc/unbound/custom.conf.d/abusebox.conf
+
+  frontend:
+    image: ghcr.io/bekkaze/abusebox-frontend:latest
+    container_name: abusebox-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8100
+    ports:
+      - "3000:3000"
+
+configs:
+  unbound_abusebox:
+    content: |
+      # A recursive, DNSSEC-validating resolver for this network only, so
+      # blacklist lookups leave from this server's own IP instead of a public
+      # resolver that Spamhaus and others refuse.
+      server:
+          # Docker networks usually have no IPv6 route; skip it instead of timing out.
+          do-ip6: no
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: frontend
+  author: bekkaze
+  developer: bekkaze
+  category: Network
+  icon: https://raw.githubusercontent.com/bekkaze/abusebox/main/files/logo.png
+  screenshot_link:
+    - https://raw.githubusercontent.com/bekkaze/abusebox/main/files/logo.png
+  scheme: http
+  port_map: "3000"
+  index: /
+  project_url: https://github.com/bekkaze/abusebox
+  title:
+    en_us: AbuseBox
+  tagline:
+    en_us: Know your mail server is blacklisted before your users do.
+  description:
+    en_us: >
+      Self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists,
+      SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when
+      something changes.
+
+      On the first start an admin password is generated and printed in the
+      abusebox-backend log; it is also saved as initial_admin_password in the
+      app's data folder.
+
+      After installing, set APP_CORS_ALLOWED_ORIGINS to the address you open
+      AbuseBox at, for example http://192.168.1.10:3000, or the browser will
+      block the API calls.
+  tips:
+    before_install:
+      en_us: The admin password is generated on the first start and printed in the abusebox-backend log.

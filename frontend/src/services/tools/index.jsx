@@ -35,7 +35,9 @@ export const checkWhois = async (hostname) => {
     const query = new URLSearchParams({ hostname }).toString();
     const response = await axios.get(`/api/tools/whois/?${query}`, {
       headers: { 'Accept': 'application/json' },
-      timeout: 30000,
+      // Longer than WHOIS_TIMEOUT_SECONDS: the backend may try IPv6 and IPv4
+      // before giving up, and its answer says why it failed.
+      timeout: 60000,
     });
     return response.data;
   } catch (error) {

@@ -149,6 +149,38 @@ def test_summary_flags_overdue_monitoring():
     assert fresh["issues"] == []
 
 
+def test_summary_reports_a_failed_whois_check():
+    # Issue #36: WHOIS was the only check whose failure raised no issue at all.
+    health = summarize(_asset(), {"blacklist": bl(), "whois": {"error": "WHOIS query failed: timed out"}})
+    whois_issues = [i for i in health["issues"] if i["kind"] == "whois"]
+    assert whois_issues == [{"kind": "whois", "severity": "warning",
+                             "message": "WHOIS query failed: timed out"}]
+
+
+def test_summary_is_quiet_when_whois_has_no_expiry_date():
+    # SIDN (.nl) never publishes an expiry date; that is not a failure.
+    health = summarize(_asset(), {"blacklist": bl(), "whois": {"domain": "x.nl", "registrar": "Example B.V."}})
+    assert health["issues"] == [] and "domain_expiry_days" not in health
+
+
+def test_summary_clamps_a_legacy_negative_check_interval():
+    # Releases before 1.3.2 stored any number, and the scheduler clamps it to
+    # MIN_CHECK_INTERVAL_MINUTES. Health has to agree or it warns forever.
+    from app.services.scheduler import _is_asset_due
+    asset = _asset(is_monitor_enabled=True, last_checked=datetime.now(timezone.utc) - timedelta(minutes=1),
+                   check_interval_minutes=-5)
+    health = summarize(asset, {"blacklist": bl()}, global_interval_minutes=360)
+    assert [i for i in health["issues"] if i["kind"] == "monitoring"] == []
+    assert _is_asset_due(asset, 360) is False
+
+
+def test_summary_still_flags_overdue_with_a_valid_own_interval():
+    stale = datetime.now(timezone.utc) - timedelta(hours=5)
+    health = summarize(_asset(is_monitor_enabled=True, last_checked=stale, check_interval_minutes=15),
+                       {"blacklist": bl()}, global_interval_minutes=360)
+    assert health["issues"][0]["kind"] == "monitoring"
+
+
 # --- notifications -------------------------------------------------------------------
 
 EVENT = {"event_type": "blacklist.listed", "severity": "critical", "title": "Listed on 1 blacklist",

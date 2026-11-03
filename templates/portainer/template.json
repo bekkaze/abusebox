@@ -1,0 +1,62 @@
+{
+  "version": "3",
+  "templates": [
+    {
+      "type": 3,
+      "title": "AbuseBox",
+      "name": "abusebox",
+      "description": "Self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.",
+      "note": "Open AbuseBox at http://&lt;your-server&gt;:3000 . The admin password is generated on the first start and printed in the backend container's log. Set 'Allowed browser origins' to the exact address you open AbuseBox at, or the browser will block the API calls.",
+      "categories": ["Tools", "Network", "Security"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/bekkaze/abusebox/main/files/logo.png",
+      "repository": {
+        "url": "https://github.com/bekkaze/abusebox",
+        "stackfile": "templates/portainer/docker-compose.yml"
+      },
+      "env": [
+        {
+          "name": "APP_CORS_ALLOWED_ORIGINS",
+          "label": "Allowed browser origins",
+          "description": "The address you open AbuseBox at, comma separated for more than one. Example: http://192.168.1.10:3000",
+          "default": "http://localhost:3000"
+        },
+        {
+          "name": "WEB_PORT",
+          "label": "Web UI port",
+          "description": "Host port for the web interface.",
+          "default": "3000"
+        },
+        {
+          "name": "DEFAULT_ADMIN_USERNAME",
+          "label": "Admin username",
+          "default": "admin"
+        },
+        {
+          "name": "DEFAULT_ADMIN_EMAIL",
+          "label": "Admin email",
+          "description": "Alerts for an asset go to the email of the user who owns it.",
+          "default": "admin@abusebox.local"
+        },
+        {
+          "name": "DEFAULT_ADMIN_PASSWORD",
+          "label": "Admin password",
+          "description": "Leave empty to have one generated on the first start and printed in the backend log.",
+          "default": ""
+        },
+        {
+          "name": "ABUSEIPDB_API_KEY",
+          "label": "AbuseIPDB API key",
+          "description": "Optional. Enables AbuseIPDB reputation checks.",
+          "default": ""
+        },
+        {
+          "name": "SCHEDULER_INTERVAL_MINUTES",
+          "label": "Check interval (minutes)",
+          "description": "How often monitored assets are re-checked. Can also be changed in Settings.",
+          "default": "360"
+        }
+      ]
+    }
+  ]
+}

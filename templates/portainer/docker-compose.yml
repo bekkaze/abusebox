@@ -1,0 +1,64 @@
+# AbuseBox for Portainer (Stacks -> Add stack, or the app template in
+# templates/portainer/template.json).
+#
+# Self-contained on purpose: no build contexts and no bind mounts, so it also
+# deploys from a pasted copy or a raw URL, not only from a clone of the repo.
+services:
+  backend:
+    image: ghcr.io/bekkaze/abusebox-backend:latest
+    restart: unless-stopped
+    environment:
+      - APP_DEBUG=false
+      # Leave empty: a secret key is generated and kept in the data volume.
+      - APP_SECRET_KEY=${APP_SECRET_KEY:-}
+      # Must match the address you open AbuseBox at, or the browser blocks the
+      # API calls (e.g. http://192.168.1.10:3000).
+      - APP_CORS_ALLOWED_ORIGINS=${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      # Must stay in the volume, or the database is lost on an update.
+      - DATABASE_URL=sqlite:////app/data/app.db
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL:-admin@abusebox.local}
+      # Empty: the first start generates a password, prints it in the log and
+      # saves it as initial_admin_password in the data volume.
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-}
+      - DEFAULT_ADMIN_PHONE=${DEFAULT_ADMIN_PHONE:-11111111}
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - SCHEDULER_INTERVAL_MINUTES=${SCHEDULER_INTERVAL_MINUTES:-360}
+      # Blacklist lookups go through the bundled resolver, so Spamhaus and
+      # others see this server's IP rather than a public resolver they refuse.
+      - DNSBL_NAMESERVERS=${DNSBL_NAMESERVERS:-unbound}
+    depends_on:
+      - unbound
+    volumes:
+      - abusebox-data:/app/data
+
+  unbound:
+    # Recursive resolver for blacklist lookups (only reachable inside this network).
+    image: klutchell/unbound:1.26.2@sha256:50cbeb32b5838a829a7226b19cb151f9535bd7f9f3190f950780f452fe807478
+    restart: unless-stopped
+    configs:
+      - source: unbound_abusebox
+        target: /etc/unbound/custom.conf.d/abusebox.conf
+
+  frontend:
+    image: ghcr.io/bekkaze/abusebox-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8100
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+configs:
+  unbound_abusebox:
+    content: |
+      # A recursive, DNSSEC-validating resolver for this network only, so
+      # blacklist lookups leave from this server's own IP instead of a public
+      # resolver that Spamhaus and others refuse.
+      server:
+          # Docker networks usually have no IPv6 route; skip it instead of timing out.
+          do-ip6: no
+
+volumes:
+  abusebox-data:

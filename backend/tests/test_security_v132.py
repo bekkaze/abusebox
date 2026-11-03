@@ -219,7 +219,7 @@ def test_whois_reads_are_bounded_and_go_to_public_servers():
     sock.__enter__.return_value = sock
     sock.recv.return_value = b"x" * 4096  # a server that never stops sending
     with mock.patch("socket.create_connection", return_value=sock) as connect, \
-            mock.patch.object(whois_lookup, "resolve_public_ipv4", return_value="192.0.43.8"):
+            mock.patch.object(whois_lookup, "resolve_public_addresses", return_value=["192.0.43.8"]):
         raw = whois_lookup._raw_whois("example.com", "whois.example")
     assert connect.call_args.args[0] == ("192.0.43.8", 43)
     assert len(raw) == whois_lookup._MAX_RESPONSE_BYTES
