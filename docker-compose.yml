@@ -52,3 +52,12 @@ services:
 
 volumes:
   abusebox-data:
+
+# Uncomment to give the containers IPv6 as well. A few WHOIS and blacklist
+# servers block an individual IPv4 address while still answering that same
+# client over IPv6 (issue #36); without this the containers only have IPv4,
+# whatever the host has. Needs Docker Engine 27 or newer: older daemons refuse
+# to create the network unless they were started with --ipv6 and fixed-cidr-v6.
+# networks:
+#   default:
+#     enable_ipv6: true

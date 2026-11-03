@@ -526,7 +526,7 @@ def test_whois_timeout_comes_from_settings(monkeypatch):
     monkeypatch.setattr(whois_lookup.socket, "create_connection", _fake_connect)
     with _whois_settings(whois_timeout_seconds=45):
         whois_lookup._raw_whois("example.com", "whois.example")
-    assert seen["timeout"] == 45.0
+    assert 44.0 <= seen["timeout"] <= 45.0
 
 
 def test_whois_reuses_a_cached_answer(monkeypatch):
@@ -684,12 +684,15 @@ def test_whois_reports_the_failure_when_every_family_is_blocked(monkeypatch):
     assert result["error"] == "WHOIS query failed: timed out"
 
 
-def test_whois_splits_its_timeout_across_the_families(monkeypatch):
+def test_whois_splits_its_timeout_when_a_family_hangs(monkeypatch):
     """A blocked family must not consume the budget the next one needs."""
+    clock = [0.0]
     timeouts = []
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
 
     def _connect(address_port, timeout):
         timeouts.append(timeout)
+        clock[0] += timeout          # this address hangs for its whole share
         raise socket.timeout("timed out")
 
     monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
@@ -698,3 +701,21 @@ def test_whois_splits_its_timeout_across_the_families(monkeypatch):
     with pytest.raises(socket.timeout):
         whois_lookup._raw_whois("theyosh.nl", "whois.sidn.nl", timeout=30.0)
     assert timeouts == [15.0, 15.0]
+    assert sum(timeouts) == 30.0     # the whole lookup still fits the budget
+
+
+def test_whois_gives_the_leftover_budget_to_the_next_family(monkeypatch):
+    """No IPv6 route fails at once; IPv4 should then get nearly the whole budget."""
+    timeouts = []
+
+    def _connect(address_port, timeout):
+        timeouts.append(timeout)
+        raise OSError(101, "Network unreachable")
+
+    monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
+                        lambda server: ["2a00:d78::1", "94.198.154.138"])
+    monkeypatch.setattr(whois_lookup.socket, "create_connection", _connect)
+    with pytest.raises(OSError):
+        whois_lookup._raw_whois("theyosh.nl", "whois.sidn.nl", timeout=30.0)
+    assert 14.0 <= timeouts[0] <= 15.0      # half the budget offered
+    assert timeouts[1] >= 29.0              # the instant failure handed its share over

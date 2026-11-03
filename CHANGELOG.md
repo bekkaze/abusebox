@@ -10,6 +10,7 @@ Upgrading: `docker compose pull && docker compose up -d`.
 
 ### Added
 
+- **IPv6 for the containers**, as a commented-out `enable_ipv6` block at the end of `docker-compose.yml`. Docker gives containers only IPv4 by default, whatever the host has, so a registry that blocks your IPv4 cannot be worked around without it. See [WHOIS that times out](README.md#whois-that-times-out).
 - **Install templates** for Unraid, Portainer and CasaOS, in `templates/`. The Portainer and CasaOS files are self-contained, with the bundled resolver's configuration inlined, so they install from a pasted copy without a clone of the repository (#31, #32).
 - **`WHOIS_TIMEOUT_SECONDS`** (default 30) and **`WHOIS_CACHE_MINUTES`** (default 360). The timeout was fixed at 10 seconds before. Successful answers are now reused for a while, which keeps the scheduler from asking a registry again for every monitored asset; failures are never cached.
 

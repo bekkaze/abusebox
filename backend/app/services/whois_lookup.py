@@ -131,11 +131,16 @@ def _raw_whois(domain: str, server: str, timeout: float | None = None) -> str:
     # Only public addresses: a referral could otherwise point at an internal host.
     addresses = resolve_public_addresses(server)
 
-    # One shared budget, split evenly, so a blocked family cannot eat the time
-    # the next one needs and the whole lookup still finishes within `timeout`.
-    per_attempt = max(timeout / len(addresses), 1.0)
+    # One shared budget so the whole lookup still finishes within `timeout`,
+    # divided by the attempts left rather than fixed up front: an address that
+    # fails at once (no IPv6 route, say) hands its share to the next one, while
+    # one that hangs cannot eat the time the next one needs.
+    deadline = time.monotonic() + timeout
     last_error: Exception | None = None
-    for address in addresses:
+    for index, address in enumerate(addresses):
+        remaining = deadline - time.monotonic()
+        attempts_left = len(addresses) - index
+        per_attempt = max(remaining / attempts_left, 1.0)
         try:
             return _query_address(domain, address, per_attempt)
         except (socket.timeout, OSError) as exc:
