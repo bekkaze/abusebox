@@ -135,6 +135,13 @@ class Settings:
     scheduler_enabled: bool = parse_bool("SCHEDULER_ENABLED", True)
     scheduler_interval_minutes: int = parse_int("SCHEDULER_INTERVAL_MINUTES", 360)
 
+    # WHOIS settings. Some registries (SIDN/.nl among them) answer slowly when
+    # they are throttling, so the old fixed 10s was easy to trip (issue #36).
+    whois_timeout_seconds: int = parse_int("WHOIS_TIMEOUT_SECONDS", 30)
+    # Registries rate limit by the hour; the scheduler re-checks every asset on
+    # its own interval, so answers are reused instead of asked for again.
+    whois_cache_minutes: int = parse_int("WHOIS_CACHE_MINUTES", 360)
+
     def __post_init__(self) -> None:
         object.__setattr__(self, "cors_allowed_origins", parse_csv("APP_CORS_ALLOWED_ORIGINS", "http://localhost:3000"))
         object.__setattr__(self, "secret_key_file", secret_key_file(self.database_url))

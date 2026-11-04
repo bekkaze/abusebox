@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.core.timeutil import as_utc
+from app.schemas.hostname import MIN_CHECK_INTERVAL_MINUTES
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 
@@ -143,6 +144,12 @@ def summarize(
         elif domain_warning_days and expiry_days <= domain_warning_days:
             issue("domain", "critical" if expiry_days <= 7 else "warning", f"Domain expires in {expiry_days} day{'s' if expiry_days != 1 else ''}")
 
+    whois = parts.get("whois")
+    if isinstance(whois, dict) and whois.get("error"):
+        # The service's own errors already start with "WHOIS ...".
+        detail = str(whois["error"])
+        issue("whois", "warning", detail if detail.lower().startswith("whois") else f"WHOIS check failed: {detail}")
+
     server = server_state(result)
     if server is not None:
         health["server"] = server
@@ -171,7 +178,10 @@ def summarize(
 
     if getattr(hostname, "is_monitor_enabled", False) and scheduler_enabled and global_interval_minutes:
         last = as_utc(getattr(hostname, "last_checked", None))
-        interval = getattr(hostname, "check_interval_minutes", None) or global_interval_minutes
+        own_interval = getattr(hostname, "check_interval_minutes", None)
+        # Same clamp as scheduler._is_asset_due: releases before 1.3.2 stored
+        # any number here, and a negative one made this warning always fire.
+        interval = max(own_interval, MIN_CHECK_INTERVAL_MINUTES) if own_interval else global_interval_minutes
         if last is None:
             issue("monitoring", "info", "Waiting for the first scheduled check")
         elif (now - last).total_seconds() > (interval * 2 + 10) * 60:

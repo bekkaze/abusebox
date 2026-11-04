@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>AbuseBox-Backend</Name>
+  <Repository>ghcr.io/bekkaze/abusebox-backend:latest</Repository>
+  <Registry>https://github.com/bekkaze/abusebox/pkgs/container/abusebox-backend</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/bekkaze/abusebox/issues</Support>
+  <Project>https://github.com/bekkaze/abusebox</Project>
+  <Overview>
+    The AbuseBox API. Install this first, then install AbuseBox-Frontend and point its BACKEND_URL at this container.
+
+    AbuseBox is self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.
+
+    On the first start an admin password is generated, printed in this container's log and saved as 'initial_admin_password' in the data path below.
+
+    Note on blacklists: Spamhaus and some other lists refuse queries that come through public resolvers such as Google or Cloudflare, and AbuseBox then shows "No answer" instead of a false "clean". Leave DNSBL_NAMESERVERS empty to use Unraid's own resolver, or set it to a resolver you run. See the README section "Blacklists that show No answer".
+  </Overview>
+  <Category>Tools: Network: Security:</Category>
+  <WebUI>http://[IP]:[PORT:8100]/swagger/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/bekkaze/abusebox/main/files/logo.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>Install AbuseBox-Frontend as well; on its own this container serves only the API.</Requires>
+  <Config Name="API port" Target="8100" Default="8100" Mode="tcp" Description="The API port. The frontend container connects to it, and scripts on this machine can use it directly." Type="Port" Display="always" Required="true" Mask="false">8100</Config>
+  <Config Name="Data" Target="/app/data" Default="/mnt/user/appdata/abusebox" Mode="rw" Description="Holds the SQLite database, the generated secret key and the initial admin password. Back this up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/abusebox</Config>
+  <Config Name="Allowed browser origins" Target="APP_CORS_ALLOWED_ORIGINS" Default="" Mode="" Description="Comma-separated origins the UI is opened from, for example http://192.168.1.10:3000 . Must match the address you use to reach the frontend, or the browser blocks the API calls." Type="Variable" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="Admin username" Target="DEFAULT_ADMIN_USERNAME" Default="admin" Mode="" Description="Username of the admin account created on the first start." Type="Variable" Display="always" Required="false" Mask="false">admin</Config>
+  <Config Name="Admin email" Target="DEFAULT_ADMIN_EMAIL" Default="admin@abusebox.local" Mode="" Description="Email address of that admin account. Alerts for an asset go to the email of the user who owns it." Type="Variable" Display="always" Required="false" Mask="false">admin@abusebox.local</Config>
+  <Config Name="Admin password" Target="DEFAULT_ADMIN_PASSWORD" Default="" Mode="" Description="Leave empty to have one generated on the first start, printed in the log and saved as 'initial_admin_password' in the data path." Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="App secret key" Target="APP_SECRET_KEY" Default="" Mode="" Description="Signs login tokens. Leave empty to have one generated and saved in the data path." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Blacklist resolvers" Target="DNSBL_NAMESERVERS" Default="" Mode="" Description="Comma-separated DNS resolvers for blacklist lookups. Empty uses this server's own resolver. Public resolvers such as 8.8.8.8 are refused by Spamhaus." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="AbuseIPDB API key" Target="ABUSEIPDB_API_KEY" Default="" Mode="" Description="Optional. Enables AbuseIPDB reputation checks." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Check interval (minutes)" Target="SCHEDULER_INTERVAL_MINUTES" Default="360" Mode="" Description="How often monitored assets are re-checked. Can also be changed in Settings." Type="Variable" Display="advanced" Required="false" Mask="false">360</Config>
+  <Config Name="Scheduler enabled" Target="SCHEDULER_ENABLED" Default="true" Mode="" Description="Run the periodic background checks." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
+  <Config Name="WHOIS timeout (seconds)" Target="WHOIS_TIMEOUT_SECONDS" Default="30" Mode="" Description="How long to wait for a WHOIS server. Registries that throttle can take well over 10 seconds." Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
+  <Config Name="WHOIS cache (minutes)" Target="WHOIS_CACHE_MINUTES" Default="360" Mode="" Description="How long a successful WHOIS answer is reused before asking the registry again. 0 disables caching." Type="Variable" Display="advanced" Required="false" Mask="false">360</Config>
+  <Config Name="SMTP host" Target="SMTP_HOST" Default="" Mode="" Description="Optional. SMTP server for email alerts." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="SMTP port" Target="SMTP_PORT" Default="587" Mode="" Description="587 uses STARTTLS; 465 uses TLS from the start." Type="Variable" Display="advanced" Required="false" Mask="false">587</Config>
+  <Config Name="SMTP username" Target="SMTP_USERNAME" Default="" Mode="" Description="Optional." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="SMTP password" Target="SMTP_PASSWORD" Default="" Mode="" Description="Optional." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="SMTP from address" Target="SMTP_FROM_EMAIL" Default="" Mode="" Description="Optional. The From address on alert emails." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Webhook URL" Target="WEBHOOK_URL" Default="" Mode="" Description="Optional. Slack and Discord URLs get chat messages. A URL set in Settings takes precedence." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Hide API docs" Target="DISABLE_API_DOCS" Default="false" Mode="" Description="true hides /swagger/, /redoc/ and /openapi.json." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+</Container>

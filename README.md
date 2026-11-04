@@ -117,6 +117,36 @@ Open `http://localhost:3000`.
 
 </details>
 
+### Unraid
+
+Templates for Unraid's Community Applications live in [`templates/unraid/`](templates/unraid/). AbuseBox runs as two containers, so install both:
+
+1. Copy `abusebox-backend.xml` and `abusebox-frontend.xml` into `/boot/config/plugins/dockerMan/templates-user/` on the server (or add this repository under **Docker → Template repositories**).
+2. Add **AbuseBox-Backend** first. Set **Data** to a path you back up, such as `/mnt/user/appdata/abusebox`, and set **Allowed browser origins** to the address you will open AbuseBox at, for example `http://192.168.1.10:3000`.
+3. Add **AbuseBox-Frontend**. Set **Backend URL** to the server's LAN IP and the backend's port, for example `http://192.168.1.10:8100`. Not `localhost` — that points at the frontend container itself.
+4. Open `http://<your-server>:3000`. The admin password is in the AbuseBox-Backend log, and in `initial_admin_password` in the data path.
+
+Unraid has no bundled resolver, so **Blacklist resolvers** is empty by default and the server's own resolver is used. If blacklists show "No answer", see [Blacklists that show "No answer"](#blacklists-that-show-no-answer).
+
+### Portainer
+
+[`templates/portainer/`](templates/portainer/) has an app template and a self-contained compose file (no build contexts, no bind mounts).
+
+- **App template:** in Portainer, **Settings → App Templates**, set the URL to `https://raw.githubusercontent.com/bekkaze/abusebox/main/templates/portainer/template.json`, then deploy **AbuseBox** from **App Templates**.
+- **Or as a stack:** **Stacks → Add stack → Repository**, repository URL `https://github.com/bekkaze/abusebox`, compose path `templates/portainer/docker-compose.yml`.
+
+Set **Allowed browser origins** to the address you open AbuseBox at, then go to `http://<your-server>:3000`. The admin password is in the backend container's log.
+
+### CasaOS
+
+[`templates/casaos/docker-compose.yml`](templates/casaos/docker-compose.yml) is a self-contained CasaOS app.
+
+1. In CasaOS, **App Store → Custom Install** (the `+` in the top right), choose **Import** and paste the file's contents.
+2. Install, then open AbuseBox from the dashboard at port 3000.
+3. In the app's settings, set `APP_CORS_ALLOWED_ORIGINS` to the address you open AbuseBox at, for example `http://192.168.1.10:3000`, or the browser will block the API calls.
+
+Data lives in `/DATA/AppData/abusebox/data`. The admin password is in the `abusebox-backend` log and in `initial_admin_password` in that folder.
+
 <a id="upgrading-to-v130"></a>
 
 ### Upgrading
@@ -198,6 +228,10 @@ DISABLE_API_DOCS=false         # true hides /swagger/, /redoc/ and /openapi.json
 SCHEDULER_ENABLED=true
 SCHEDULER_INTERVAL_MINUTES=360
 
+# WHOIS lookups
+WHOIS_TIMEOUT_SECONDS=30       # total per lookup, split across IPv6 and IPv4
+WHOIS_CACHE_MINUTES=360        # reuse answers instead of re-asking; 0 disables
+
 # Email alerts (optional)
 SMTP_HOST=
 SMTP_PORT=587                  # 587 uses STARTTLS; 465 uses TLS from the start
@@ -220,6 +254,8 @@ WEBHOOK_URL=
 | `ABUSEIPDB_API_KEY` | Enables AbuseIPDB reputation checks | No |
 | `SCHEDULER_ENABLED` | Run periodic background checks (default: `true`; can also be changed in Settings) | No |
 | `SCHEDULER_INTERVAL_MINUTES` | Check interval in minutes (default: 360) | No |
+| `WHOIS_TIMEOUT_SECONDS` | Total seconds for one WHOIS lookup (default: 30), split evenly across the server's IPv6 and IPv4 addresses. Some registries block a client on one family and answer it on the other | No |
+| `WHOIS_CACHE_MINUTES` | How long a successful WHOIS answer is reused before asking again (default: 360). `0` disables caching | No |
 | `SMTP_HOST` | SMTP server for email alerts. Alerts go to the email address of the asset's owner; each user sets theirs in **Settings → Notifications** | No |
 | `WEBHOOK_URL` | Webhook URL for alerts (Slack and Discord URLs get chat messages). A URL set in Settings → Notifications takes precedence | No |
 | `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers (IPs or hostnames) for blacklist lookups. Docker Compose sets it to its bundled resolver, `unbound`. Spamhaus and some others refuse public resolvers; see [Blacklists that show "No answer"](#blacklists-that-show-no-answer) | No |
@@ -250,6 +286,32 @@ DNSBL_NAMESERVERS=192.0.2.53
 ```
 
 For a manual install, point `DNSBL_NAMESERVERS` at a local Unbound or another recursive resolver that isn't a large public one. If you use dnsmasq, add `rebind-localhost-ok`.
+
+<a id="whois-that-times-out"></a>
+
+### WHOIS that times out
+
+Registries sometimes block an individual client's IPv4 address while still answering that same client over IPv6. SIDN (`.nl`) is known to do it. AbuseBox tries both address families and falls back to the other when one does not answer, so this fixes itself wherever IPv6 is available.
+
+Docker containers only get IPv4 by default, whatever the host has. To give them IPv6 as well, uncomment this at the end of `docker-compose.yml` and recreate the stack:
+
+```yaml
+networks:
+  default:
+    enable_ipv6: true
+```
+
+It needs Docker Engine 27 or newer; older daemons refuse to create the network unless they were started with `--ipv6` and `fixed-cidr-v6`. Check that it worked:
+
+```bash
+docker compose exec backend python -c "import socket; socket.create_connection(('2a00:d78:0:b001:94:198:154:138', 43), timeout=8); print('IPv6 OK')"
+```
+
+A WHOIS lookup has one time budget (`WHOIS_TIMEOUT_SECONDS`, default 30) shared across both families, so enabling IPv6 never makes a failing lookup take longer.
+
+Registries also rate limit hard: SIDN refuses a second query made soon after the first, answering `Error: ratelimit exceeded`. AbuseBox reports that as a failed check rather than an empty record, and reuses successful answers for `WHOIS_CACHE_MINUTES` (default 6 hours) so monitoring does not re-ask on every cycle.
+
+If a registry refuses anyway, the last good answer is served for up to four times that window rather than nothing, marked `stale` with the reason and its age. A registration does not change by the hour, so an asset keeps its registrar and expiry date instead of flipping to an error whenever the registry is busy. Once the stale window passes, the failure is reported normally.
 
 Frontend: the Docker image serves the built UI with nginx and proxies `/api` to `BACKEND_URL` (default `http://backend:8100`). For the development server (`yarn dev`), `frontend/.env` sets:
 
@@ -348,6 +410,7 @@ abusebox/
 │       └── routes/            # React Router config
 │   ├── nginx/                 # production web server config (serves the UI, proxies /api)
 ├── unbound/                   # settings for the bundled DNS resolver
+├── templates/                 # install templates: unraid/, portainer/, casaos/
 ├── site/                      # project website (GitHub Pages)
 ├── files/                     # logo, demo GIF and screenshots
 ├── docker-compose.yml
@@ -360,6 +423,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.3.4** | November 3, 2026 | WHOIS works where a registry blocks IPv4 but answers over IPv6, `.nl` records read correctly, rate-limit replies no longer look like empty records (#36), install templates for Unraid, Portainer and CasaOS (#31, #32) |
 | **v1.3.3** | October 30, 2026 | Copy a blacklist result as plain text for a ticket or an email to the list operator (#29), a readable activity timeline (#30), copying works on plain-HTTP installs |
 | **v1.3.2** | October 28, 2026 | Security release (login rate-limit bypass, random first admin password, alert and scheduler abuse, DNS rebinding, dnspython), bundled DNS resolver for blacklist lookups, resolver warning |
 | **v1.3.1** | October 26, 2026 | Email alerts reach a real address (each user sets theirs in Settings, #28), SMTP on port 465, certifi security update |

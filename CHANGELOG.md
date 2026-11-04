@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2026-11-03
+
+WHOIS fixes and install templates. No upgrade steps.
+
+Upgrading: `docker compose pull && docker compose up -d`.
+
+### Added
+
+- **IPv6 for the containers**, as a commented-out `enable_ipv6` block at the end of `docker-compose.yml`. Docker gives containers only IPv4 by default, whatever the host has, so a registry that blocks your IPv4 cannot be worked around without it. See [WHOIS that times out](README.md#whois-that-times-out).
+- **Install templates** for Unraid, Portainer and CasaOS, in `templates/`. The Portainer and CasaOS files are self-contained, with the bundled resolver's configuration inlined, so they install from a pasted copy without a clone of the repository (#31, #32).
+- **`WHOIS_TIMEOUT_SECONDS`** (default 30) and **`WHOIS_CACHE_MINUTES`** (default 360). The timeout was fixed at 10 seconds before. Successful answers are now reused for a while, which keeps the scheduler from asking a registry again for every monitored asset; failures are never cached.
+
+### Fixed
+
+- **WHOIS failed where the `whois` command worked.** Lookups only ever used IPv4, so a registry that blocks a server's IPv4 address made the check time out even when the same query answered over IPv6. WHOIS now tries both, in the order the system prefers, the way the `whois` command does. The time budget is split between them, so a blocked address cannot use up the time the other one needs (#36).
+- **`.nl` lookups came back almost empty.** SIDN writes a record as indented blocks under a bare heading rather than as `key: value` lines, so the registrar was read as empty and the name servers and abuse contact were dropped. Those fields are filled in now. An expiry date stays blank for `.nl`: SIDN does not publish one (#36).
+- **One refusal wiped out a good record.** When a registry refuses, the last good answer is now served for up to four times `WHOIS_CACHE_MINUTES`, marked as stale with the reason and its age, instead of the asset losing its registrar and expiry date until the registry is willing again. A safety refusal is never covered up this way.
+- **`.it` and similar records came back nearly empty too.** Some registries write a bare heading with no colon and indent the block underneath it, and use short field names (`Domain`, `Created`, `Expire Date`) that were not recognised. Those are read now, including the name servers. Fields inside a contact block stay with that contact: the date under "Admin Contact" is no longer taken as the domain's creation date, and a contact's organisation is no longer taken as the registrar.
+- **A refused WHOIS query looked like an empty record.** Registries answer "rate limit exceeded" and similar as plain text on port 43, with nothing to mark it as an error, and SIDN does so after as little as one query. Such a reply is now reported as a failed check instead of an empty but successful one, and is kept out of the cache.
+- **A WHOIS check on a subdomain showed a blank result.** A host like `mail1.example.nl` cannot be looked up, and the registry says so in plain text, which was being read as an empty but successful record. It is reported as a failed check now. Looking up the domain the host belongs to, rather than failing, is still to come.
+- **A failed WHOIS check said nothing.** Blacklist, SSL and server checks all report their failures on the dashboard and the asset page; WHOIS was the one that did not.
+- **Assets could show "Scheduled check overdue" forever.** Releases before 1.3.2 accepted any per-asset interval, including negative ones. The scheduler ignores those and checks on time, but the health summary took them at face value and warned on every page load.
+- **Saving the scheduler settings during a check cycle threw that cycle's results away.** The checks had already run; only saving them was skipped.
+
+### Security
+
+- **Vite updated to 6.4.5** ([GHSA-8g5g-mxqh-grgj](https://github.com/advisories/GHSA-8g5g-mxqh-grgj), CVE-2026-118662: `server.fs.deny` bypassed with queries). A development dependency: the published frontend image serves the built files with nginx and never runs Vite's dev server, so installs were not affected.
+
 ## [1.3.3] - 2026-10-30
 
 Small fixes, no upgrade steps.

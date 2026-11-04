@@ -1,5 +1,6 @@
 """Offline unit tests for services (network calls are stubbed)."""
 
+import contextlib
 import gzip
 import io
 import socket
@@ -436,3 +437,450 @@ def test_long_txt_records_are_joined_without_quotes():
     answer = [mock.Mock(strings=[b"v=spf1 include:a.example include:b.example", b" include:c.example -all"])]
     with mock.patch("dns.resolver.resolve", return_value=answer):
         assert email_security._dns_txt_records("x.example") == ["v=spf1 include:a.example include:b.example include:c.example -all"]
+
+
+# Issue #36: SIDN (.nl) answers with indented blocks under a bare header, so a
+# successful lookup used to return an empty registrar and no name servers.
+SIDN_ANSWER = """Domain name: theyosh.nl
+Status:      active
+
+Registrar:
+   Quickhost B.V.
+   Friesestraatweg 213 D
+   9743AD Groningen
+   Netherlands
+
+Abuse Contact:
+   abuse@exsilia.net
+
+DNSSEC:      yes
+
+Domain nameservers:
+   ns2.exsilia.net
+   ns1.exsilia.net
+
+Creation Date: 2006-07-01
+
+Updated Date: 2026-01-02
+
+Record maintained by: SIDN BV
+"""
+
+
+def test_whois_parses_indented_blocks_from_sidn():
+    parsed = whois_lookup._parse_whois(SIDN_ANSWER)
+    assert parsed["registrar"] == "Quickhost B.V."
+    assert parsed["abuse_email"] == "abuse@exsilia.net"
+    assert parsed["name_servers"] == ["ns2.exsilia.net", "ns1.exsilia.net"]
+    assert parsed["creation_date"] == "2006-07-01"
+    assert parsed["status"] == ["active"]
+
+
+def test_whois_header_without_value_does_not_claim_the_field():
+    # "Registrar:" alone must not win over the real name on the next line.
+    assert whois_lookup._parse_whois("Registrar:\n   Real Name B.V.\n")["registrar"] == "Real Name B.V."
+
+
+def test_whois_still_parses_flat_key_value_answers():
+    flat = (
+        "   Domain Name: EXAMPLE.COM\n"
+        "   Registrar: MarkMonitor Inc.\n"
+        "   Registry Expiry Date: 2026-08-13T04:00:00Z\n"
+        "   Name Server: A.IANA-SERVERS.NET\n"
+        "   Name Server: B.IANA-SERVERS.NET\n"
+    )
+    parsed = whois_lookup._parse_whois(flat)
+    assert parsed["registrar"] == "MarkMonitor Inc."
+    assert parsed["expiry_date"] == "2026-08-13T04:00:00Z"
+    assert parsed["name_servers"] == ["A.IANA-SERVERS.NET", "B.IANA-SERVERS.NET"]
+
+
+@contextlib.contextmanager
+def _whois_settings(**values):
+    """Settings is a frozen dataclass, so override fields the hard way."""
+    from app.core.config import settings
+    previous = {key: getattr(settings, key) for key in values}
+    for key, value in values.items():
+        object.__setattr__(settings, key, value)
+    try:
+        yield
+    finally:
+        for key, value in previous.items():
+            object.__setattr__(settings, key, value)
+
+
+def test_whois_timeout_comes_from_settings(monkeypatch):
+    seen = {}
+
+    class _Sock:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def sendall(self, _data): pass
+        def recv(self, _n): return b""
+
+    def _fake_connect(address, timeout):
+        seen["timeout"] = timeout
+        return _Sock()
+
+    monkeypatch.setattr(whois_lookup, "resolve_public_addresses", lambda host: ["203.0.113.5"])
+    monkeypatch.setattr(whois_lookup.socket, "create_connection", _fake_connect)
+    with _whois_settings(whois_timeout_seconds=45):
+        whois_lookup._raw_whois("example.com", "whois.example")
+    assert 44.0 <= seen["timeout"] <= 45.0
+
+
+def test_whois_reuses_a_cached_answer(monkeypatch):
+    calls = []
+
+    def _fake_raw(domain, server, timeout=None):
+        calls.append(domain)
+        return "Domain name: cached.nl\nRegistrar:\n   Example B.V.\n"
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _fake_raw)
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        first = whois_lookup.whois_lookup("cached.nl")
+        second = whois_lookup.whois_lookup("cached.nl")
+        whois_lookup.clear_whois_cache()
+    assert calls == ["cached.nl"]
+    assert first == second and second["registrar"] == "Example B.V."
+
+
+def test_whois_failures_are_not_cached(monkeypatch):
+    attempts = []
+
+    def _flaky(domain, server, timeout=None):
+        attempts.append(domain)
+        if len(attempts) == 1:
+            raise socket.timeout("timed out")
+        return "Domain name: flaky.nl\n"
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _flaky)
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        failed = whois_lookup.whois_lookup("flaky.nl")
+        recovered = whois_lookup.whois_lookup("flaky.nl")
+        whois_lookup.clear_whois_cache()
+    assert "error" in failed
+    assert recovered["domain_name"] == "flaky.nl"
+
+
+def test_whois_cache_can_be_disabled(monkeypatch):
+    calls = []
+
+    def _fake_raw(domain, server, timeout=None):
+        calls.append(domain)
+        return "Domain name: nocache.nl\n"
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _fake_raw)
+    with _whois_settings(whois_cache_minutes=0):
+        whois_lookup.clear_whois_cache()
+        whois_lookup.whois_lookup("nocache.nl")
+        whois_lookup.whois_lookup("nocache.nl")
+    assert calls == ["nocache.nl", "nocache.nl"]
+
+
+def test_whois_rate_limit_reply_is_an_error_not_an_empty_record(monkeypatch):
+    # SIDN answers "Error: ratelimit exceeded" on port 43 with no status code,
+    # which used to parse to nothing and be shown as a successful lookup.
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: "Error: ratelimit exceeded\r\n")
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        result = whois_lookup.whois_lookup("theyosh.nl")
+    assert result["error"] == "WHOIS query failed: ratelimit exceeded"
+
+
+def test_whois_rate_limit_reply_is_not_cached(monkeypatch):
+    replies = ["Error: ratelimit exceeded\r\n", "Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n"]
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: replies.pop(0))
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        first = whois_lookup.whois_lookup("theyosh.nl")
+        second = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+    assert "error" in first
+    assert second["registrar"] == "Quickhost B.V."
+
+
+def test_whois_does_not_mistake_record_text_for_a_failure(monkeypatch):
+    # "access denied" deep inside a registrar's terms must not fail the lookup.
+    record = (
+        "Domain Name: EXAMPLE.COM\r\n"
+        "Registrar: MarkMonitor Inc.\r\n"
+        "Name Server: A.IANA-SERVERS.NET\r\n"
+        ">>> Last update: 2026-01-01 <<<\r\n"
+        "Terms of use: access denied to automated bulk queries.\r\n"
+    )
+    monkeypatch.setattr(whois_lookup, "_raw_whois", lambda domain, server, timeout=None: record)
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("example.com")
+    assert "error" not in result and result["registrar"] == "MarkMonitor Inc."
+
+
+def _fake_dual_stack(mapping):
+    """getaddrinfo stub returning (family, address) pairs in the given order."""
+    def fake(host, *args, **kwargs):
+        if host not in mapping:
+            raise socket.gaierror("not found")
+        return [(family, socket.SOCK_STREAM, 6, "", (addr, 0) if family == socket.AF_INET else (addr, 0, 0, 0))
+                for family, addr in mapping[host]]
+    return fake
+
+
+def test_resolve_public_addresses_prefers_the_system_order():
+    pairs = [(socket.AF_INET6, "2a00:d78:0:b001:94:198:154:138"), (socket.AF_INET, "94.198.154.138")]
+    with mock.patch("socket.getaddrinfo", _fake_dual_stack({"whois.sidn.nl": pairs})):
+        assert network_safety.resolve_public_addresses("whois.sidn.nl") == [
+            "2a00:d78:0:b001:94:198:154:138", "94.198.154.138"]
+
+
+def test_resolve_public_addresses_keeps_one_address_per_family():
+    pairs = [(socket.AF_INET, "93.184.216.34"), (socket.AF_INET, "93.184.216.35"),
+             (socket.AF_INET6, "2606:2800:220:1:248:1893:25c8:1946")]
+    with mock.patch("socket.getaddrinfo", _fake_dual_stack({"many.test": pairs})):
+        assert network_safety.resolve_public_addresses("many.test") == [
+            "93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"]
+
+
+def test_resolve_public_addresses_rejects_a_private_ipv6_answer():
+    pairs = [(socket.AF_INET, "93.184.216.34"), (socket.AF_INET6, "fd00::1")]
+    with mock.patch("socket.getaddrinfo", _fake_dual_stack({"mixed.test": pairs})):
+        with pytest.raises(network_safety.UnsafeDestinationError):
+            network_safety.resolve_public_addresses("mixed.test")
+
+
+def test_whois_falls_back_to_the_other_family_when_one_is_blocked(monkeypatch):
+    """Issue #36: SIDN blocks some IPv4 clients but answers them over IPv6."""
+    tried = []
+
+    def _connect(address_port, timeout):
+        tried.append(address_port[0])
+        if ":" not in address_port[0]:          # the blocked IPv4 address
+            raise socket.timeout("timed out")
+        sock = mock.MagicMock()
+        sock.__enter__.return_value = sock
+        sock.recv.side_effect = [b"Domain name: theyosh.nl\r\n", b""]
+        return sock
+
+    monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
+                        lambda server: ["94.198.154.138", "2a00:d78:0:b001:94:198:154:138"])
+    monkeypatch.setattr(whois_lookup.socket, "create_connection", _connect)
+    raw = whois_lookup._raw_whois("theyosh.nl", "whois.sidn.nl", timeout=20.0)
+    assert tried == ["94.198.154.138", "2a00:d78:0:b001:94:198:154:138"]
+    assert "theyosh.nl" in raw
+
+
+def test_whois_reports_the_failure_when_every_family_is_blocked(monkeypatch):
+    def _connect(address_port, timeout):
+        raise socket.timeout("timed out")
+
+    monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
+                        lambda server: ["94.198.154.138", "2a00:d78::1"])
+    monkeypatch.setattr(whois_lookup.socket, "create_connection", _connect)
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("theyosh.nl")
+    assert result["error"] == "WHOIS query failed: timed out"
+
+
+def test_whois_splits_its_timeout_when_a_family_hangs(monkeypatch):
+    """A blocked family must not consume the budget the next one needs."""
+    clock = [0.0]
+    timeouts = []
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+
+    def _connect(address_port, timeout):
+        timeouts.append(timeout)
+        clock[0] += timeout          # this address hangs for its whole share
+        raise socket.timeout("timed out")
+
+    monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
+                        lambda server: ["94.198.154.138", "2a00:d78::1"])
+    monkeypatch.setattr(whois_lookup.socket, "create_connection", _connect)
+    with pytest.raises(socket.timeout):
+        whois_lookup._raw_whois("theyosh.nl", "whois.sidn.nl", timeout=30.0)
+    assert timeouts == [15.0, 15.0]
+    assert sum(timeouts) == 30.0     # the whole lookup still fits the budget
+
+
+def test_whois_gives_the_leftover_budget_to_the_next_family(monkeypatch):
+    """No IPv6 route fails at once; IPv4 should then get nearly the whole budget."""
+    timeouts = []
+
+    def _connect(address_port, timeout):
+        timeouts.append(timeout)
+        raise OSError(101, "Network unreachable")
+
+    monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
+                        lambda server: ["2a00:d78::1", "94.198.154.138"])
+    monkeypatch.setattr(whois_lookup.socket, "create_connection", _connect)
+    with pytest.raises(OSError):
+        whois_lookup._raw_whois("theyosh.nl", "whois.sidn.nl", timeout=30.0)
+    assert 14.0 <= timeouts[0] <= 15.0      # half the budget offered
+    assert timeouts[1] >= 29.0              # the instant failure handed its share over
+
+
+def test_whois_serves_the_last_good_answer_when_the_registry_refuses(monkeypatch):
+    """SIDN refuses a second query soon after the first; a monitored asset
+    should keep its last good record instead of flipping to an error."""
+    replies = ["Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n",
+               "Error: ratelimit exceeded\r\n"]
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: replies.pop(0))
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        fresh = whois_lookup.whois_lookup("theyosh.nl")
+        clock[0] += 90 * 60                      # past the cache window
+        refused = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+
+    assert "stale" not in fresh and fresh["registrar"] == "Quickhost B.V."
+    assert refused["registrar"] == "Quickhost B.V."
+    assert refused["stale"] is True
+    assert refused["stale_age_minutes"] == 90
+    assert refused["stale_reason"] == "WHOIS query failed: ratelimit exceeded"
+
+
+def test_whois_stale_answer_eventually_expires(monkeypatch):
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: "Error: ratelimit exceeded\r\n")
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        whois_lookup._cache_put("theyosh.nl", {"domain": "theyosh.nl", "registrar": "Quickhost B.V.", "raw": "x"})
+        clock[0] += 5 * 60 * 60                  # past 4x the cache window
+        result = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+
+    assert result == {"error": "WHOIS query failed: ratelimit exceeded"}
+
+
+def test_whois_does_not_serve_stale_after_a_safety_refusal(monkeypatch):
+    def _unsafe(domain, server, timeout=None):
+        raise whois_lookup.UnsafeDestinationError("Private, loopback, link-local, reserved, or mixed DNS destinations are not allowed.")
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _unsafe)
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        whois_lookup._cache_put("theyosh.nl", {"domain": "theyosh.nl", "registrar": "Quickhost B.V.", "raw": "x"})
+        clock[0] += 90 * 60              # past the fresh window, inside the stale one
+        result = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+    assert "error" in result and "stale" not in result
+
+
+def test_whois_serves_stale_when_the_server_is_unreachable(monkeypatch):
+    calls = []
+
+    def _flaky(domain, server, timeout=None):
+        calls.append(domain)
+        if len(calls) == 1:
+            return "Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n"
+        raise socket.timeout("timed out")
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _flaky)
+    clock = [0.0]
+    monkeypatch.setattr(whois_lookup.time, "monotonic", lambda: clock[0])
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        whois_lookup.whois_lookup("theyosh.nl")
+        clock[0] += 2 * 60 * 60
+        result = whois_lookup.whois_lookup("theyosh.nl")
+        whois_lookup.clear_whois_cache()
+    assert result["registrar"] == "Quickhost B.V." and result["stale"] is True
+
+
+# Issue #36: .it writes bare headings with no colon and indents the block's
+# fields under them, at varying widths.
+IT_ANSWER = """*********************************************************************
+* Please note that the following result could be a subgroup of      *
+*********************************************************************
+
+Domain:             google.it
+Status:             ok
+Signed:             no
+Created:            1999-12-10 00:00:00
+Last Update:        2026-06-09 23:13:34
+Expire Date:        2027-04-21
+
+Registrant
+  Organization:     Google Ireland Holdings Unlimited Company
+  Address:          70 Sir John Rogerson's Quay
+                    Dublin
+                    IE
+  Created:          2018-03-02 19:04:02
+
+Admin Contact
+  Name:             Jared Oberhaus
+  Organization:     Google LLC
+  Created:          2026-06-09 19:22:56
+
+Registrar
+  Organization:     MarkMonitor International Limited
+  Name:             MARKMONITOR-REG
+  Web:              https://www.markmonitor.com/
+  DNSSEC:           no
+
+Nameservers
+  ns1.google.com
+  ns2.google.com
+"""
+
+
+def test_whois_parses_bare_headings_and_short_field_names():
+    parsed = whois_lookup._parse_whois(IT_ANSWER)
+    assert parsed["domain_name"] == "google.it"
+    assert parsed["registrar"] == "MarkMonitor International Limited"
+    assert parsed["registrar_url"] == "https://www.markmonitor.com/"
+    assert parsed["registrant_org"] == "Google Ireland Holdings Unlimited Company"
+    assert parsed["expiry_date"] == "2027-04-21"
+    assert parsed["updated_date"] == "2026-06-09 23:13:34"
+    assert parsed["name_servers"] == ["ns1.google.com", "ns2.google.com"]
+
+
+def test_whois_ignores_dates_belonging_to_a_contact_block():
+    """"Created" under "Admin Contact" is that contact's, not the domain's."""
+    parsed = whois_lookup._parse_whois(IT_ANSWER)
+    assert parsed["creation_date"] == "1999-12-10 00:00:00"
+
+
+def test_whois_does_not_take_a_contact_organisation_as_the_registrar():
+    # "Admin Contact" has Organization: Google LLC, which must not win.
+    assert whois_lookup._parse_whois(IT_ANSWER)["registrar"] == "MarkMonitor International Limited"
+
+
+def test_whois_takes_dnssec_from_the_domain_not_the_registrar():
+    # The registrar block also carries "DNSSEC: no"; the domain's own flag is
+    # the top-level "Signed".
+    assert whois_lookup._parse_whois(IT_ANSWER)["dnssec"] == "no"
+    signed_yes = IT_ANSWER.replace("Signed:             no", "Signed:             yes")
+    assert whois_lookup._parse_whois(signed_yes)["dnssec"] == "yes"
+
+
+def test_whois_reports_a_registry_error_it_has_no_marker_for(monkeypatch):
+    """A subdomain cannot be looked up; SIDN says so in words the marker list
+    does not name, and it used to come back as an empty successful record."""
+    monkeypatch.setattr(
+        whois_lookup, "_raw_whois",
+        lambda domain, server, timeout=None: "Error: subdomains such as mail1.theyosh.nl are not supported\r\n")
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("mail1.theyosh.nl")
+    assert result == {"error": "WHOIS query failed: subdomains such as mail1.theyosh.nl are not supported"}
+
+
+def test_whois_error_prefix_does_not_fire_inside_a_real_record(monkeypatch):
+    record = ("Domain Name: EXAMPLE.COM\r\n"
+              "Registrar: MarkMonitor Inc.\r\n"
+              "Error: this line is part of a record that parsed fine\r\n")
+    monkeypatch.setattr(whois_lookup, "_raw_whois", lambda domain, server, timeout=None: record)
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("example.com")
+    assert "error" not in result and result["registrar"] == "MarkMonitor Inc."

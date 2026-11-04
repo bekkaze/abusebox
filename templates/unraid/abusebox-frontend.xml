@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>AbuseBox-Frontend</Name>
+  <Repository>ghcr.io/bekkaze/abusebox-frontend:latest</Repository>
+  <Registry>https://github.com/bekkaze/abusebox/pkgs/container/abusebox-frontend</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/bekkaze/abusebox/issues</Support>
+  <Project>https://github.com/bekkaze/abusebox</Project>
+  <Overview>
+    The AbuseBox web interface. Install AbuseBox-Backend first, then set BACKEND_URL below to that container's address.
+
+    AbuseBox is self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.
+
+    nginx serves the built UI here and proxies /api to the backend, so the browser only ever talks to this container.
+
+    Sign in with the admin account created by the backend on its first start. Its password is in the backend container's log and in 'initial_admin_password' in the backend's data path.
+  </Overview>
+  <Category>Tools: Network: Security:</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/bekkaze/abusebox/main/files/logo.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>AbuseBox-Backend must be installed and running first.</Requires>
+  <Config Name="Web UI port" Target="3000" Default="3000" Mode="tcp" Description="Open AbuseBox at http://[your-server]:[this port]/" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="Backend URL" Target="BACKEND_URL" Default="http://192.168.1.10:8100" Mode="" Description="Address of the AbuseBox-Backend container, for example http://192.168.1.10:8100 . Use the server's LAN IP and the backend's API port; 'localhost' points at this container, not the backend." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.10:8100</Config>
+</Container>
