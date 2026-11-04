@@ -12,7 +12,7 @@ COPY . .
 RUN yarn build
 
 # Serve it with nginx, which also proxies /api to the backend. No Node.js at runtime.
-FROM nginx:1.30.6-alpine@sha256:47928bf67eb62a1863cb08d9ecb52d3e704304ba614eaee17884204677702951
+FROM nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
 
 ENV BACKEND_URL=http://backend:8100
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
