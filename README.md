@@ -54,7 +54,7 @@ If AbuseBox saves you a bounce, a star helps other mail operators find it.
 - **Blacklists:** 24 DNS blacklists, each listing decoded with its meaning and a severity, and each list verified against its test addresses
 - **AbuseIPDB:** abuse confidence score, reports, ISP and country (free API key)
 - **SSL:** validity, issuer, expiry, cipher and covered names
-- **WHOIS:** registrar, dates and name servers
+- **WHOIS:** registrar, dates, name servers and abuse contact, over IPv6 or IPv4
 - **DNS:** A, AAAA, MX, TXT, CNAME, NS, SOA and PTR records
 - **SPF / DKIM / DMARC:** graded A to F, with custom DKIM selectors, plus DMARC aggregate report parsing
 - **Server status:** DNS resolution, ports 80 and 443, HTTP status and response time
@@ -156,6 +156,12 @@ docker compose pull && docker compose up -d
 ```
 
 The database is migrated automatically on start, and your data is kept. (Built from source? `git pull && docker compose up -d --build`.)
+
+**Notes for v1.3.4**
+
+- **Nothing is required**, the images upgrade on their own. Two new things live in the repository rather than the images, so `git pull` as well if you want them:
+  - The **`enable_ipv6`** block at the end of `docker-compose.yml`, commented out. Worth turning on if a registry blocks your server's IPv4 address, since Docker gives containers only IPv4 by default. See [WHOIS that times out](#whois-that-times-out).
+  - **Install templates** for Unraid, Portainer and CasaOS, in `templates/`.
 
 **Notes for v1.3.2**
 
