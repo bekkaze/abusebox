@@ -1,8 +1,10 @@
+import ipaddress
 import logging
 import re
 import socket
 import threading
 import time
+from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
@@ -118,6 +120,40 @@ def _extract_domain(value: str) -> str | None:
     if not target or any(ord(char) <= 0x20 or ord(char) == 0x7F for char in target):
         return None
     return target
+
+
+@lru_cache(maxsize=1)
+def _public_suffix_list():
+    # Built once and reused: parsing the list takes a moment, and the data is
+    # bundled with the package, so nothing is fetched at runtime.
+    from publicsuffixlist import PublicSuffixList
+
+    return PublicSuffixList()
+
+
+def _registrable_domain(host: str) -> str | None:
+    """The domain actually registered, for a host that belongs to one.
+
+    A registry can only answer for the name someone registered, so a host such
+    as mail1.example.nl has to be asked about as example.nl (issue #39). Where
+    that boundary sits needs the Public Suffix List: taking the last two labels
+    would turn mail.example.co.uk into co.uk, which is a public suffix and not
+    a registration at all.
+
+    None for anything that is not a name under a registrable domain: an IP
+    address, "localhost", or a bare suffix like "nl". Those are left alone, so
+    an IP still reaches its RIR through IANA's referral as before.
+    """
+    try:
+        ipaddress.ip_address(host)
+        return None
+    except ValueError:
+        pass
+    try:
+        return _public_suffix_list().privatesuffix(host) or None
+    except Exception:  # pragma: no cover - a malformed name is not worth failing on
+        logger.warning("Could not reduce %s to a registrable domain", host, exc_info=True)
+        return None
 
 
 def _get_whois_server(domain: str) -> str:
@@ -392,19 +428,35 @@ def _stale_or_error(domain: str, message: str) -> dict[str, Any]:
     return value
 
 
+def _with_requested(result: dict[str, Any], requested: str) -> dict[str, Any]:
+    """Note the host that was asked about, when it is not the domain queried.
+
+    Without this a lookup for mail1.example.nl silently answers about
+    example.nl and looks like it ignored the input.
+    """
+    if requested == result.get("domain"):
+        return result
+    return {**result, "requested_host": requested}
+
+
 def clear_whois_cache() -> None:
     with _cache_lock:
         _cache.clear()
 
 
 def whois_lookup(hostname: str) -> dict[str, Any]:
-    domain = _extract_domain(hostname)
-    if not domain:
+    requested = _extract_domain(hostname)
+    if not requested:
         return {"error": "Invalid domain or hostname."}
+
+    # Ask about the registered domain, not the host under it. Every host in a
+    # domain then shares one cache entry and one query, which matters where a
+    # registry rate limits as hard as SIDN does.
+    domain = _registrable_domain(requested) or requested
 
     cached = _cache_get(domain)
     if cached is not None:
-        return cached
+        return _with_requested(cached, requested)
 
     server = _get_whois_server(domain)
     try:
@@ -444,4 +496,4 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
         **parsed,
     }
     _cache_put(domain, result)
-    return result
+    return _with_requested(result, requested)

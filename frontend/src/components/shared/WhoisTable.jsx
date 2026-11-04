@@ -29,10 +29,26 @@ export default function WhoisTable({ data }) {
       return { name, copyLabel, mono, values };
     })
     .filter((row) => row.values.length);
+  // A registry only answers for the registered domain, so a host is looked up
+  // as the domain it belongs to. Say so, or the result looks like the wrong
+  // thing was asked for.
+  const note = data.requested_host && data.domain ? (
+    <p className="text-sm text-ink-2">
+      <span className="font-mono">{data.requested_host}</span> is a host, not a registered domain.
+      Showing the record for <span className="font-mono">{data.domain}</span>.
+    </p>
+  ) : null;
   if (rows.length === 0) {
-    return <p className="text-sm text-ink-2">The WHOIS server returned no fields AbuseBox could parse. Check the raw response.</p>;
+    return (
+      <div className="space-y-2">
+        {note}
+        <p className="text-sm text-ink-2">The WHOIS server returned no fields AbuseBox could parse. Check the raw response.</p>
+      </div>
+    );
   }
   return (
+    <div className="space-y-3">
+    {note}
     <Fields className="gap-y-2">
       {rows.map(({ name, copyLabel, mono, values }) => (
         <Field key={name} name={name}>
@@ -47,5 +63,6 @@ export default function WhoisTable({ data }) {
         </Field>
       ))}
     </Fields>
+    </div>
   );
 }
