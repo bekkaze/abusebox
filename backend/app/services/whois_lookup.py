@@ -196,18 +196,25 @@ _ERROR_MARKERS = (
     "service unavailable",
     "try again later",
 )
-# Only consulted when the answer held no record fields at all, so wording
-# inside a real record (a registrar's terms of use, say) is never mistaken
-# for a failure.
+# A line the registry labelled as an error itself, whatever it goes on to say.
+# This catches complaints the list above does not name, such as SIDN's
+# "Error: subdomains such as mail1.example.nl are not supported".
+_ERROR_PREFIX = re.compile(r"^(error|fatal|failure)\s*[:\-]\s*", re.IGNORECASE)
+_LABEL_PREFIX = re.compile(r"^(error|warning|fatal|failure)\s*[:\-]\s*", re.IGNORECASE)
+# Both are only consulted when the answer held no record fields at all, so
+# wording inside a real record (a registrar's terms of use, say) is never
+# mistaken for a failure.
 
 
 def _response_error(raw: str) -> str | None:
     """The registry's complaint, if the answer is one instead of a record."""
     for line in raw.strip().splitlines():
         line = line.strip()
-        if line and any(marker in line.lower() for marker in _ERROR_MARKERS):
-            # Drop the registry's own "Error:" label; the caller adds context.
-            return re.sub(r"^(error|warning)\s*:\s*", "", line, flags=re.IGNORECASE)[:200]
+        if not line:
+            continue
+        if _ERROR_PREFIX.match(line) or any(marker in line.lower() for marker in _ERROR_MARKERS):
+            # Drop the registry's own label; the caller adds its own context.
+            return _LABEL_PREFIX.sub("", line)[:200]
     return None
 
 

@@ -863,3 +863,24 @@ def test_whois_takes_dnssec_from_the_domain_not_the_registrar():
     assert whois_lookup._parse_whois(IT_ANSWER)["dnssec"] == "no"
     signed_yes = IT_ANSWER.replace("Signed:             no", "Signed:             yes")
     assert whois_lookup._parse_whois(signed_yes)["dnssec"] == "yes"
+
+
+def test_whois_reports_a_registry_error_it_has_no_marker_for(monkeypatch):
+    """A subdomain cannot be looked up; SIDN says so in words the marker list
+    does not name, and it used to come back as an empty successful record."""
+    monkeypatch.setattr(
+        whois_lookup, "_raw_whois",
+        lambda domain, server, timeout=None: "Error: subdomains such as mail1.theyosh.nl are not supported\r\n")
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("mail1.theyosh.nl")
+    assert result == {"error": "WHOIS query failed: subdomains such as mail1.theyosh.nl are not supported"}
+
+
+def test_whois_error_prefix_does_not_fire_inside_a_real_record(monkeypatch):
+    record = ("Domain Name: EXAMPLE.COM\r\n"
+              "Registrar: MarkMonitor Inc.\r\n"
+              "Error: this line is part of a record that parsed fine\r\n")
+    monkeypatch.setattr(whois_lookup, "_raw_whois", lambda domain, server, timeout=None: record)
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("example.com")
+    assert "error" not in result and result["registrar"] == "MarkMonitor Inc."
