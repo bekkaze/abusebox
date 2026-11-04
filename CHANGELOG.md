@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.4] - 2026-11-03
+## [1.3.4] - 2026-11-05
 
 WHOIS fixes and install templates. No upgrade steps.
 
