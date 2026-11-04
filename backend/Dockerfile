@@ -1,12 +1,12 @@
 # Pinned by digest like the frontend image; Dependabot keeps it current.
-FROM python:3.11.17-alpine@sha256:5fb4bc53dd0180955e31e5245b648bbb24a4ac4ab03a1de81513642325220bcd AS build
+FROM python:3.11.18-alpine@sha256:09d17d5e4c16d0a7a1eea690bcb7c6ab8616b211f8421e429e97c1bef5bd0ed2 AS build
 
 # Compilers are needed only to build wheels, so they stay in this stage.
 RUN apk add --no-cache build-base libffi-dev
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-FROM python:3.11.17-alpine@sha256:5fb4bc53dd0180955e31e5245b648bbb24a4ac4ab03a1de81513642325220bcd
+FROM python:3.11.18-alpine@sha256:09d17d5e4c16d0a7a1eea690bcb7c6ab8616b211f8421e429e97c1bef5bd0ed2
 
 # su-exec lets the entrypoint fix the data volume's owner, then drop root.
 RUN apk add --no-cache libffi su-exec \
