@@ -955,3 +955,15 @@ def test_whois_still_queries_an_ip_address_unchanged(monkeypatch):
     with _whois_settings(whois_cache_minutes=0):
         result = whois_lookup.whois_lookup("8.8.8.8")
     assert asked == ["8.8.8.8"] and result["domain"] == "8.8.8.8"
+
+
+@pytest.mark.parametrize("host,expected", [
+    # The list's private section marks where a service lets people put a site.
+    # That is the right boundary for cookies, not for WHOIS: .io knows
+    # github.io because someone registered it, and knows nothing of foo.github.io.
+    ("foo.github.io", "github.io"),
+    ("site.pages.dev", "pages.dev"),
+    ("blog.example.s3.amazonaws.com", "amazonaws.com"),
+])
+def test_registrable_domain_uses_the_icann_boundary(host, expected):
+    assert whois_lookup._registrable_domain(host) == expected

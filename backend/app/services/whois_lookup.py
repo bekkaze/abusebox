@@ -126,9 +126,15 @@ def _extract_domain(value: str) -> str | None:
 def _public_suffix_list():
     # Built once and reused: parsing the list takes a moment, and the data is
     # bundled with the package, so nothing is fetched at runtime.
+    #
+    # ICANN rules only. The list's private section records where services let
+    # people put a site, such as github.io or pages.dev, which is the right
+    # boundary for cookies but not for WHOIS: a registry knows github.io,
+    # because someone registered it under .io, and knows nothing at all about
+    # foo.github.io. Including that section would ask the wrong question.
     from publicsuffixlist import PublicSuffixList
 
-    return PublicSuffixList()
+    return PublicSuffixList(only_icann=True)
 
 
 def _registrable_domain(host: str) -> str | None:
