@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **A mail server's hostname looked like it had no DMARC.** A host without a DMARC record of its own is covered by the organisational domain's, and the policy that applies to it is that record's `sp` tag (RFC 7489 §6.6.3). AbuseBox only ever asked for the exact name, so `mail1.example.com` was reported as having no DMARC while `example.com` published `p=reject; sp=reject`, and the grade dropped accordingly. The inherited policy is used now, and the result says which domain it came from (#40).
+
+  SPF is deliberately left as it was. A sending host publishes its own SPF record, and `mail1.example.com` having `v=spf1 a ~all` where its parent has `v=spf1 mx ~all` is normal; reporting the parent's would state a policy that is not the one in force.
+
 ## [1.3.5] - 2026-11-06
 
 A follow-up to 1.3.4, from testing on the issue tracker.

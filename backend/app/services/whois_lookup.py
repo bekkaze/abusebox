@@ -1,14 +1,13 @@
-import ipaddress
 import logging
 import re
 import socket
 import threading
 import time
-from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
 from app.core.config import settings
+from app.core.domains import registrable_domain as _registrable_domain
 from app.core.network_safety import UnsafeDestinationError, resolve_public_addresses
 
 
@@ -120,46 +119,6 @@ def _extract_domain(value: str) -> str | None:
     if not target or any(ord(char) <= 0x20 or ord(char) == 0x7F for char in target):
         return None
     return target
-
-
-@lru_cache(maxsize=1)
-def _public_suffix_list():
-    # Built once and reused: parsing the list takes a moment, and the data is
-    # bundled with the package, so nothing is fetched at runtime.
-    #
-    # ICANN rules only. The list's private section records where services let
-    # people put a site, such as github.io or pages.dev, which is the right
-    # boundary for cookies but not for WHOIS: a registry knows github.io,
-    # because someone registered it under .io, and knows nothing at all about
-    # foo.github.io. Including that section would ask the wrong question.
-    from publicsuffixlist import PublicSuffixList
-
-    return PublicSuffixList(only_icann=True)
-
-
-def _registrable_domain(host: str) -> str | None:
-    """The domain actually registered, for a host that belongs to one.
-
-    A registry can only answer for the name someone registered, so a host such
-    as mail1.example.nl has to be asked about as example.nl (issue #39). Where
-    that boundary sits needs the Public Suffix List: taking the last two labels
-    would turn mail.example.co.uk into co.uk, which is a public suffix and not
-    a registration at all.
-
-    None for anything that is not a name under a registrable domain: an IP
-    address, "localhost", or a bare suffix like "nl". Those are left alone, so
-    an IP still reaches its RIR through IANA's referral as before.
-    """
-    try:
-        ipaddress.ip_address(host)
-        return None
-    except ValueError:
-        pass
-    try:
-        return _public_suffix_list().privatesuffix(host) or None
-    except Exception:  # pragma: no cover - a malformed name is not worth failing on
-        logger.warning("Could not reduce %s to a registrable domain", host, exc_info=True)
-        return None
 
 
 def _get_whois_server(domain: str) -> str:

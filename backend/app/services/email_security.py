@@ -1,6 +1,8 @@
 from typing import Any
 from urllib.parse import urlparse
 
+from app.core.domains import registrable_domain
+
 
 def _dns_txt_records(domain: str) -> list[str]:
     try:
@@ -119,15 +121,35 @@ def _check_dkim(domain: str, selectors: list[str] | None = None) -> dict[str, An
     }
 
 
-def _check_dmarc(domain: str) -> dict[str, Any]:
-    dmarc_domain = f"_dmarc.{domain}"
-    txt_records = _dns_txt_records(dmarc_domain)
-    dmarc_records = [r for r in txt_records if r.startswith("v=DMARC1")]
+def _dmarc_record_at(name: str) -> str | None:
+    for record in _dns_txt_records(f"_dmarc.{name}"):
+        if record.startswith("v=DMARC1"):
+            return record
+    return None
 
-    if not dmarc_records:
+
+def _check_dmarc(domain: str) -> dict[str, Any]:
+    """The DMARC policy in force for *domain*.
+
+    RFC 7489 section 6.6.3: a host without a record of its own is covered by
+    the organisational domain's, and the policy that applies to it is that
+    record's `sp` tag when it has one, falling back to `p`. So a mail server
+    at mail1.example.com inherits example.com's policy; reporting it as having
+    no DMARC at all was wrong (issue #40).
+    """
+    record = _dmarc_record_at(domain)
+    inherited_from = None
+
+    if record is None:
+        organisational = registrable_domain(domain)
+        if organisational and organisational != domain:
+            record = _dmarc_record_at(organisational)
+            if record is not None:
+                inherited_from = organisational
+
+    if record is None:
         return {"found": False, "record": None, "policy": None, "details": "No DMARC record found."}
 
-    record = dmarc_records[0]
     tags = {}
     for part in record.split(";"):
         part = part.strip()
@@ -135,12 +157,23 @@ def _check_dmarc(domain: str) -> dict[str, Any]:
             key, value = part.split("=", 1)
             tags[key.strip()] = value.strip()
 
-    policy = tags.get("p", "none")
+    # On an inherited record it is `sp` that governs this host, and `p` only
+    # when the parent did not say otherwise.
+    if inherited_from:
+        policy = tags.get("sp") or tags.get("p", "none")
+    else:
+        policy = tags.get("p", "none")
+
     warnings = []
     if policy == "none":
         warnings.append("DMARC policy is 'none' — no enforcement, monitoring only.")
     if "rua" not in tags:
         warnings.append("No aggregate report URI (rua) configured.")
+    if inherited_from:
+        warnings.append(
+            f"No DMARC record of its own; covered by {inherited_from} "
+            f"({'sp' if tags.get('sp') else 'p'}={policy})."
+        )
 
     return {
         "found": True,
@@ -150,6 +183,7 @@ def _check_dmarc(domain: str) -> dict[str, Any]:
         "percentage": tags.get("pct", "100"),
         "rua": tags.get("rua"),
         "ruf": tags.get("ruf"),
+        "inherited_from": inherited_from,
         "warnings": warnings,
     }
 

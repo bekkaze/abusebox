@@ -967,3 +967,71 @@ def test_whois_still_queries_an_ip_address_unchanged(monkeypatch):
 ])
 def test_registrable_domain_uses_the_icann_boundary(host, expected):
     assert whois_lookup._registrable_domain(host) == expected
+
+
+# Issue #40: RFC 7489 6.6.3 - a host with no DMARC record of its own is
+# covered by the organisational domain's, and `sp` is what governs it.
+
+def test_dmarc_inherits_the_organisational_domain_policy():
+    from app.services import email_security
+    records = {"_dmarc.example.com": ["v=DMARC1; p=quarantine; sp=reject; rua=mailto:d@example.com"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("mail1.example.com")
+    assert dmarc["found"] is True
+    assert dmarc["policy"] == "reject"          # sp, not p
+    assert dmarc["inherited_from"] == "example.com"
+    assert any("covered by example.com" in w for w in dmarc["warnings"])
+
+
+def test_dmarc_inherited_falls_back_to_p_when_there_is_no_sp():
+    from app.services import email_security
+    records = {"_dmarc.example.com": ["v=DMARC1; p=reject; rua=mailto:d@example.com"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("mail1.example.com")
+    assert dmarc["policy"] == "reject" and dmarc["inherited_from"] == "example.com"
+
+
+def test_dmarc_prefers_the_hosts_own_record_over_the_parent():
+    from app.services import email_security
+    records = {
+        "_dmarc.mail1.example.com": ["v=DMARC1; p=none"],
+        "_dmarc.example.com": ["v=DMARC1; p=reject; sp=reject"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("mail1.example.com")
+    assert dmarc["policy"] == "none" and dmarc["inherited_from"] is None
+
+
+def test_dmarc_on_the_organisational_domain_is_not_marked_inherited():
+    from app.services import email_security
+    records = {"_dmarc.example.com": ["v=DMARC1; p=reject; sp=reject"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("example.com")
+    assert dmarc["policy"] == "reject" and dmarc["inherited_from"] is None
+
+
+def test_dmarc_missing_everywhere_is_still_not_found():
+    from app.services import email_security
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})):
+        assert email_security._check_dmarc("mail1.example.com")["found"] is False
+
+
+def test_spf_is_not_reduced_to_the_parent_domain():
+    """A sending host publishes its own SPF; the parent's is a different
+    policy and reporting it would be wrong (issue #40)."""
+    from app.services import email_security
+    records = {
+        "mail1.example.com": ["v=spf1 a ~all"],
+        "example.com": ["v=spf1 mx ~all"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        spf = email_security._check_spf("mail1.example.com")
+    assert spf["record"] == "v=spf1 a ~all"
+
+
+def test_spf_on_a_host_without_one_does_not_borrow_the_parents():
+    from app.services import email_security
+    records = {"example.com": ["v=spf1 mx -all"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        spf = email_security._check_spf("mail1.example.com")
+    assert spf["found"] is False
