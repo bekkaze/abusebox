@@ -10,5 +10,9 @@ requests==2.34.2
 certifi==2026.10.23
 # dnspython >= 2.9.0 fixes excessive CPU use on crafted DNS names (GHSA-45c3-73f7-pv4m)
 dnspython==2.9.0
+# Public Suffix List, so a host can be reduced to the domain actually
+# registered (mail1.example.co.uk -> example.co.uk). Data is bundled; it
+# never fetches at runtime, but needs updating now and then.
+publicsuffixlist==1.1.2.20261101
 python-multipart==0.0.32
 alembic==1.20.1

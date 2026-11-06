@@ -884,3 +884,86 @@ def test_whois_error_prefix_does_not_fire_inside_a_real_record(monkeypatch):
     with _whois_settings(whois_cache_minutes=0):
         result = whois_lookup.whois_lookup("example.com")
     assert "error" not in result and result["registrar"] == "MarkMonitor Inc."
+
+
+# Issue #39: a registry can only answer for the name someone registered.
+
+@pytest.mark.parametrize("host,expected", [
+    ("mail1.theyosh.nl", "theyosh.nl"),
+    ("theyosh.nl", "theyosh.nl"),
+    ("a.b.example.co.uk", "example.co.uk"),          # last two labels would give co.uk
+    ("smtp.mail.example.com.au", "example.com.au"),
+    ("EXAMPLE.COM", "example.com"),
+])
+def test_registrable_domain(host, expected):
+    assert whois_lookup._registrable_domain(host.lower()) == expected
+
+
+@pytest.mark.parametrize("host", ["8.8.8.8", "2001:4860:4860::8888", "localhost", "nl", "co.uk"])
+def test_registrable_domain_is_none_without_one(host):
+    # Left alone, so an IP still reaches its RIR through IANA's referral.
+    assert whois_lookup._registrable_domain(host) is None
+
+
+def test_whois_looks_up_the_domain_a_host_belongs_to(monkeypatch):
+    asked = []
+
+    def _fake(domain, server, timeout=None):
+        asked.append((domain, server))
+        return "Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n"
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _fake)
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("mail1.theyosh.nl")
+    assert asked == [("theyosh.nl", "whois.sidn.nl")]
+    assert result["domain"] == "theyosh.nl"
+    assert result["requested_host"] == "mail1.theyosh.nl"
+    assert result["registrar"] == "Quickhost B.V."
+
+
+def test_whois_does_not_note_a_host_when_it_is_the_domain(monkeypatch):
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: "Domain name: theyosh.nl\r\n")
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("theyosh.nl")
+    assert "requested_host" not in result
+
+
+def test_whois_hosts_in_one_domain_share_a_single_query(monkeypatch):
+    """Registries rate limit per client, so three mail servers in one domain
+    must not cost three queries."""
+    asked = []
+
+    def _fake(domain, server, timeout=None):
+        asked.append(domain)
+        return "Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n"
+
+    monkeypatch.setattr(whois_lookup, "_raw_whois", _fake)
+    with _whois_settings(whois_cache_minutes=60):
+        whois_lookup.clear_whois_cache()
+        hosts = [whois_lookup.whois_lookup(f"mail{n}.theyosh.nl") for n in (1, 2, 3)]
+        whois_lookup.clear_whois_cache()
+    assert asked == ["theyosh.nl"]
+    assert [h["requested_host"] for h in hosts] == ["mail1.theyosh.nl", "mail2.theyosh.nl", "mail3.theyosh.nl"]
+    assert all(h["registrar"] == "Quickhost B.V." for h in hosts)
+
+
+def test_whois_still_queries_an_ip_address_unchanged(monkeypatch):
+    asked = []
+    monkeypatch.setattr(whois_lookup, "_raw_whois",
+                        lambda domain, server, timeout=None: asked.append(domain) or "NetName: LVLT-GOGL-8-8-8\r\n")
+    with _whois_settings(whois_cache_minutes=0):
+        result = whois_lookup.whois_lookup("8.8.8.8")
+    assert asked == ["8.8.8.8"] and result["domain"] == "8.8.8.8"
+
+
+@pytest.mark.parametrize("host,expected", [
+    # The list's private section marks where a service lets people put a site.
+    # That is the right boundary for cookies, not for WHOIS: .io knows
+    # github.io because someone registered it, and knows nothing of foo.github.io.
+    ("foo.github.io", "github.io"),
+    ("site.pages.dev", "pages.dev"),
+    ("blog.example.s3.amazonaws.com", "amazonaws.com"),
+])
+def test_registrable_domain_uses_the_icann_boundary(host, expected):
+    assert whois_lookup._registrable_domain(host) == expected

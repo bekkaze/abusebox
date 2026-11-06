@@ -1,0 +1,51 @@
+name: CodeQL
+
+# Static analysis for the Python backend and the JavaScript frontend. Runs on
+# pull requests so a problem is caught before it lands, and weekly so newly
+# published queries are applied to code that has not changed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Monday 03:17 UTC. An odd minute, so this does not join the rush of jobs
+    # that every repository schedules on the hour.
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # Needed to upload the results to the Security tab.
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          # Beyond the default set: more checks, and more to read through.
+          queries: security-and-quality
+
+      - name: Analyse
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

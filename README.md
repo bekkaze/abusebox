@@ -54,7 +54,7 @@ If AbuseBox saves you a bounce, a star helps other mail operators find it.
 - **Blacklists:** 24 DNS blacklists, each listing decoded with its meaning and a severity, and each list verified against its test addresses
 - **AbuseIPDB:** abuse confidence score, reports, ISP and country (free API key)
 - **SSL:** validity, issuer, expiry, cipher and covered names
-- **WHOIS:** registrar, dates and name servers
+- **WHOIS:** registrar, dates, name servers and abuse contact, over IPv6 or IPv4
 - **DNS:** A, AAAA, MX, TXT, CNAME, NS, SOA and PTR records
 - **SPF / DKIM / DMARC:** graded A to F, with custom DKIM selectors, plus DMARC aggregate report parsing
 - **Server status:** DNS resolution, ports 80 and 443, HTTP status and response time
@@ -156,6 +156,12 @@ docker compose pull && docker compose up -d
 ```
 
 The database is migrated automatically on start, and your data is kept. (Built from source? `git pull && docker compose up -d --build`.)
+
+**Notes for v1.3.4**
+
+- **Nothing is required**, the images upgrade on their own. Two new things live in the repository rather than the images, so `git pull` as well if you want them:
+  - The **`enable_ipv6`** block at the end of `docker-compose.yml`, commented out. Worth turning on if a registry blocks your server's IPv4 address, since Docker gives containers only IPv4 by default. See [WHOIS that times out](#whois-that-times-out).
+  - **Install templates** for Unraid, Portainer and CasaOS, in `templates/`.
 
 **Notes for v1.3.2**
 
@@ -423,6 +429,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.3.5** | November 6, 2026 | WHOIS on a mail server's hostname looks up the domain it belongs to (#39), a record kept from an earlier check says how old it is, CodeQL analysis |
 | **v1.3.4** | November 5, 2026 | WHOIS works where a registry blocks IPv4 but answers over IPv6, `.nl` records read correctly, rate-limit replies no longer look like empty records (#36), install templates for Unraid, Portainer and CasaOS (#31, #32) |
 | **v1.3.3** | October 30, 2026 | Copy a blacklist result as plain text for a ticket or an email to the list operator (#29), a readable activity timeline (#30), copying works on plain-HTTP installs |
 | **v1.3.2** | October 28, 2026 | Security release (login rate-limit bypass, random first admin password, alert and scheduler abuse, DNS rebinding, dnspython), bundled DNS resolver for blacklist lookups, resolver warning |
