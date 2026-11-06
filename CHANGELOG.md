@@ -2,15 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.5] - 2026-11-06
+
+A follow-up to 1.3.4, from testing on the issue tracker.
+
+Upgrading: `docker compose pull && docker compose up -d`.
 
 ### Fixed
 
 - **WHOIS on a mail server's hostname failed.** A registry can only answer for the name someone registered, so a host such as `mail1.example.nl` is now looked up as `example.nl`, and the result says which host was asked about. Working out where the registered domain starts uses the Public Suffix List, so `mail.example.co.uk` reduces to `example.co.uk` rather than to a public suffix. Every host in one domain shares a single query and cache entry, which matters where a registry rate limits as hard as SIDN does. IP addresses are unchanged and still reach their RIR through IANA's referral (#39).
 
+- **A WHOIS record kept from an earlier check now says so.** 1.3.4 began serving the last good answer when a registry refuses, which is most of the time with a rate limit as tight as SIDN's. It read as current; it now says how old it is and why the registry did not answer.
+
 ### Security
 
 - **follow-redirects updated to 1.16.2** ([GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p)). It reaches AbuseBox as a dependency of axios. The published frontend never contained it: axios uses the browser's own request API and its Node adapter is dropped from the build, so installs were not affected.
+- **CodeQL** now analyses the backend and the frontend on every pull request and weekly.
 
 ## [1.3.4] - 2026-11-05
 
