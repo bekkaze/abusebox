@@ -1,14 +1,15 @@
-import ipaddress
 import logging
 import re
 import socket
 import threading
 import time
-from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
 from app.core.config import settings
+from app.core.domains import registrable_domain as _registrable_domain
+from app.core.logging_safety import for_log
+from app.core.failures import describe
 from app.core.network_safety import UnsafeDestinationError, resolve_public_addresses
 
 
@@ -122,46 +123,6 @@ def _extract_domain(value: str) -> str | None:
     return target
 
 
-@lru_cache(maxsize=1)
-def _public_suffix_list():
-    # Built once and reused: parsing the list takes a moment, and the data is
-    # bundled with the package, so nothing is fetched at runtime.
-    #
-    # ICANN rules only. The list's private section records where services let
-    # people put a site, such as github.io or pages.dev, which is the right
-    # boundary for cookies but not for WHOIS: a registry knows github.io,
-    # because someone registered it under .io, and knows nothing at all about
-    # foo.github.io. Including that section would ask the wrong question.
-    from publicsuffixlist import PublicSuffixList
-
-    return PublicSuffixList(only_icann=True)
-
-
-def _registrable_domain(host: str) -> str | None:
-    """The domain actually registered, for a host that belongs to one.
-
-    A registry can only answer for the name someone registered, so a host such
-    as mail1.example.nl has to be asked about as example.nl (issue #39). Where
-    that boundary sits needs the Public Suffix List: taking the last two labels
-    would turn mail.example.co.uk into co.uk, which is a public suffix and not
-    a registration at all.
-
-    None for anything that is not a name under a registrable domain: an IP
-    address, "localhost", or a bare suffix like "nl". Those are left alone, so
-    an IP still reaches its RIR through IANA's referral as before.
-    """
-    try:
-        ipaddress.ip_address(host)
-        return None
-    except ValueError:
-        pass
-    try:
-        return _public_suffix_list().privatesuffix(host) or None
-    except Exception:  # pragma: no cover - a malformed name is not worth failing on
-        logger.warning("Could not reduce %s to a registrable domain", host, exc_info=True)
-        return None
-
-
 def _get_whois_server(domain: str) -> str:
     parts = domain.rsplit(".", 1)
     tld = parts[-1] if len(parts) > 1 else ""
@@ -216,7 +177,7 @@ def _raw_whois(domain: str, server: str, timeout: float | None = None) -> str:
             return _query_address(domain, address, per_attempt)
         except (socket.timeout, OSError) as exc:
             last_error = exc
-            logger.info("WHOIS %s unreachable at %s: %s", server, address, exc)
+            logger.info("WHOIS %s unreachable at %s: %s", for_log(server), address, exc)
     raise last_error if last_error is not None else OSError("No usable address for the WHOIS server.")
 
 
@@ -470,9 +431,9 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
     except UnsafeDestinationError as exc:
         # A safety refusal means the name now resolves somewhere it should not;
         # say so rather than papering over it with an older answer.
-        return {"error": f"WHOIS query failed: {exc}"}
+        return {"error": f"WHOIS query failed: {describe(exc)}."}
     except (socket.timeout, socket.error, OSError) as exc:
-        return _stale_or_error(domain, f"WHOIS query failed: {exc}")
+        return _stale_or_error(domain, f"WHOIS query failed: {describe(exc)}.")
 
     if not raw.strip():
         return _stale_or_error(domain, "Empty response from WHOIS server.")

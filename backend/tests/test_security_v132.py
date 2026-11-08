@@ -1,6 +1,7 @@
 """1.3.2 security fixes: asset input, schedule abuse, alert text, sign-in, WHOIS, quick check."""
 
 import dataclasses
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -165,6 +166,61 @@ def test_first_start_generates_a_random_admin_password(tmp_path, monkeypatch):
         assert pbkdf2_sha256.verify(password, admin.hashed_password)
         init_data.forget_initial_password()
         assert not (tmp_path / "initial_admin_password").exists()
+
+
+def test_the_generated_admin_password_is_not_written_to_the_log(tmp_path, monkeypatch, caplog):
+    """Container logs are kept, shipped elsewhere and pasted into bug reports.
+    The password goes to a 0600 file; the log only says where."""
+    from app.db import init_data
+
+    patched = dataclasses.replace(settings, default_admin_username="logadmin",
+                                  default_admin_email="log@example.com", default_admin_password="")
+    object.__setattr__(patched, "secret_key_file", str(tmp_path / ".secret_key"))
+    monkeypatch.setattr(init_data, "settings", patched)
+    with caplog.at_level(logging.INFO), SessionLocal() as db:
+        init_data.seed_default_admin(db)
+
+    password = (tmp_path / "initial_admin_password").read_text().strip()
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert password not in logged
+    assert "initial_admin_password" in logged
+
+
+def test_no_account_is_created_when_the_password_cannot_be_saved(tmp_path, monkeypatch, caplog):
+    """An account whose generated password nobody can read is an account nobody
+    can sign in to, and the log is not an acceptable second home for it. The
+    next start tries again, and DEFAULT_ADMIN_PASSWORD is the way out."""
+    from app.db import init_data
+
+    patched = dataclasses.replace(settings, default_admin_username="nofileadmin",
+                                  default_admin_email="nofile@example.com", default_admin_password="")
+    object.__setattr__(patched, "secret_key_file", str(tmp_path / ".secret_key"))
+    monkeypatch.setattr(init_data, "settings", patched)
+    monkeypatch.setattr(init_data, "_save_initial_password", lambda password: False)
+    with caplog.at_level(logging.INFO), SessionLocal() as db:
+        init_data.seed_default_admin(db)
+        assert db.query(User).filter(User.username == "nofileadmin").first() is None
+
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "Not creating the admin account" in logged
+    assert "DEFAULT_ADMIN_PASSWORD" in logged
+
+
+def test_a_chosen_password_still_works_when_the_volume_is_unwritable(tmp_path, monkeypatch):
+    """Nothing has to be saved when the operator picked the password, so an
+    unwritable path is not a reason to refuse."""
+    from app.db import init_data
+
+    patched = dataclasses.replace(settings, default_admin_username="chosenadmin",
+                                  default_admin_email="chosen@example.com",
+                                  default_admin_password="a-chosen-password")
+    object.__setattr__(patched, "secret_key_file", str(tmp_path / ".secret_key"))
+    monkeypatch.setattr(init_data, "settings", patched)
+    monkeypatch.setattr(init_data, "_save_initial_password", lambda password: False)
+    with SessionLocal() as db:
+        init_data.seed_default_admin(db)
+        admin = db.query(User).filter(User.username == "chosenadmin").one()
+    assert pbkdf2_sha256.verify("a-chosen-password", admin.hashed_password)
 
 
 def test_existing_installs_on_the_old_default_are_flagged(client):

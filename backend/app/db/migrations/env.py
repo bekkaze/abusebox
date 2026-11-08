@@ -1,9 +1,14 @@
 """Alembic environment. Migrations run at startup through app.db.migrate."""
 
+import importlib
+
 from alembic import context
 
-import app.models  # noqa: F401  (registers every table on Base.metadata)
 from app.db.session import Base
+
+# Imported for the side effect, not for a name: this registers every table on
+# Base.metadata before Alembic compares it against the database.
+importlib.import_module("app.models")
 
 config = context.config
 

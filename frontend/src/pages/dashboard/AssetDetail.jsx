@@ -527,11 +527,23 @@ function DnsPanel({ data }) {
 function SslPanel({ data }) {
   if (!data || (data.error && !('valid' in data))) return <ErrorMsg msg={data?.error} />;
   const { valid, days_remaining: days } = data;
-  const code = !valid ? '5.x' : days < 30 ? '4.x' : '2.x';
-  const text = !valid ? 'Expired or invalid' : days < 30 ? `Valid, expires in ${plural(days, 'day')}` : `Valid, ${days} days remaining`;
+  // A good certificate on an obsolete TLS version is not a pass: the
+  // certificate is only half of what a client has to accept.
+  const weakTls = data.warnings?.length > 0;
+  const code = !valid ? '5.x' : days < 30 || weakTls ? '4.x' : '2.x';
+  const text = !valid
+    ? 'Expired or invalid'
+    : days < 30
+      ? `Valid, expires in ${plural(days, 'day')}`
+      : weakTls
+        ? `Valid for ${plural(days, 'day')}, but the TLS configuration is weak`
+        : `Valid, ${days} days remaining`;
   return (
     <div className="space-y-5">
       <CheckVerdict code={code} detail={data.error}>{text}</CheckVerdict>
+      {data.warnings?.map((warning) => (
+        <p key={warning} className="text-sm text-s4">{warning}</p>
+      ))}
       <Fields>
         <Field name="Subject">{data.subject?.common_name && <Mono>{data.subject.common_name}</Mono>}</Field>
         <Field name="Issuer">{data.issuer?.common_name}</Field>

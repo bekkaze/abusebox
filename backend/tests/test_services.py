@@ -4,6 +4,7 @@ import contextlib
 import gzip
 import io
 import socket
+import ssl
 import zipfile
 from unittest import mock
 
@@ -82,7 +83,7 @@ def test_server_status_reports_private_target_clearly():
         result = server_status.check_server_status("router.test")
     assert result["dns_resolves"] is True
     assert result["is_up"] is False
-    assert "not allowed" in result["reason"]
+    assert result["reason"] == "Not checked: it does not resolve to a public address."
 
 
 # --- client IP ------------------------------------------------------------------
@@ -681,7 +682,7 @@ def test_whois_reports_the_failure_when_every_family_is_blocked(monkeypatch):
     monkeypatch.setattr(whois_lookup.socket, "create_connection", _connect)
     with _whois_settings(whois_cache_minutes=0):
         result = whois_lookup.whois_lookup("theyosh.nl")
-    assert result["error"] == "WHOIS query failed: timed out"
+    assert result["error"] == "WHOIS query failed: timed out."
 
 
 def test_whois_splits_its_timeout_when_a_family_hangs(monkeypatch):
@@ -967,3 +968,434 @@ def test_whois_still_queries_an_ip_address_unchanged(monkeypatch):
 ])
 def test_registrable_domain_uses_the_icann_boundary(host, expected):
     assert whois_lookup._registrable_domain(host) == expected
+
+
+# Issue #40: RFC 7489 6.6.3 - a host with no DMARC record of its own is
+# covered by the organisational domain's, and `sp` is what governs it.
+
+def test_dmarc_inherits_the_organisational_domain_policy():
+    from app.services import email_security
+    records = {"_dmarc.example.com": ["v=DMARC1; p=quarantine; sp=reject; rua=mailto:d@example.com"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("mail1.example.com")
+    assert dmarc["found"] is True
+    assert dmarc["policy"] == "reject"          # sp, not p
+    assert dmarc["inherited_from"] == "example.com"
+    assert any("covered by example.com" in w for w in dmarc["warnings"])
+
+
+def test_dmarc_inherited_falls_back_to_p_when_there_is_no_sp():
+    from app.services import email_security
+    records = {"_dmarc.example.com": ["v=DMARC1; p=reject; rua=mailto:d@example.com"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("mail1.example.com")
+    assert dmarc["policy"] == "reject" and dmarc["inherited_from"] == "example.com"
+
+
+def test_dmarc_prefers_the_hosts_own_record_over_the_parent():
+    from app.services import email_security
+    records = {
+        "_dmarc.mail1.example.com": ["v=DMARC1; p=none"],
+        "_dmarc.example.com": ["v=DMARC1; p=reject; sp=reject"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("mail1.example.com")
+    assert dmarc["policy"] == "none" and dmarc["inherited_from"] is None
+
+
+def test_dmarc_on_the_organisational_domain_is_not_marked_inherited():
+    from app.services import email_security
+    records = {"_dmarc.example.com": ["v=DMARC1; p=reject; sp=reject"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        dmarc = email_security._check_dmarc("example.com")
+    assert dmarc["policy"] == "reject" and dmarc["inherited_from"] is None
+
+
+def test_dmarc_missing_everywhere_is_still_not_found():
+    from app.services import email_security
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})):
+        assert email_security._check_dmarc("mail1.example.com")["found"] is False
+
+
+def test_spf_is_not_reduced_to_the_parent_domain():
+    """A sending host publishes its own SPF; the parent's is a different
+    policy and reporting it would be wrong (issue #40)."""
+    from app.services import email_security
+    records = {
+        "mail1.example.com": ["v=spf1 a ~all"],
+        "example.com": ["v=spf1 mx ~all"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        spf = email_security._check_spf("mail1.example.com")
+    assert spf["record"] == "v=spf1 a ~all"
+
+
+def test_spf_on_a_host_without_one_does_not_borrow_the_parents():
+    from app.services import email_security
+    records = {"example.com": ["v=spf1 mx -all"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
+        spf = email_security._check_spf("mail1.example.com")
+    assert spf["found"] is False
+
+
+# --- email security: DKIM -----------------------------------------------------------
+# Issue #40 asked for all three checks to be reduced to the parent domain. SPF
+# must not be (the two tests above pin that), DMARC inherits by RFC, and DKIM
+# is the third case: nothing is inherited, but the key is published under the
+# domain a message is signed as, which is usually not the sending host.
+
+def _no_cname(name):
+    return None
+
+
+def _cname(mapping):
+    return lambda name: mapping.get(name)
+
+
+def test_dkim_key_found_under_the_organisational_domain_is_labelled():
+    from app.services import email_security
+    records = {"mail._domainkey.example.com": ["v=DKIM1; t=s; p=AAAA"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("mail1.example.com")
+    assert dkim["found"] is True
+    assert dkim["inherited_from"] == "example.com"
+    assert dkim["domains_searched"] == ["mail1.example.com", "example.com"]
+    assert [s["selector"] for s in dkim["selectors_found"]] == ["mail"]
+    assert dkim["selectors_found"][0]["found_at"] == "example.com"
+    assert any("Found under example.com" in w for w in dkim["warnings"])
+
+
+def test_dkim_under_the_host_itself_wins_and_the_parent_is_not_consulted():
+    from app.services import email_security
+    records = {
+        "default._domainkey.mail1.example.com": ["v=DKIM1; p=HOSTKEY"],
+        "default._domainkey.example.com": ["v=DKIM1; p=PARENTKEY"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("mail1.example.com")
+    assert dkim["selectors_found"][0]["record"] == "v=DKIM1; p=HOSTKEY"
+    assert dkim["selectors_found"][0]["found_at"] == "mail1.example.com"
+    assert dkim["inherited_from"] is None
+    assert dkim["domains_searched"] == ["mail1.example.com"]
+    assert dkim["warnings"] == []
+
+
+def test_dkim_on_the_organisational_domain_is_not_marked_inherited():
+    from app.services import email_security
+    records = {"mail._domainkey.example.com": ["v=DKIM1; p=AAAA"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("example.com")
+    assert dkim["found"] is True and dkim["inherited_from"] is None
+    assert dkim["domains_searched"] == ["example.com"]
+
+
+def test_dkim_missing_everywhere_names_both_domains_it_looked_at():
+    from app.services import email_security
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("mail1.example.com")
+    assert dkim["found"] is False
+    assert dkim["domains_searched"] == ["mail1.example.com", "example.com"]
+    assert "mail1.example.com or example.com" in dkim["details"]
+
+
+def test_dkim_selector_delegated_by_cname_counts_as_published():
+    """Providers commonly delegate a selector with a CNAME rather than a TXT."""
+    from app.services import email_security
+    cnames = {"selector1._domainkey.example.com": "selector1-example-com._domainkey.provider.example."}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})), \
+         mock.patch.object(email_security, "_dns_cname_record", _cname(cnames)):
+        dkim = email_security._check_dkim("example.com")
+    assert dkim["found"] is True
+    assert dkim["selectors_found"][0]["cname"].startswith("selector1-example-com")
+    assert dkim["selectors_found"][0]["record"] is None
+
+
+def test_dkim_is_not_searched_above_a_bare_public_suffix():
+    """registrable_domain returns None for a name that is not under a
+    registration, so there is nothing to fall back to."""
+    from app.services import email_security
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("localhost")
+    assert dkim["domains_searched"] == ["localhost"]
+
+
+def test_a_key_at_the_organisational_domain_counts_toward_the_grade():
+    """The reporter's own shape in issue #40: a host with its own SPF, an
+    inherited DMARC policy and the domain's DKIM key grades A, not B."""
+    from app.services import email_security
+    records = {
+        "mail1.example.com": ["v=spf1 a ~all"],
+        "_dmarc.example.com": ["v=DMARC1; p=reject; sp=reject; rua=mailto:d@example.com"],
+        "mail._domainkey.example.com": ["v=DKIM1; t=s; p=AAAA"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        result = email_security.check_email_security("mail1.example.com")
+    assert result["grade"] == "A"
+    assert result["spf"]["record"] == "v=spf1 a ~all"
+    assert result["dmarc"]["inherited_from"] == "example.com"
+    assert result["dkim"]["inherited_from"] == "example.com"
+
+
+# --- SSL: the TLS version, not only the certificate ---------------------------------
+# create_default_context refuses TLS 1.0 and 1.1, so a server stuck on one used
+# to come back as "SSL error: [SSL: TLSV1_ALERT_PROTOCOL_VERSION]" with no
+# verdict. It is now negotiated on a second attempt and reported as a finding.
+
+def test_an_obsolete_tls_version_is_reported_as_a_finding():
+    warnings = ssl_checker._tls_warnings(("ECDHE-RSA-AES256-SHA", "TLSv1.0", 256), None)
+    assert len(warnings) == 1
+    assert "Negotiated TLSv1.0" in warnings[0] and "RFC 8996" in warnings[0]
+
+
+def test_current_tls_produces_no_findings():
+    assert ssl_checker._tls_warnings(("TLS_AES_256_GCM_SHA384", "TLSv1.3", 256), None) == []
+    assert ssl_checker._tls_warnings(("ECDHE-RSA-AES128-GCM-SHA256", "TLSv1.2", 128), None) == []
+
+
+def test_a_short_key_is_reported_even_on_a_current_version():
+    warnings = ssl_checker._tls_warnings(("DES-CBC3-SHA", "TLSv1.2", 112), None)
+    assert warnings == ["DES-CBC3-SHA gives only 112-bit encryption."]
+
+
+def test_a_relaxed_retry_on_a_current_version_says_what_was_refused():
+    error = ssl.SSLError(1, "[SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure")
+    error.reason = "SSLV3_ALERT_HANDSHAKE_FAILURE"
+    warnings = ssl_checker._tls_warnings(("ECDHE-RSA-AES256-SHA", "TLSv1.2", 256), error)
+    assert len(warnings) == 1
+    assert "current TLS defaults" in warnings[0]
+    assert "SSLV3_ALERT_HANDSHAKE_FAILURE" in warnings[0]
+
+
+def test_a_certificate_error_is_not_retried_with_relaxed_settings():
+    """A bad chain is a real answer. Retrying it at a lower security level
+    would turn a failure into a pass."""
+    calls = []
+
+    def handshake(ip, port, hostname, context):
+        calls.append(context)
+        raise ssl.SSLCertVerificationError("certificate has expired")
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake):
+        with pytest.raises(ssl.SSLCertVerificationError):
+            ssl_checker._connect("192.0.2.1", 443, "host.example")
+    assert len(calls) == 1
+
+
+def test_a_version_error_gets_exactly_one_relaxed_retry():
+    attempts = []
+
+    def handshake(ip, port, hostname, context):
+        attempts.append(context.minimum_version)
+        if len(attempts) == 1:
+            raise ssl.SSLError(1, "unsupported protocol")
+        return {"notBefore": "Jan 1 00:00:00 2026 GMT"}, ("ECDHE-RSA-AES256-SHA", "TLSv1.0", 256)
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake):
+        cert, cipher, strict_error = ssl_checker._connect("192.0.2.1", 443, "host.example")
+    assert len(attempts) == 2
+    assert attempts[0] == ssl.TLSVersion.TLSv1_2          # as a mail client would
+    assert attempts[1] == ssl.TLSVersion.MINIMUM_SUPPORTED  # only to diagnose
+    assert cipher[1] == "TLSv1.0" and strict_error is not None
+
+
+def test_a_passing_server_is_only_connected_to_once():
+    attempts = []
+
+    def handshake(ip, port, hostname, context):
+        attempts.append(context)
+        return {"notBefore": "Jan 1 00:00:00 2026 GMT"}, ("TLS_AES_256_GCM_SHA384", "TLSv1.3", 256)
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake):
+        _, cipher, strict_error = ssl_checker._connect("192.0.2.1", 443, "host.example")
+    assert len(attempts) == 1 and strict_error is None and cipher[1] == "TLSv1.3"
+
+
+# --- log safety ---------------------------------------------------------------------
+
+def test_a_hostname_cannot_forge_a_log_line():
+    from app.core.logging_safety import for_log
+    forged = "ok.example\r\n2026-01-01 00:00:00 WARNING Nothing to see here"
+    assert "\n" not in for_log(forged) and "\r" not in for_log(forged)
+    assert for_log(forged).startswith("ok.example\\r\\n")
+
+
+def test_a_long_value_is_truncated_for_the_log():
+    from app.core.logging_safety import for_log
+    assert for_log("a" * 500).endswith("...")
+    assert len(for_log("a" * 500)) == 203
+
+
+def test_an_unexpected_check_failure_does_not_send_its_text_to_the_browser():
+    """The traceback belongs in the log. An exception's text carries file
+    paths and internals that a check result should not."""
+    from app.services import check_runner
+
+    def boom(hostname):
+        raise RuntimeError("/app/secret/path.py line 7: connection string pg://u:p@db")
+
+    with mock.patch("app.services.dnsbl.check_dnsbl_providers", boom):
+        results = check_runner.run_enabled_checks("host.example", {"check_blacklist": True})
+    assert "secret" not in results["blacklist"]["error"]
+    assert results["blacklist"]["error"] == "The blacklist check failed (RuntimeError). See the backend log."
+
+
+# --- what a failure is allowed to say -----------------------------------------------
+# A check result can be forwarded to a list operator or pasted into a ticket, so
+# no exception's own text goes into one. describe() picks from fixed phrases.
+
+def test_a_failure_is_described_without_quoting_the_exception():
+    from app.core.failures import describe
+    leak = RuntimeError("/app/app/core/config.py line 7: postgres://user:pw@db/app")
+    described = describe(leak)
+    assert described == "the request failed"
+    for fragment in ("/app/", "postgres://", "user:pw", "config.py"):
+        assert fragment not in described
+
+
+@pytest.mark.parametrize("exc, expected", [
+    (socket.timeout(), "timed out"),
+    (TimeoutError(), "timed out"),
+    (ConnectionRefusedError(), "the connection was refused"),
+    (ConnectionResetError(), "the connection was reset"),
+    (socket.gaierror(-2, "Name or service not known"), "the name could not be resolved"),
+])
+def test_ordinary_network_failures_are_named_plainly(exc, expected):
+    from app.core.failures import describe
+    assert describe(exc) == expected
+
+
+def test_an_ssl_reason_is_translated_not_echoed():
+    from app.core.failures import describe
+    exc = ssl.SSLError(1, "[SSL: TLSV1_ALERT_PROTOCOL_VERSION] tlsv1 alert (_ssl.c:1082)")
+    exc.reason = "TLSV1_ALERT_PROTOCOL_VERSION"
+    assert describe(exc) == "the server refused every TLS version offered"
+    assert "_ssl.c" not in describe(exc)
+
+
+def test_an_unknown_ssl_reason_still_says_nothing_specific():
+    from app.core.failures import describe
+    exc = ssl.SSLError(1, "[SSL: SOMETHING_NEW] detail (_ssl.c:99)")
+    exc.reason = "SOMETHING_NEW"
+    assert describe(exc) == "the TLS handshake failed"
+
+
+def test_an_smtp_reply_is_named_without_repeating_the_servers_words():
+    import smtplib
+    from app.core.failures import describe_smtp
+    exc = smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
+    described = describe_smtp(exc)
+    assert described == "the mail server rejected the username or password"
+    # Neither the server's text nor its code: the code is compared, not echoed.
+    assert "Password" not in described and "535" not in described
+
+
+def test_an_unlisted_smtp_reply_falls_back_to_the_class_of_the_reply():
+    import smtplib
+    from app.core.failures import describe_smtp
+    transient = smtplib.SMTPResponseException(451, b"4.3.0 try again later")
+    permanent = smtplib.SMTPResponseException(571, b"5.7.1 blocked")
+    assert "worth retrying" in describe_smtp(transient)
+    assert describe_smtp(permanent) == "the mail server rejected it outright"
+
+
+def test_a_subnet_with_a_bad_mask_does_not_echo_the_input_back():
+    from app.services import subnet_check
+    result = subnet_check.check_subnet("203.0.113.0/99")
+    assert "99" not in result["error"]
+    assert result["error"].startswith("Not a valid IPv4 CIDR range")
+
+
+@pytest.mark.parametrize("code, expected", [
+    (10, "The certificate has expired."),
+    (62, "The certificate is not valid for this hostname."),
+    (18, "The certificate is self-signed."),
+    (19, "The chain ends in a self-signed certificate nobody trusts."),
+    (9999, "The certificate could not be verified."),
+])
+def test_a_rejected_certificate_says_which_way_it_was_rejected(code, expected):
+    """Every one of these used to come back as CERTIFICATE_VERIFY_FAILED.
+    OpenSSL's verify code is an integer, so the distinction costs nothing."""
+    exc = ssl.SSLCertVerificationError("certificate verify failed")
+    exc.verify_code = code
+
+    def handshake(ip, port, hostname, context):
+        raise exc
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake), \
+         mock.patch.object(ssl_checker, "resolve_public_ipv4", lambda h: "192.0.2.1"):
+        result = ssl_checker.check_ssl_certificate("host.example")
+    assert result["error"] == expected
+    assert result["valid"] is False
+
+
+@pytest.mark.parametrize("exc, expected", [
+    (network_safety.UnresolvableHostError("Could not resolve hostname."),
+     "the name could not be resolved"),
+    (network_safety.PrivateDestinationError("Private, loopback, ... are not allowed."),
+     "it does not resolve to a public address"),
+    (network_safety.UnsupportedUrlError("Only absolute HTTP(S) URLs are allowed."),
+     "only absolute HTTP and HTTPS URLs can be checked"),
+    (network_safety.UnsafeDestinationError("something else"), "the destination was refused"),
+])
+def test_our_own_refusals_are_reported_in_our_words_not_the_exceptions(exc, expected):
+    """These carry only literals we wrote, but a caller still states the
+    reason itself rather than forwarding an exception's message."""
+    from app.core.failures import describe
+    assert describe(exc) == expected
+
+
+def test_describe_can_only_ever_return_a_literal_from_its_own_module():
+    """The property the module claims, pinned independently of any analyser.
+
+    Every phrase describe() can produce is written in failures.py. This walks
+    that file's own string constants, then throws exceptions carrying obvious
+    markers in every field it reads, and checks the answer is always one of
+    them. A future change that interpolates something from an exception fails
+    here.
+    """
+    import ast
+    import inspect
+    import smtplib
+    from app.core import failures
+
+    source = inspect.getsource(failures)
+    allowed = {
+        node.value for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+    marker = "SENTINEL-/app/secret.py-pg://u:pw@db"
+    nasty = [
+        RuntimeError(marker),
+        OSError(9999, marker),
+        ConnectionRefusedError(marker),
+        socket.gaierror(-2, marker),
+        network_safety.PrivateDestinationError(marker),
+        network_safety.UnresolvableHostError(marker),
+    ]
+
+    ssl_err = ssl.SSLError(1, marker)
+    ssl_err.reason = marker
+    nasty.append(ssl_err)
+
+    verify_err = ssl.SSLCertVerificationError(marker)
+    verify_err.verify_code = 9999
+    verify_err.verify_message = marker
+    nasty.append(verify_err)
+
+    for exc in nasty:
+        described = failures.describe(exc)
+        assert described in allowed, f"{type(exc).__name__} produced {described!r}"
+        assert marker not in described
+
+    for code in (421, 535, 451, 571, 9999):
+        smtp = smtplib.SMTPResponseException(code, marker.encode())
+        described = failures.describe_smtp(smtp)
+        assert described in allowed, f"SMTP {code} produced {described!r}"
+        assert marker not in described and str(code) not in described

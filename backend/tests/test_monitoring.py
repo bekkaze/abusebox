@@ -198,8 +198,10 @@ def test_generic_webhook_keeps_v11_fields():
 def test_slack_and_discord_payloads_are_text():
     slack = notifications.build_webhook_payload("https://hooks.slack.com/services/T/B/x", "mail.example.com", "", EVENT)
     discord = notifications.build_webhook_payload("https://discord.com/api/webhooks/1/abc", "mail.example.com", "", EVENT)
-    assert set(slack) == {"text"} and "mail.example.com" in slack["text"]
-    assert set(discord) == {"content", "allowed_mentions"} and "zen.spamhaus.org" in discord["content"]
+    expected = "[AbuseBox] \U0001f534 mail.example.com: Listed on 1 blacklist (zen.spamhaus.org)"
+    # The whole line, not a substring of it: this is what lands in the channel.
+    assert slack == {"text": expected}
+    assert discord == {"content": expected, "allowed_mentions": {"parse": []}}
 
 
 def test_notification_preferences_filter_events():

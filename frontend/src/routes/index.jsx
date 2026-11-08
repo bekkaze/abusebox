@@ -102,6 +102,6 @@ const Routes = () => {
   ]), [Boolean(token)]);
 
   return <RouterProvider router={router} />;
-}
+};
 
 export default Routes;

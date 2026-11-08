@@ -1,11 +1,14 @@
 from typing import Any
 from urllib.parse import urlparse
 
+import dns.exception
+import dns.resolver
+
+from app.core.domains import registrable_domain
+
 
 def _dns_txt_records(domain: str) -> list[str]:
     try:
-        import dns.resolver
-
         answers = dns.resolver.resolve(domain, "TXT", lifetime=5)
         # Long TXT records are split into several 255-byte strings; a record's
         # value is their concatenation (RFC 7208 §3.3).
@@ -87,47 +90,126 @@ def _check_spf(domain: str) -> dict[str, Any]:
     }
 
 
-def _check_dkim(domain: str, selectors: list[str] | None = None) -> dict[str, Any]:
-    if selectors is None:
-        selectors = ["default", "google", "selector1", "selector2", "k1", "mail", "dkim", "s1", "s2"]
+_DEFAULT_DKIM_SELECTORS = ("default", "google", "selector1", "selector2", "k1", "mail", "dkim", "s1", "s2")
 
-    found_selectors = []
+
+def _dns_cname_record(name: str) -> str | None:
+    try:
+        answers = dns.resolver.resolve(name, "CNAME", lifetime=5)
+    except dns.exception.DNSException:
+        # No CNAME, no such name, or no answer in time. All of them mean the
+        # same thing here: nothing is published at this selector.
+        return None
+    for rdata in answers:
+        return rdata.to_text()
+    return None
+
+
+def _dkim_keys_at(name: str, selectors: list[str]) -> list[dict[str, Any]]:
+    """Every selector of *selectors* with a key published under *name*."""
+    keys = []
     for selector in selectors:
-        dkim_domain = f"{selector}._domainkey.{domain}"
-        records = _dns_txt_records(dkim_domain)
-        cname_records = []
-        try:
-            import dns.resolver
-
-            answers = dns.resolver.resolve(dkim_domain, "CNAME", lifetime=5)
-            cname_records = [rdata.to_text() for rdata in answers]
-        except Exception:
-            pass
-
-        if records or cname_records:
-            found_selectors.append({
+        target = f"{selector}._domainkey.{name}"
+        records = _dns_txt_records(target)
+        cname = _dns_cname_record(target)
+        if records or cname:
+            keys.append({
                 "selector": selector,
                 "record": records[0] if records else None,
-                "cname": cname_records[0] if cname_records else None,
+                "cname": cname,
+                "found_at": name,
             })
+    return keys
+
+
+def _check_dkim(domain: str, selectors: list[str] | None = None) -> dict[str, Any]:
+    """DKIM keys for *domain*, falling back to its organisational domain.
+
+    A selector lives under the domain a message is signed as, which is the
+    signature's `d=` tag, and for most setups that is the organisational
+    domain rather than the sending host: mail from mail1.example.com is
+    normally signed as example.com, so the key is at
+    <selector>._domainkey.example.com. Looking only at the host reported "no
+    DKIM" for a domain that has it (issue #40).
+
+    Unlike DMARC nothing is inherited here, because DKIM defines no fallback.
+    A key found at the organisational domain is reported as found there, and
+    it only applies if the host does sign as that domain, which DNS cannot
+    tell us.
+    """
+    selectors = list(selectors) if selectors else list(_DEFAULT_DKIM_SELECTORS)
+
+    found_selectors = _dkim_keys_at(domain, selectors)
+    searched = [domain]
+
+    organisational = registrable_domain(domain)
+    if not found_selectors and organisational and organisational != domain:
+        found_selectors = _dkim_keys_at(organisational, selectors)
+        searched.append(organisational)
+
+    found_at = found_selectors[0]["found_at"] if found_selectors else None
+    inherited_from = found_at if found_at and found_at != domain else None
+
+    warnings = []
+    if inherited_from:
+        warnings.append(
+            f"No DKIM key under {domain} itself. Found under {inherited_from}, "
+            f"which covers mail this host signs as that domain."
+        )
+
+    if found_selectors:
+        details = "DKIM selectors found."
+    elif len(searched) > 1:
+        details = (
+            f"No DKIM selectors found under {domain} or {searched[1]}. Provide the "
+            "selectors used by your mail provider to check custom names."
+        )
+    else:
+        details = (
+            "No DKIM selectors found. Provide selectors used by your mail provider "
+            "to check custom names."
+        )
 
     return {
         "found": bool(found_selectors),
         "selectors_checked": selectors,
         "selectors_found": found_selectors,
-        "details": "DKIM selectors found." if found_selectors else "No DKIM selectors found. Provide selectors used by your mail provider to check custom names.",
+        "domains_searched": searched,
+        "inherited_from": inherited_from,
+        "details": details,
+        "warnings": warnings,
     }
 
 
-def _check_dmarc(domain: str) -> dict[str, Any]:
-    dmarc_domain = f"_dmarc.{domain}"
-    txt_records = _dns_txt_records(dmarc_domain)
-    dmarc_records = [r for r in txt_records if r.startswith("v=DMARC1")]
+def _dmarc_record_at(name: str) -> str | None:
+    for record in _dns_txt_records(f"_dmarc.{name}"):
+        if record.startswith("v=DMARC1"):
+            return record
+    return None
 
-    if not dmarc_records:
+
+def _check_dmarc(domain: str) -> dict[str, Any]:
+    """The DMARC policy in force for *domain*.
+
+    RFC 7489 section 6.6.3: a host without a record of its own is covered by
+    the organisational domain's, and the policy that applies to it is that
+    record's `sp` tag when it has one, falling back to `p`. So a mail server
+    at mail1.example.com inherits example.com's policy; reporting it as having
+    no DMARC at all was wrong (issue #40).
+    """
+    record = _dmarc_record_at(domain)
+    inherited_from = None
+
+    if record is None:
+        organisational = registrable_domain(domain)
+        if organisational and organisational != domain:
+            record = _dmarc_record_at(organisational)
+            if record is not None:
+                inherited_from = organisational
+
+    if record is None:
         return {"found": False, "record": None, "policy": None, "details": "No DMARC record found."}
 
-    record = dmarc_records[0]
     tags = {}
     for part in record.split(";"):
         part = part.strip()
@@ -135,12 +217,23 @@ def _check_dmarc(domain: str) -> dict[str, Any]:
             key, value = part.split("=", 1)
             tags[key.strip()] = value.strip()
 
-    policy = tags.get("p", "none")
+    # On an inherited record it is `sp` that governs this host, and `p` only
+    # when the parent did not say otherwise.
+    if inherited_from:
+        policy = tags.get("sp") or tags.get("p", "none")
+    else:
+        policy = tags.get("p", "none")
+
     warnings = []
     if policy == "none":
         warnings.append("DMARC policy is 'none' — no enforcement, monitoring only.")
     if "rua" not in tags:
         warnings.append("No aggregate report URI (rua) configured.")
+    if inherited_from:
+        warnings.append(
+            f"No DMARC record of its own; covered by {inherited_from} "
+            f"({'sp' if tags.get('sp') else 'p'}={policy})."
+        )
 
     return {
         "found": True,
@@ -150,6 +243,7 @@ def _check_dmarc(domain: str) -> dict[str, Any]:
         "percentage": tags.get("pct", "100"),
         "rua": tags.get("rua"),
         "ruf": tags.get("ruf"),
+        "inherited_from": inherited_from,
         "warnings": warnings,
     }
 

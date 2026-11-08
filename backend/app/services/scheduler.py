@@ -24,7 +24,9 @@ _PRUNE_EVERY_SECONDS = 3600
 # Last cycle summary, shown on the dashboard.
 _status_lock = threading.Lock()
 _status: dict = {"last_cycle_started": None, "last_cycle_finished": None, "last_cycle_checked": 0, "last_error": None}
-_last_prune: datetime | None = None
+# A dict rather than a module global rebound through `global`: the state is
+# the same, but it reads as state that outlives the call, which is what it is.
+_prune_state: dict[str, datetime | None] = {"last": None}
 
 
 def _is_asset_due(hostname: Hostname, global_interval_minutes: int) -> bool:
@@ -61,11 +63,11 @@ def due_hostnames(db, global_interval: int) -> list[Hostname]:
 
 
 def _maybe_prune(db) -> None:
-    global _last_prune
+    last = _prune_state["last"]
     now = datetime.now(timezone.utc)
-    if _last_prune and (now - _last_prune).total_seconds() < _PRUNE_EVERY_SECONDS:
+    if last and (now - last).total_seconds() < _PRUNE_EVERY_SECONDS:
         return
-    _last_prune = now
+    _prune_state["last"] = now
     row = db.query(AppSettings).filter(AppSettings.id == 1).first()
     if row and row.history_retention_days:
         prune_history(db, row.history_retention_days)
@@ -186,7 +188,9 @@ def start_scheduler(interval_minutes: int | None = None) -> None:
         finally:
             db.close()
 
-    _current_interval = interval_minutes
+    # An int, whatever the column or the environment held: it is logged
+    # below, and a scheduler interval is a number by definition.
+    _current_interval = int(interval_minutes)
 
     if _scheduler_thread and _scheduler_thread.is_alive():
         logger.warning("Scheduler already running.")

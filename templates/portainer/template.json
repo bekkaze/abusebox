@@ -6,7 +6,7 @@
       "title": "AbuseBox",
       "name": "abusebox",
       "description": "Self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.",
-      "note": "Open AbuseBox at http://&lt;your-server&gt;:3000 . The admin password is generated on the first start and printed in the backend container's log. Set 'Allowed browser origins' to the exact address you open AbuseBox at, or the browser will block the API calls.",
+      "note": "Open AbuseBox at http://&lt;your-server&gt;:3000 . The admin password is generated on the first start and saved in the backend container at /app/data/initial_admin_password; read it from the container's Console. Set 'Allowed browser origins' to the exact address you open AbuseBox at, or the browser will block the API calls.",
       "categories": ["Tools", "Network", "Security"],
       "platform": "linux",
       "logo": "https://raw.githubusercontent.com/bekkaze/abusebox/main/files/logo.png",

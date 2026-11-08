@@ -20,7 +20,8 @@ def initial_password_file() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(settings.secret_key_file)), "initial_admin_password")
 
 
-def _save_initial_password(password: str) -> None:
+def _save_initial_password(password: str) -> bool:
+    """Write the generated password to the data volume. True if it landed there."""
     path = initial_password_file()
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -28,13 +29,15 @@ def _save_initial_password(password: str) -> None:
             handle.write(password + "\n")
     except OSError as exc:
         logger.warning("Could not save the initial admin password to %s: %s", path, exc)
+        return False
+    return True
 
 
 def forget_initial_password() -> None:
     try:
         os.remove(initial_password_file())
     except FileNotFoundError:
-        pass
+        logger.debug("No saved initial password to remove; nothing to do.")
     except OSError as exc:
         logger.warning("Could not remove %s: %s", initial_password_file(), exc)
 
@@ -47,6 +50,21 @@ def seed_default_admin(db: Session) -> None:
 
     generated = not settings.default_admin_password
     password = settings.default_admin_password or secrets.token_urlsafe(12)
+
+    # Written before the account exists, not after. A generated password the
+    # operator cannot read is an account nobody can sign in to, and the log is
+    # not an acceptable second home for it: container logs are kept, shipped
+    # into other systems, and pasted into bug reports. So if it cannot be
+    # saved, no account is created and the next start tries again.
+    if generated and not _save_initial_password(password):
+        logger.error(
+            "Not creating the admin account: the generated password could not be saved to %s, "
+            "and it is not written to the log. Make that path writable, or set "
+            "DEFAULT_ADMIN_PASSWORD, and start again.",
+            initial_password_file(),
+        )
+        return
+
     db.add(
         User(
             username=settings.default_admin_username,
@@ -61,10 +79,12 @@ def seed_default_admin(db: Session) -> None:
     )
     db.commit()
     if generated:
-        _save_initial_password(password)
         logger.warning(
-            "Created the admin account %r with password %s (also saved to %s). Sign in and change it.",
-            settings.default_admin_username, password, initial_password_file(),
+            "Created the admin account %r with a random password, saved to %s "
+            "and readable only by this user. Sign in and change it in Settings; "
+            "the saved copy is removed when you do. Under Docker: "
+            "docker compose exec backend cat /app/data/initial_admin_password",
+            settings.default_admin_username, initial_password_file(),
         )
 
 

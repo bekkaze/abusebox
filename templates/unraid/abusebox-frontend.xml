@@ -16,7 +16,7 @@
 
     nginx serves the built UI here and proxies /api to the backend, so the browser only ever talks to this container.
 
-    Sign in with the admin account created by the backend on its first start. Its password is in the backend container's log and in 'initial_admin_password' in the backend's data path.
+    Sign in with the admin account created by the backend on its first start. Its password is in 'initial_admin_password' in the backend's data path.
   </Overview>
   <Category>Tools: Network: Security:</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>

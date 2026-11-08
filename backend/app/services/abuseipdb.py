@@ -1,5 +1,4 @@
 import ipaddress
-import socket
 from typing import Any
 from urllib.parse import urlparse
 

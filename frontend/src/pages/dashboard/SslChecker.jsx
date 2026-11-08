@@ -18,6 +18,9 @@ function verdictFor(data) {
     return { code: '5.x', tone: 'text-s5', text: 'Certificate expired' };
   }
   if (days < EXPIRY_WARNING_DAYS) return { code: '4.x', tone: 'text-s4', text: `Certificate valid, but expires in ${plural(days, 'day')}` };
+  // A good certificate served over an obsolete protocol is not a pass. The
+  // certificate is only half of what a client has to accept.
+  if (data.warnings?.length > 0) return { code: '4.x', tone: 'text-s4', text: 'Certificate valid, but the TLS configuration is weak' };
   return { code: '2.x', tone: 'text-s2', text: `Certificate valid, expires in ${plural(days, 'day')}` };
 }
 
@@ -33,6 +36,9 @@ function SslVerdict({ data }) {
       {data.valid && data.days_remaining < EXPIRY_WARNING_DAYS && (
         <p className="text-sm text-ink-2">Renew it before it expires, or browsers and mail servers will refuse the connection.</p>
       )}
+      {data.warnings?.map((warning) => (
+        <p key={warning} className="text-sm text-s4">{warning}</p>
+      ))}
     </div>
   );
 }
@@ -111,7 +117,7 @@ export default function SslChecker() {
     <div>
       <PageHeader
         title="SSL certificate"
-        description="Connects on port 443 and reports whether the certificate is valid, when it expires, who issued it and the cipher in use."
+        description="Connects on port 443 and reports whether the certificate is valid, when it expires, who issued it, and whether the TLS version in use is still acceptable."
       />
 
       <LookupForm

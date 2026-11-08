@@ -2,6 +2,55 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+## [1.3.6] - 2026-11-08
+
+Email security on a mail server's own hostname, and the TLS version a server
+actually speaks. Both came out of issue #40.
+
+Upgrading: `docker compose pull && docker compose up -d`.
+
+### Fixed
+
+- **A mail server's hostname looked like it had no DMARC.** A host without a DMARC record of its own is covered by the organisational domain's, and the policy that applies to it is that record's `sp` tag (RFC 7489 §6.6.3). AbuseBox only ever asked for the exact name, so `mail1.example.com` was reported as having no DMARC while `example.com` published `p=reject; sp=reject`, and the grade dropped accordingly. The inherited policy is used now, and the result says which domain it came from (#40).
+
+  SPF is deliberately left as it was. A sending host publishes its own SPF record, and `mail1.example.com` having `v=spf1 a ~all` where its parent has `v=spf1 mx ~all` is normal; reporting the parent's would state a policy that is not the one in force.
+
+- **The same hostname looked like it had no DKIM.** A selector lives under the domain a message is signed as, which is the signature's `d=` tag and for most setups is the organisational domain rather than the sending host. Mail from `mail1.example.com` is normally signed as `example.com`, so the key is at `<selector>._domainkey.example.com` and looking only at the host found nothing. The organisational domain is now searched when the host itself publishes no key, and the result says which domain the key was found under (#40).
+
+  Nothing is inherited here, because DKIM defines no fallback. A key found at the organisational domain only applies if the host does sign as that domain, which DNS cannot tell us, so it is reported as found there rather than silently treated as the host's own.
+
+- **An obsolete TLS version was reported as an error instead of a problem.** `ssl.create_default_context()` will not negotiate below TLS 1.2, and OpenSSL's security level refuses those cipher suites as well, so a server still on TLS 1.0 produced `SSL error: [SSL: TLSV1_ALERT_PROTOCOL_VERSION]` and no verdict at all. The certificate check now tries as a mail client would first, and only if that fails retries with the versions relaxed, so the certificate is read and the old protocol is named as the finding. A short key is reported the same way.
+
+  A certificate problem is never retried that way. A chain that fails verification is a real answer, and re-asking at a lower security level would turn it into a pass.
+
+- **An unexpected check failure put the exception's text in the browser.** A traceback's message carries file paths and internals. The failure's kind is shown and the traceback goes to the backend log, where it belongs.
+
+- **A rejected certificate now says which way it was rejected.** Expired, issued for a different hostname, self-signed, or signed by a root nobody trusts all came back as `SSL verification failed: CERTIFICATE_VERIFY_FAILED`. OpenSSL reports the reason as a number, so the four are told apart and named in plain words.
+
+- **Failure messages across the checks read as sentences.** `[Errno 101] Network is unreachable`, `[SSL: ...] (_ssl.c:1082)` and requests' own messages are gone from results; every check now reports the cause in words, chosen by the kind of failure. A bad CIDR says what a good one looks like instead of quoting the input back.
+
+### Security
+
+- **The generated admin password is no longer written to the log.** The first start creates `admin` with a random password, and that line stayed in `docker compose logs` for the life of the install, in anything the logs were shipped to, and in logs pasted into bug reports. It is written to `initial_admin_password` in the data volume, readable only by the backend's user and deleted the moment the password is changed, and the log now names the file instead.
+
+  **This changes first sign-in.** Read it with `docker compose exec backend cat /app/data/initial_admin_password`. Existing installs are untouched.
+
+  If that file cannot be written, no account is created: a generated password nobody can read is an account nobody can sign in to, and the log is not an acceptable second home for it. The start says so and the next one tries again, or set `DEFAULT_ADMIN_PASSWORD` and nothing needs saving at all.
+
+- **A hostname can no longer forge a line in the log.** A value with a carriage return in it could close the real entry and open what read as another genuine one. Values that came from outside are escaped to a single line before they are logged.
+
+- **No exception's own text reaches a check result.** A result gets forwarded to a list operator or pasted into a ticket, and an exception's message can carry a file path, a connection string or an SMTP server's reply. `app/core/failures.py` maps a failure to one of a fixed set of phrases by its type; where a number genuinely helps, such as an errno, an SMTP reply code or an X509 verify code, it is read from a field that holds an integer rather than from the message. The detail stays in the backend log.
+
+  AbuseBox's own refusals are typed rather than told apart by their text, so `UnresolvableHostError`, `PrivateDestinationError` and `UnsupportedUrlError` let a caller state the reason in its own words instead of forwarding ours.
+
+- **CodeQL's findings are addressed in code rather than dismissed.** Of the 26 alerts from the first scan, 24 are fixed here: handlers that absorbed an expected absence say which absence and what happens next, the prune timestamp is held in a container instead of a module global rebound through `global`, the scheduler interval is an int before it is logged, the two imports that exist for their side effect say so with `importlib.import_module`, three unused imports are gone, and two test assertions compare whole values instead of substrings.
+
+  Two are left standing and are reported as accepted rather than quietly suppressed. The relaxed TLS context exists to negotiate what it is reporting on, so the only way to clear it would be to drop the capability this release adds. And the SSL endpoint is read as exposing a stack trace because the analysis summarises `describe()` as passing its argument through to its return value; it does not, and a test now walks `failures.py` for its own string constants and checks that every answer is one of them even when the exception carries a marker in every field it reads.
+
+- **Base images updated:** python 3.11.18-alpine and a current nginx 1.30.6-alpine digest.
+
 ## [1.3.5] - 2026-11-06
 
 A follow-up to 1.3.4, from testing on the issue tracker.

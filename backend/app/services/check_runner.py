@@ -4,6 +4,8 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
+from app.core.logging_safety import for_log
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,8 +68,12 @@ def run_enabled_checks(hostname: str, toggles: dict[str, bool]) -> dict[str, Any
             try:
                 results[key] = future.result()
             except Exception as exc:
-                logger.exception("Check '%s' failed for %s", key, hostname)
-                results[key] = {"error": str(exc)}
+                # The traceback goes to the log, where the operator can read
+                # it. What reaches the browser is the kind of failure and
+                # nothing else: the text of an unexpected exception carries
+                # file paths and internals that a check result should not.
+                logger.exception("Check '%s' failed for %s", key, for_log(hostname))
+                results[key] = {"error": f"The {key} check failed ({type(exc).__name__}). See the backend log."}
 
     return results
 

@@ -1,3 +1,4 @@
+import logging
 import socket
 import time
 from typing import Any
@@ -6,7 +7,11 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import requests
 from requests.adapters import HTTPAdapter
 
+from app.core.failures import describe
+from app.core.logging_safety import for_log
 from app.core.network_safety import UnsafeDestinationError, resolve_public_ipv4, validate_public_url
+
+logger = logging.getLogger(__name__)
 
 _MAX_REDIRECTS = 5
 _MAX_BODY_BYTES = 1024 * 1024
@@ -133,7 +138,7 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
         result["resolved_ip"] = None
         result["dns_resolves"] = True
         result["is_up"] = False
-        result["reason"] = str(exc)
+        result["reason"] = f"Not checked: {describe(exc)}."
         return result
     result["resolved_ip"] = ip
     result["dns_resolves"] = True
@@ -164,12 +169,14 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
             resp, final_url, size = _safe_get(url.replace("https://", "http://", 1))
             _record_response(result, resp, final_url, size, start)
             result["ssl_error"] = True
-        except (requests.exceptions.RequestException, UnsafeDestinationError):
-            pass
+        except (requests.exceptions.RequestException, UnsafeDestinationError) as retry_exc:
+            # Both schemes failed. The SSL error above is the better
+            # answer to report, so only the log hears about this one.
+            logger.debug("Plain-HTTP retry for %s also failed: %s", for_log(url), retry_exc)
     except UnsafeDestinationError as exc:
         # A redirect pointed at a private/reserved destination.
         result["is_up"] = False
-        result["reason"] = f"Redirect blocked: {exc}"
+        result["reason"] = f"Redirect blocked: {describe(exc)}."
     except requests.exceptions.ConnectionError:
         result["is_up"] = False
         result["reason"] = "Connection refused or unreachable"
@@ -178,6 +185,8 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
         result["reason"] = "Request timed out"
     except requests.exceptions.RequestException as exc:
         result["is_up"] = False
-        result["reason"] = str(exc)
+        # The cause, not requests' own message: that one quotes the full
+        # URL and its internals back into a result the operator may forward.
+        result["reason"] = describe(exc.__cause__ or exc, fallback="The request failed.")
 
     return result

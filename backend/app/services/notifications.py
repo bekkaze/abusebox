@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import requests
 
 from app.core.config import settings
+from app.core.failures import describe, describe_smtp
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str | None
         return True, None
     except Exception as exc:  # noqa: BLE001 - report any SMTP failure to the caller
         logger.error("Failed to send email alert: %s", exc)
-        return False, str(exc)
+        return False, f"Could not send it: {describe_smtp(exc)}. The backend log has the detail."
 
 
 def _webhook_kind(url: str) -> str:
@@ -122,7 +123,9 @@ def post_webhook(url: str, payload: dict[str, Any]) -> tuple[bool, str | None]:
         return True, None
     except Exception as exc:  # noqa: BLE001 - report any delivery failure to the caller
         logger.error("Failed to send webhook alert: %s", exc)
-        return False, str(exc)
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        detail = f"the endpoint replied {status}" if isinstance(status, int) else describe(exc)
+        return False, f"Could not deliver it: {detail}. The backend log has the detail."
 
 
 def should_notify(event_type: str, prefs: dict[str, Any]) -> bool:

@@ -14,7 +14,7 @@
 
     AbuseBox is self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.
 
-    On the first start an admin password is generated, printed in this container's log and saved as 'initial_admin_password' in the data path below.
+    On the first start an admin password is generated and saved as 'initial_admin_password' in the data path below. The log names the file but does not print the password, so a log you share does not hand over the account. Read it from this container's Console with: cat /app/data/initial_admin_password
 
     Note on blacklists: Spamhaus and some other lists refuse queries that come through public resolvers such as Google or Cloudflare, and AbuseBox then shows "No answer" instead of a false "clean". Leave DNSBL_NAMESERVERS empty to use Unraid's own resolver, or set it to a resolver you run. See the README section "Blacklists that show No answer".
   </Overview>
@@ -34,7 +34,7 @@
   <Config Name="Allowed browser origins" Target="APP_CORS_ALLOWED_ORIGINS" Default="" Mode="" Description="Comma-separated origins the UI is opened from, for example http://192.168.1.10:3000 . Must match the address you use to reach the frontend, or the browser blocks the API calls." Type="Variable" Display="always" Required="true" Mask="false"></Config>
   <Config Name="Admin username" Target="DEFAULT_ADMIN_USERNAME" Default="admin" Mode="" Description="Username of the admin account created on the first start." Type="Variable" Display="always" Required="false" Mask="false">admin</Config>
   <Config Name="Admin email" Target="DEFAULT_ADMIN_EMAIL" Default="admin@abusebox.local" Mode="" Description="Email address of that admin account. Alerts for an asset go to the email of the user who owns it." Type="Variable" Display="always" Required="false" Mask="false">admin@abusebox.local</Config>
-  <Config Name="Admin password" Target="DEFAULT_ADMIN_PASSWORD" Default="" Mode="" Description="Leave empty to have one generated on the first start, printed in the log and saved as 'initial_admin_password' in the data path." Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Admin password" Target="DEFAULT_ADMIN_PASSWORD" Default="" Mode="" Description="Leave empty to have one generated on the first start and saved as 'initial_admin_password' in the data path." Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="App secret key" Target="APP_SECRET_KEY" Default="" Mode="" Description="Signs login tokens. Leave empty to have one generated and saved in the data path." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Blacklist resolvers" Target="DNSBL_NAMESERVERS" Default="" Mode="" Description="Comma-separated DNS resolvers for blacklist lookups. Empty uses this server's own resolver. Public resolvers such as 8.8.8.8 are refused by Spamhaus." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="AbuseIPDB API key" Target="ABUSEIPDB_API_KEY" Default="" Mode="" Description="Optional. Enables AbuseIPDB reputation checks." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>

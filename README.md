@@ -27,7 +27,7 @@ git clone https://github.com/bekkaze/abusebox.git && cd abusebox
 docker compose up -d
 ```
 
-Open `http://localhost:3000` and sign in as `admin` with the password from `docker compose logs backend | grep password`, then change it in Settings. More options under [Installation](#installation).
+Open `http://localhost:3000` and sign in as `admin` with the password from `docker compose exec backend cat /app/data/initial_admin_password`, then change it in Settings. More options under [Installation](#installation).
 
 ## Why AbuseBox
 
@@ -53,10 +53,10 @@ If AbuseBox saves you a bounce, a star helps other mail operators find it.
 **Checks**
 - **Blacklists:** 24 DNS blacklists, each listing decoded with its meaning and a severity, and each list verified against its test addresses
 - **AbuseIPDB:** abuse confidence score, reports, ISP and country (free API key)
-- **SSL:** validity, issuer, expiry, cipher and covered names
+- **SSL:** validity, issuer, expiry, covered names, and whether the TLS version and cipher are still acceptable
 - **WHOIS:** registrar, dates, name servers and abuse contact, over IPv6 or IPv4
 - **DNS:** A, AAAA, MX, TXT, CNAME, NS, SOA and PTR records
-- **SPF / DKIM / DMARC:** graded A to F, with custom DKIM selectors, plus DMARC aggregate report parsing
+- **SPF / DKIM / DMARC:** graded A to F, with custom DKIM selectors, plus DMARC aggregate report parsing. A mail server's own hostname is handled: its SPF is read where it is published, and the DMARC policy and DKIM key it is covered by are found on the domain it belongs to
 - **Server status:** DNS resolution, ports 80 and 443, HTTP status and response time
 - **Bulk and subnet checks:** up to 300 targets at once, or every address in a /24
 
@@ -82,7 +82,7 @@ docker compose up -d            # pulls the prebuilt images (add --build to buil
 
 Open `http://localhost:3000` and you're ready to go. To update later: `docker compose pull && docker compose up -d`.
 
-> **First sign-in:** the user is `admin`, and the first start generates a random password. It's in the logs (`docker compose logs backend | grep password`) and in the data volume (`docker compose exec backend cat /app/data/initial_admin_password`). **Change it in Settings right after signing in**; the saved copy is deleted when you do. To choose it yourself, set `DEFAULT_ADMIN_PASSWORD` in `.env` before the first start.
+> **First sign-in:** the user is `admin`, and the first start generates a random password. Read it with `docker compose exec backend cat /app/data/initial_admin_password`; the backend log names the file but no longer prints the password itself, so a log you share with someone does not hand them the account. **Change it in Settings right after signing in**; the saved copy is deleted when you do. To choose it yourself, set `DEFAULT_ADMIN_PASSWORD` in `.env` before the first start. If the data path is not writable the account is not created at all, and the log says so rather than putting the password in it.
 >
 > The UI answers on any hostname, so you can open it from another machine right away. Put it behind your own HTTPS reverse proxy before exposing it to a network you don't trust.
 
@@ -102,7 +102,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 127.0.0.1 --port 8100 --reload
 ```
 
-The admin password is printed in this terminal on the first start.
+The first start generates an admin password and saves it next to the database, as `initial_admin_password`. This terminal names the exact path.
 
 **Frontend** (new terminal):
 
@@ -124,7 +124,7 @@ Templates for Unraid's Community Applications live in [`templates/unraid/`](temp
 1. Copy `abusebox-backend.xml` and `abusebox-frontend.xml` into `/boot/config/plugins/dockerMan/templates-user/` on the server (or add this repository under **Docker → Template repositories**).
 2. Add **AbuseBox-Backend** first. Set **Data** to a path you back up, such as `/mnt/user/appdata/abusebox`, and set **Allowed browser origins** to the address you will open AbuseBox at, for example `http://192.168.1.10:3000`.
 3. Add **AbuseBox-Frontend**. Set **Backend URL** to the server's LAN IP and the backend's port, for example `http://192.168.1.10:8100`. Not `localhost` — that points at the frontend container itself.
-4. Open `http://<your-server>:3000`. The admin password is in the AbuseBox-Backend log, and in `initial_admin_password` in the data path.
+4. Open `http://<your-server>:3000`. The admin password is in `initial_admin_password` in the data path you chose; the AbuseBox-Backend log names the file. Read it from **Docker → AbuseBox-Backend → Console** with `cat /app/data/initial_admin_password`, or from the share over SMB.
 
 Unraid has no bundled resolver, so **Blacklist resolvers** is empty by default and the server's own resolver is used. If blacklists show "No answer", see [Blacklists that show "No answer"](#blacklists-that-show-no-answer).
 
@@ -135,7 +135,7 @@ Unraid has no bundled resolver, so **Blacklist resolvers** is empty by default a
 - **App template:** in Portainer, **Settings → App Templates**, set the URL to `https://raw.githubusercontent.com/bekkaze/abusebox/main/templates/portainer/template.json`, then deploy **AbuseBox** from **App Templates**.
 - **Or as a stack:** **Stacks → Add stack → Repository**, repository URL `https://github.com/bekkaze/abusebox`, compose path `templates/portainer/docker-compose.yml`.
 
-Set **Allowed browser origins** to the address you open AbuseBox at, then go to `http://<your-server>:3000`. The admin password is in the backend container's log.
+Set **Allowed browser origins** to the address you open AbuseBox at, then go to `http://<your-server>:3000`. For the admin password, open the backend container's **Console** in Portainer and run `cat /app/data/initial_admin_password`.
 
 ### CasaOS
 
@@ -145,7 +145,7 @@ Set **Allowed browser origins** to the address you open AbuseBox at, then go to 
 2. Install, then open AbuseBox from the dashboard at port 3000.
 3. In the app's settings, set `APP_CORS_ALLOWED_ORIGINS` to the address you open AbuseBox at, for example `http://192.168.1.10:3000`, or the browser will block the API calls.
 
-Data lives in `/DATA/AppData/abusebox/data`. The admin password is in the `abusebox-backend` log and in `initial_admin_password` in that folder.
+Data lives in `/DATA/AppData/abusebox/data`. The admin password is in `initial_admin_password` in that folder, which you can open in the CasaOS file manager.
 
 <a id="upgrading-to-v130"></a>
 
@@ -212,7 +212,7 @@ APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
 DATABASE_URL=sqlite:///./app.db   # ignored by Docker Compose (always uses the data volume)
 
 # Default admin, created on first start only. Leave the password empty to
-# generate a random one (printed in the logs).
+# generate a random one, saved as initial_admin_password in the data path.
 DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=
 DEFAULT_ADMIN_EMAIL=admin@abusebox.local
@@ -256,7 +256,7 @@ WEBHOOK_URL=
 | `APP_DEBUG` | Show error tracebacks (development only) | No |
 | `APP_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the API | No |
 | `DATABASE_URL` | Database connection string (SQLite default) | No |
-| `DEFAULT_ADMIN_PASSWORD` | Password for the admin account created on the first start. If empty, a random one is generated, printed in the logs and saved as `initial_admin_password` next to the database | No |
+| `DEFAULT_ADMIN_PASSWORD` | Password for the admin account created on the first start. If empty, a random one is generated and saved as `initial_admin_password` next to the database, readable only by the backend's user | No |
 | `ABUSEIPDB_API_KEY` | Enables AbuseIPDB reputation checks | No |
 | `SCHEDULER_ENABLED` | Run periodic background checks (default: `true`; can also be changed in Settings) | No |
 | `SCHEDULER_INTERVAL_MINUTES` | Check interval in minutes (default: 360) | No |
@@ -429,6 +429,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.3.6** | November 8, 2026 | A mail server's hostname gets the DMARC policy and DKIM key of the domain it belongs to (#40), an obsolete TLS version is reported instead of failing the check, the first admin password is no longer written to the log |
 | **v1.3.5** | November 6, 2026 | WHOIS on a mail server's hostname looks up the domain it belongs to (#39), a record kept from an earlier check says how old it is, CodeQL analysis |
 | **v1.3.4** | November 5, 2026 | WHOIS works where a registry blocks IPv4 but answers over IPv6, `.nl` records read correctly, rate-limit replies no longer look like empty records (#36), install templates for Unraid, Portainer and CasaOS (#31, #32) |
 | **v1.3.3** | October 30, 2026 | Copy a blacklist result as plain text for a ticket or an email to the list operator (#29), a readable activity timeline (#30), copying works on plain-HTTP installs |
