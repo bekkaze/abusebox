@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   HiChevronDown, HiOutlineArrowDownTray, HiOutlineArrowPath, HiOutlineBell, HiOutlineMagnifyingGlass, HiOutlinePlus,
   HiOutlineRectangleStack, HiOutlineServerStack, HiOutlineSquares2X2, HiOutlineSquaresPlus, HiOutlineTableCells,
-  HiOutlineTrash, HiOutlineUserCircle, HiXMark,
+  HiOutlineTrash, HiOutlineUserCircle, HiChevronLeft, HiChevronRight, HiXMark,
 } from "react-icons/hi2";
 import { toast } from "react-toastify";
 import HostnameService from "../../services/hostname";
@@ -62,7 +62,8 @@ const SORTS = [
   { key: 'created', label: 'Recently added' },
 ];
 
-const PAGE_SIZE = 60;
+const PAGE_SIZES = [25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 const FINDINGS_SHOWN = 3;
 
 // Local control styles: a segmented group of standard h-9 buttons.
@@ -142,6 +143,39 @@ function healthOf(item) {
 function urgency(item) {
   if (item.is_blacklisted) return -1;
   return SEVERITY_RANK[item.health?.status] ?? 4;
+}
+
+/** How many issues an asset has, by severity. */
+function issueTally(item) {
+  const issues = item.health?.issues || [];
+  return {
+    critical: issues.filter((issue) => issue.severity === 'critical').length,
+    warning: issues.filter((issue) => issue.severity === 'warning').length,
+    total: issues.length,
+  };
+}
+
+/**
+ * Most urgent first, with ties broken on what is actually known.
+ *
+ * Severity alone sorts into four buckets, so with twenty assets the order
+ * inside "critical" came down to the name. These tie-breaks are counts of
+ * findings the checks produced, so the order is one you can see and verify in
+ * the rows themselves. Deliberately not a single composite score: weighing a
+ * listing against an expiring certificate would be an invented number, and a
+ * reader could not tell whether it was right.
+ */
+function byUrgency(a, b) {
+  const base = urgency(a) - urgency(b);
+  if (base !== 0) return base;
+  const ta = issueTally(a), tb = issueTally(b);
+  const listedA = a.health?.blacklist?.listed?.length || 0;
+  const listedB = b.health?.blacklist?.listed?.length || 0;
+  return (tb.critical - ta.critical)
+    || (listedB - listedA)
+    || (tb.warning - ta.warning)
+    || (tb.total - ta.total)
+    || a.hostname.localeCompare(b.hostname, undefined, { numeric: true });
 }
 
 function exportAssetsCsv(assets) {
@@ -225,6 +259,91 @@ function SelectBox({ checked, onChange, label, indeterminate = false }) {
   );
 }
 
+/** Page numbers around the current one, with the ends always reachable. */
+function pageWindow(page, pageCount) {
+  if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+  const pages = new Set([1, pageCount, page, page - 1, page + 1]);
+  // Keep the row a steady width near the ends, where the window is one-sided.
+  if (page <= 3) { pages.add(2); pages.add(3); pages.add(4); }
+  if (page >= pageCount - 2) { pages.add(pageCount - 3); pages.add(pageCount - 2); pages.add(pageCount - 1); }
+  const sorted = [...pages].filter((n) => n >= 1 && n <= pageCount).sort((a, b) => a - b);
+  const out = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) out.push('gap');
+    out.push(n);
+  });
+  return out;
+}
+
+const pageButtonClass = (on) =>
+  `inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-sm tabular-nums transition-colors ` +
+  (on ? 'bg-accent-soft text-accent font-semibold ring-1 ring-inset ring-accent/40'
+      : 'text-ink-2 hover:bg-sunk hover:text-ink');
+
+function Pager({ page, pageCount, pageSize, total, firstIndex, shownCount, onPage, onPageSize }) {
+  // Nothing to page through and nothing to choose: say the count and stop.
+  if (total === 0) return null;
+  const first = firstIndex + 1;
+  const last = firstIndex + shownCount;
+
+  return (
+    <nav className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3" aria-label="Asset pages">
+      <p className="text-sm text-ink-2" role="status">
+        Showing <span className="text-ink tabular-nums">{first}–{last}</span> of{' '}
+        <span className="text-ink tabular-nums">{total}</span>
+      </p>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {total > PAGE_SIZES[0] && (
+          <label className="flex items-center gap-2 text-sm text-ink-2">
+            Per page
+            <select
+              value={pageSize}
+              onChange={(event) => onPageSize(Number(event.target.value))}
+              className={`${selectClass} h-8 w-auto`}
+            >
+              {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+        )}
+
+        {pageCount > 1 && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button" onClick={() => onPage(page - 1)} disabled={page === 1}
+              className={`${pageButtonClass(false)} disabled:opacity-40 disabled:hover:bg-transparent`}
+              aria-label="Previous page"
+            >
+              <HiChevronLeft className="text-base" aria-hidden="true" />
+            </button>
+            {pageWindow(page, pageCount).map((entry, index) => (
+              entry === 'gap'
+                ? <span key={`gap-${index}`} className="px-1 text-ink-3" aria-hidden="true">&hellip;</span>
+                : (
+                  <button
+                    key={entry} type="button" onClick={() => onPage(entry)}
+                    className={pageButtonClass(entry === page)}
+                    aria-label={`Page ${entry}`}
+                    aria-current={entry === page ? 'page' : undefined}
+                  >
+                    {entry}
+                  </button>
+                )
+            ))}
+            <button
+              type="button" onClick={() => onPage(page + 1)} disabled={page === pageCount}
+              className={`${pageButtonClass(false)} disabled:opacity-40 disabled:hover:bg-transparent`}
+              aria-label="Next page"
+            >
+              <HiChevronRight className="text-base" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}
+
 function LoadingState({ view }) {
   if (view === 'table') {
     return (
@@ -273,7 +392,10 @@ export default function Assets() {
   const [view, setView] = useState(() => readPref('abusebox.assets.view', 'table'));
   const [sort, setSort] = useState(() => readPref('abusebox.assets.sort', 'status'));
   const [selected, setSelected] = useState(() => new Set());
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(() => {
+    const stored = Number(readPref('abusebox.assets.pageSize', DEFAULT_PAGE_SIZE));
+    return PAGE_SIZES.includes(stored) ? stored : DEFAULT_PAGE_SIZE;
+  });
   const [bulkBusy, setBulkBusy] = useState(false);
   const { token } = useAuth();
   const [formData, setFormData] = useState({ ...initialFormData });
@@ -284,6 +406,16 @@ export default function Assets() {
   const setFilterStatus = (key) => {
     const next = new URLSearchParams(searchParams);
     if (key === 'all') next.delete('filter'); else next.set('filter', key);
+    next.delete('page');
+    setSearchParams(next, { replace: true });
+  };
+
+  // The page lives in the URL, so a reload, a shared link and the back button
+  // all land on the rows you were looking at.
+  const requestedPage = Math.max(1, Number(searchParams.get('page')) || 1);
+  const goToPage = (page) => {
+    const next = new URLSearchParams(searchParams);
+    if (page <= 1) next.delete('page'); else next.set('page', String(page));
     setSearchParams(next, { replace: true });
   };
 
@@ -306,7 +438,9 @@ export default function Assets() {
 
   useEffect(() => { if (token) fetchAssets(); }, [token, fetchAssets]);
   const refresh = useCallback(() => fetchAssets({ quiet: true }), [fetchAssets]);
-  useEffect(() => { setVisible(PAGE_SIZE); }, [search, filterStatus, sort]);
+  // A narrower result set can leave you past the end; searching or sorting
+  // should put you back at the top of it either way.
+  useEffect(() => { goToPage(1); }, [search, sort, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -389,7 +523,7 @@ export default function Assets() {
       return matchSearch && matchesFilter(item, filterStatus);
     });
     const sorters = {
-      status: (a, b) => urgency(a) - urgency(b) || a.hostname.localeCompare(b.hostname),
+      status: byUrgency,
       name: (a, b) => a.hostname.localeCompare(b.hostname, undefined, { numeric: true }),
       checked: (a, b) => String(b.last_checked || '').localeCompare(String(a.last_checked || '')),
       created: (a, b) => String(b.created).localeCompare(String(a.created)),
@@ -397,8 +531,17 @@ export default function Assets() {
     return [...matches].sort(sorters[sort] || sorters.status);
   }, [assets, search, filterStatus, sort]);
 
-  const shown = filtered.slice(0, visible);
+  // Clamped, not trusted: deleting rows or narrowing a filter can leave the
+  // URL pointing past the end, and an empty page with no explanation is worse
+  // than quietly showing the last one.
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const page = Math.min(requestedPage, pageCount);
+  const firstIndex = (page - 1) * pageSize;
+  const shown = filtered.slice(firstIndex, firstIndex + pageSize);
   const listedCount = filterCounts.listed || 0;
+  // Bulk actions apply to the whole selection, which can now reach past the
+  // page you are looking at, so the count says how much of it is out of sight.
+  const offPageSelected = selected.size - shown.filter((item) => selected.has(item.id)).length;
   const allShownSelected = shown.length > 0 && shown.every((item) => selected.has(item.id));
   const someShownSelected = !allShownSelected && shown.some((item) => selected.has(item.id));
 
@@ -560,13 +703,18 @@ export default function Assets() {
           >
             {view === 'cards' && (
               <label className="inline-flex items-center gap-2 mr-2 cursor-pointer">
-                <SelectBox checked={allShownSelected} indeterminate={someShownSelected} onChange={toggleAllShown} label="Select all shown assets" />
-                Select all
+                <SelectBox checked={allShownSelected} indeterminate={someShownSelected} onChange={toggleAllShown} label="Select every asset on this page" />
+                Select page
               </label>
             )}
             {selected.size > 0 ? (
               <div role="region" aria-label="Bulk actions" className="flex flex-1 flex-wrap items-center gap-2">
-                <span className="font-semibold text-ink mr-auto" aria-live="polite">{selected.size} selected</span>
+                <span className="font-semibold text-ink mr-auto" aria-live="polite">
+                  {selected.size} selected
+                  {offPageSelected > 0 && (
+                    <span className="ml-1.5 font-normal text-ink-2">({offPageSelected} on other pages)</span>
+                  )}
+                </span>
                 <button type="button" disabled={bulkBusy} onClick={() => runBulk('recheck')} className={secondaryButtonClass}>
                   <HiOutlineArrowPath className="text-base text-ink-2" aria-hidden="true" /> Re-check
                 </button>
@@ -604,14 +752,16 @@ export default function Assets() {
             </ul>
           )}
 
-          {filtered.length > shown.length && (
-            <div className="flex flex-wrap items-center gap-3">
-              <button type="button" className={secondaryButtonClass} onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                Show {Math.min(PAGE_SIZE, filtered.length - shown.length)} more
-              </button>
-              <span className="text-sm text-ink-2">{filtered.length - shown.length} not shown</span>
-            </div>
-          )}
+          <Pager
+            page={page}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={filtered.length}
+            firstIndex={firstIndex}
+            shownCount={shown.length}
+            onPage={goToPage}
+            onPageSize={(size) => { setPageSize(size); writePref('abusebox.assets.pageSize', String(size)); }}
+          />
         </>
       )}
 
@@ -713,7 +863,7 @@ function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSele
         <thead className="bg-sunk">
           <tr>
             <th scope="col" className={`${thBase} w-9 pl-3 pr-1`}>
-              <SelectBox checked={allSelected} indeterminate={someSelected} onChange={onToggleAll} label="Select all shown assets" />
+              <SelectBox checked={allSelected} indeterminate={someSelected} onChange={onToggleAll} label="Select every asset on this page" />
             </th>
             <SortHeader sortKey="name" sort={sort} onSort={onSort} />
             <th scope="col" className={`${thBase} px-3`}>Type</th>
