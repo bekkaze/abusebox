@@ -9,6 +9,10 @@
 /*
   Delivery Report: results read like a mail delivery report.
   Depth: white panels sit on a tinted canvas, with one soft elevation scale.
+  The navigation sits a step behind the canvas in both themes, so the content
+  is what comes forward. Light goes darker, dark goes darker still; either way
+  the rail recedes and `paper` advances, which is what keeps the selected item
+  legible against it.
   White paper, ink, hairline rules; status classes borrowed from SMTP
   (5.x listed, 4.x no answer, 2.x clear); the logo's teal is the only accent.
   Colours are RGB channels so Tailwind opacity modifiers work.
@@ -16,7 +20,7 @@
 :root {
   --canvas: 241 243 246;       /* page background the panels sit on */
   --paper: 255 255 255;        /* panels and content */
-  --rail: 243 244 246;         /* navigation and side panels */
+  --rail: 232 235 240;         /* navigation: recedes behind the canvas */
   --sunk: 248 249 250;         /* table heads, inset fields */
   --ink: 20 23 28;
   --ink-2: 88 96 108;          /* field names, secondary text (6.3:1 on paper) */
@@ -46,7 +50,7 @@
 .dark {
   --canvas: 12 14 18;
   --paper: 23 26 32;
-  --rail: 15 17 21;
+  --rail: 7 8 11;
   --sunk: 28 32 38;
   --ink: 231 234 238;
   --ink-2: 158 166 177;

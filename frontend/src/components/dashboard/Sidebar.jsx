@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DASHBOARD_SIDEBAR_BOTTOM_LINKS, DASHBOARD_SIDEBAR_SECTIONS } from './constants'
 import { Link, useLocation } from 'react-router-dom'
-import { HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiXMark } from 'react-icons/hi2'
+import { HiChevronRight, HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiXMark } from 'react-icons/hi2'
 import classNames from 'classnames'
-import ToolsMenu from './ToolsMenu'
 
 const linkClass =
   'relative flex items-center h-8 gap-2.5 rounded-md text-sm transition-colors hover:no-underline'
 
 const RAIL_KEY = 'abusebox.sidebar.collapsed'
+const TOOLS_KEY = 'abusebox.sidebar.toolsOpen'
 
 /** A preference that survives a reload, and shrugs if storage is unavailable. */
 function useStoredFlag(key, fallback) {
@@ -49,7 +49,7 @@ export default function Sidebar({ open, onClose }) {
       )}
 
       <aside aria-label='Main navigation' className={classNames(
-        'bg-canvas px-3 pb-3 flex flex-col border-r border-rule/70 overflow-y-auto overflow-x-hidden',
+        'bg-rail px-3 pb-3 flex flex-col border-r border-rule/70 overflow-y-auto overflow-x-hidden',
         'fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:flex-shrink-0',
         'transition-[transform,width] duration-200 ease-out',
         collapsed ? 'w-60 lg:w-[4.25rem]' : 'w-60',
@@ -107,38 +107,68 @@ export default function Sidebar({ open, onClose }) {
 }
 
 function Section({ section, collapsed, pathname, onClose }) {
-  const overflow = useMemo(
-    () => (section.collapsible ? section.links.filter((item) => !item.primary) : []),
-    [section]
+  const [open, setOpen] = useStoredFlag(TOOLS_KEY, false);
+
+  const holdsActivePage = useMemo(
+    () => section.links.some((item) => pathname === item.path || pathname.startsWith(`${item.path}/`)),
+    [section, pathname]
   );
-  // The page you are on always has an entry in the nav, even when it lives in
-  // the flyout. Otherwise nothing looks selected and the page reads as
-  // orphaned; the flyout still lists it, marked as current.
-  const activeOverflowItem = overflow.find(
-    (item) => pathname === item.path || pathname.startsWith(`${item.path}/`)
-  );
-  const pinned = section.collapsible
-    ? section.links.filter((item) => item.primary || item === activeOverflowItem)
-    : section.links;
+
+  // A plain heading when the group is always shown, a disclosure when it folds.
+  if (!section.collapsible) {
+    return (
+      <div>
+        {!collapsed && <p className='px-2.5 mb-1 text-xs font-medium text-ink-2'>{section.label}</p>}
+        <div className='flex flex-col gap-px'>
+          {section.links.map((item) => (
+            <SidebarLink key={item.key} item={item} collapsed={collapsed} onClose={onClose} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Collapsed to a rail there is nothing to disclose: no heading, no labels to
+  // fold away, so every tool is just an icon.
+  if (collapsed) {
+    return (
+      <div className='flex flex-col gap-px'>
+        {section.links.map((item) => (
+          <SidebarLink key={item.key} item={item} collapsed onClose={onClose} />
+        ))}
+      </div>
+    )
+  }
+
+  // Open if you left it open, and open regardless when the page you are on is
+  // inside it, so the current page always has a visible entry in the nav.
+  const expanded = open || holdsActivePage;
+  const panelId = `sidebar-${section.label.toLowerCase().replace(/\W+/g, '-')}`;
 
   return (
     <div>
-      {!collapsed && (
-        <p className='px-2.5 mb-1 text-xs font-medium text-ink-2'>{section.label}</p>
+      <button
+        type='button'
+        onClick={() => setOpen(!expanded)}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className='group flex w-full items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-ink-2 transition-colors hover:text-ink'
+      >
+        {/* A caret, which is what people expect of a section that opens. */}
+        <HiChevronRight
+          className={classNames('text-sm transition-transform', expanded && 'rotate-90')}
+          aria-hidden='true'
+        />
+        <span className='truncate'>{section.label}</span>
+        <span className='ml-auto tabular-nums text-ink-3'>{section.links.length}</span>
+      </button>
+      {expanded && (
+        <div id={panelId} className='mt-1 flex flex-col gap-px'>
+          {section.links.map((item) => (
+            <SidebarLink key={item.key} item={item} collapsed={collapsed} onClose={onClose} />
+          ))}
+        </div>
       )}
-      <div className='flex flex-col gap-px'>
-        {pinned.map((item) => (
-          <SidebarLink key={item.key} item={item} collapsed={collapsed} onClose={onClose} />
-        ))}
-        {section.collapsible && (
-          <ToolsMenu
-            items={overflow}
-            collapsed={collapsed}
-            label={`More tools (${overflow.length})`}
-            onNavigate={onClose}
-          />
-        )}
-      </div>
     </div>
   )
 }
