@@ -293,6 +293,10 @@ DNSBL_NAMESERVERS=192.0.2.53
 
 For a manual install, point `DNSBL_NAMESERVERS` at a local Unbound or another recursive resolver that isn't a large public one. If you use dnsmasq, add `rebind-localhost-ok`.
 
+**If you can't run a recursive resolver**, which is common on a cloud VPS where outbound port 53 is filtered, a recursive resolver cannot reach the root servers and your provider's resolver is one of the shared ones Spamhaus refuses. Both routes are closed, so ask Spamhaus directly instead: a [free Data Query Service key](https://www.spamhaus.com/data-access/free-data-query-service/) in `SPAMHAUS_DQS_KEY` sends Spamhaus lookups to your own keyed mirror, which answers whatever resolver they arrive through. The other lists are unaffected and keep using `DNSBL_NAMESERVERS`.
+
+A refusal is not a listing. Spamhaus answers a refused query with `127.255.255.254`, or `127.255.255.255` when rate limited, and AbuseBox reads both as **No answer** rather than as a listing or a clean result. If another tool tells you an address is listed on `127.255.255.254`, that tool is misreading a refusal.
+
 <a id="whois-that-times-out"></a>
 
 ### WHOIS that times out
