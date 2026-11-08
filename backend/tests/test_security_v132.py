@@ -1,6 +1,7 @@
 """1.3.2 security fixes: asset input, schedule abuse, alert text, sign-in, WHOIS, quick check."""
 
 import dataclasses
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -165,6 +166,43 @@ def test_first_start_generates_a_random_admin_password(tmp_path, monkeypatch):
         assert pbkdf2_sha256.verify(password, admin.hashed_password)
         init_data.forget_initial_password()
         assert not (tmp_path / "initial_admin_password").exists()
+
+
+def test_the_generated_admin_password_is_not_written_to_the_log(tmp_path, monkeypatch, caplog):
+    """Container logs are kept, shipped elsewhere and pasted into bug reports.
+    The password goes to a 0600 file; the log only says where."""
+    from app.db import init_data
+
+    patched = dataclasses.replace(settings, default_admin_username="logadmin",
+                                  default_admin_email="log@example.com", default_admin_password="")
+    object.__setattr__(patched, "secret_key_file", str(tmp_path / ".secret_key"))
+    monkeypatch.setattr(init_data, "settings", patched)
+    with caplog.at_level(logging.INFO), SessionLocal() as db:
+        init_data.seed_default_admin(db)
+
+    password = (tmp_path / "initial_admin_password").read_text().strip()
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert password not in logged
+    assert "initial_admin_password" in logged
+
+
+def test_the_password_is_logged_only_when_it_could_not_be_saved(tmp_path, monkeypatch, caplog):
+    """An unwritable volume is the one case where the log is the only copy.
+    Losing it locks the operator out of a fresh install."""
+    from app.db import init_data
+
+    patched = dataclasses.replace(settings, default_admin_username="nofileadmin",
+                                  default_admin_email="nofile@example.com", default_admin_password="")
+    object.__setattr__(patched, "secret_key_file", str(tmp_path / ".secret_key"))
+    monkeypatch.setattr(init_data, "settings", patched)
+    monkeypatch.setattr(init_data, "_save_initial_password", lambda password: False)
+    with caplog.at_level(logging.INFO), SessionLocal() as db:
+        init_data.seed_default_admin(db)
+        admin = db.query(User).filter(User.username == "nofileadmin").one()
+
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert any(pbkdf2_sha256.verify(word.rstrip("."), admin.hashed_password)
+               for word in logged.split() if len(word) >= 16)
 
 
 def test_existing_installs_on_the_old_default_are_flagged(client):

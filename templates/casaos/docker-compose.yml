@@ -18,8 +18,8 @@ services:
       - DATABASE_URL=sqlite:////app/data/app.db
       - DEFAULT_ADMIN_USERNAME=admin
       - DEFAULT_ADMIN_EMAIL=admin@abusebox.local
-      # Empty: the first start generates a password, prints it in the log and
-      # saves it as initial_admin_password in the data volume.
+      # Empty: the first start generates a password and saves it as
+      # initial_admin_password in the data volume. It is not logged.
       - DEFAULT_ADMIN_PASSWORD=
       - DEFAULT_ADMIN_PHONE=11111111
       # Blacklist lookups go through the bundled resolver, so Spamhaus and
@@ -36,7 +36,7 @@ services:
             en_us: "Origins the UI is opened from, comma separated. Must match the address you type in the browser, for example http://192.168.1.10:3000"
         - container: DEFAULT_ADMIN_PASSWORD
           description:
-            en_us: "Admin password. Leave empty to have one generated and written to the log on the first start."
+            en_us: "Admin password. Leave empty to have one generated on the first start and saved as initial_admin_password in the data volume."
         - container: ABUSEIPDB_API_KEY
           description:
             en_us: "Optional. Enables AbuseIPDB reputation checks."
@@ -99,13 +99,13 @@ x-casaos:
       SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when
       something changes.
 
-      On the first start an admin password is generated and printed in the
-      abusebox-backend log; it is also saved as initial_admin_password in the
-      app's data folder.
+      On the first start an admin password is generated and saved as
+      initial_admin_password in the app's data folder. It is not written to the
+      log, so a log you share does not hand over the account.
 
       After installing, set APP_CORS_ALLOWED_ORIGINS to the address you open
       AbuseBox at, for example http://192.168.1.10:3000, or the browser will
       block the API calls.
   tips:
     before_install:
-      en_us: The admin password is generated on the first start and printed in the abusebox-backend log.
+      en_us: The admin password is generated on the first start and saved as initial_admin_password in the app's data folder.

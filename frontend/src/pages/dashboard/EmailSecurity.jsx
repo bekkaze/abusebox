@@ -38,10 +38,11 @@ function assessDkim(dkim = {}) {
     return { status: { severity: 'warning', label: 'Not found' }, findings: [{ severity: 'warning', text: dkim.details || 'No DKIM selectors found.' }] };
   }
   const count = dkim.selectors_found?.length || 0;
-  return {
-    status: { severity: 'ok', label: 'Pass' },
-    findings: [{ severity: 'ok', text: `DKIM key published for ${plural(count, 'selector')}.` }],
-  };
+  const findings = (dkim.warnings || []).map((text) => ({ severity: 'warning', text }));
+  if (findings.length === 0) {
+    findings.push({ severity: 'ok', text: `DKIM key published for ${plural(count, 'selector')}.` });
+  }
+  return { status: { severity: 'ok', label: 'Pass' }, findings };
 }
 
 function assessDmarc(dmarc = {}) {
@@ -140,6 +141,9 @@ function EmailReport({ data }) {
           <div key={selector.selector} className="space-y-2">
             <Fields>
               <Field name="Selector">{mono(selector.selector)}</Field>
+              {selector.found_at && selector.found_at !== data.domain && (
+                <Field name="Published-Under">{mono(selector.found_at)}</Field>
+              )}
               {selector.cname && <Field name="CNAME">{mono(selector.cname)}</Field>}
             </Fields>
             {selector.record && <RecordBlock label={`DKIM record for selector ${selector.selector}`}>{selector.record}</RecordBlock>}
@@ -148,6 +152,9 @@ function EmailReport({ data }) {
         {data.dkim?.selectors_checked?.length > 0 && (
           <Fields>
             <Field name="Selectors-Checked">{mono(data.dkim.selectors_checked.join(', '))}</Field>
+            {data.dkim.domains_searched?.length > 1 && (
+              <Field name="Domains-Searched">{mono(data.dkim.domains_searched.join(', '))}</Field>
+            )}
           </Fields>
         )}
       </MechanismSection>

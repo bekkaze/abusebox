@@ -3,7 +3,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from app.services.dnsbl import (
-    BASE_PROVIDERS,
     REFUSED,
     UNREACHABLE,
     _answers_test_points,

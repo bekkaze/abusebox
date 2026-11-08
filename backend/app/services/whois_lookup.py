@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from app.core.config import settings
 from app.core.domains import registrable_domain as _registrable_domain
+from app.core.logging_safety import for_log
 from app.core.network_safety import UnsafeDestinationError, resolve_public_addresses
 
 
@@ -175,7 +176,7 @@ def _raw_whois(domain: str, server: str, timeout: float | None = None) -> str:
             return _query_address(domain, address, per_attempt)
         except (socket.timeout, OSError) as exc:
             last_error = exc
-            logger.info("WHOIS %s unreachable at %s: %s", server, address, exc)
+            logger.info("WHOIS %s unreachable at %s: %s", for_log(server), address, exc)
     raise last_error if last_error is not None else OSError("No usable address for the WHOIS server.")
 
 

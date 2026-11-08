@@ -18,8 +18,8 @@ services:
       - DATABASE_URL=sqlite:////app/data/app.db
       - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
       - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL:-admin@abusebox.local}
-      # Empty: the first start generates a password, prints it in the log and
-      # saves it as initial_admin_password in the data volume.
+      # Empty: the first start generates a password and saves it as
+      # initial_admin_password in the data volume. It is not logged.
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-}
       - DEFAULT_ADMIN_PHONE=${DEFAULT_ADMIN_PHONE:-11111111}
       - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}

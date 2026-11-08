@@ -4,11 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-11-08
+
+Email security on a mail server's own hostname, and the TLS version a server
+actually speaks. Both came out of issue #40.
+
+Upgrading: `docker compose pull && docker compose up -d`.
+
 ### Fixed
 
 - **A mail server's hostname looked like it had no DMARC.** A host without a DMARC record of its own is covered by the organisational domain's, and the policy that applies to it is that record's `sp` tag (RFC 7489 §6.6.3). AbuseBox only ever asked for the exact name, so `mail1.example.com` was reported as having no DMARC while `example.com` published `p=reject; sp=reject`, and the grade dropped accordingly. The inherited policy is used now, and the result says which domain it came from (#40).
 
   SPF is deliberately left as it was. A sending host publishes its own SPF record, and `mail1.example.com` having `v=spf1 a ~all` where its parent has `v=spf1 mx ~all` is normal; reporting the parent's would state a policy that is not the one in force.
+
+- **The same hostname looked like it had no DKIM.** A selector lives under the domain a message is signed as, which is the signature's `d=` tag and for most setups is the organisational domain rather than the sending host. Mail from `mail1.example.com` is normally signed as `example.com`, so the key is at `<selector>._domainkey.example.com` and looking only at the host found nothing. The organisational domain is now searched when the host itself publishes no key, and the result says which domain the key was found under (#40).
+
+  Nothing is inherited here, because DKIM defines no fallback. A key found at the organisational domain only applies if the host does sign as that domain, which DNS cannot tell us, so it is reported as found there rather than silently treated as the host's own.
+
+- **An obsolete TLS version was reported as an error instead of a problem.** `ssl.create_default_context()` will not negotiate below TLS 1.2, and OpenSSL's security level refuses those cipher suites as well, so a server still on TLS 1.0 produced `SSL error: [SSL: TLSV1_ALERT_PROTOCOL_VERSION]` and no verdict at all. The certificate check now tries as a mail client would first, and only if that fails retries with the versions relaxed, so the certificate is read and the old protocol is named as the finding. A short key is reported the same way.
+
+  A certificate problem is never retried that way. A chain that fails verification is a real answer, and re-asking at a lower security level would turn it into a pass.
+
+- **An unexpected check failure put the exception's text in the browser.** A traceback's message carries file paths and internals. The failure's kind is shown and the traceback goes to the backend log, where it belongs.
+
+### Security
+
+- **The generated admin password is no longer written to the log.** The first start creates `admin` with a random password, and that line stayed in `docker compose logs` for the life of the install, in anything the logs were shipped to, and in logs pasted into bug reports. It is written to `initial_admin_password` in the data volume, readable only by the backend's user and deleted the moment the password is changed, and the log now names the file instead. The one exception is a volume that cannot be written: the password is logged there, because the alternative is being locked out of a fresh install.
+
+- **A hostname can no longer forge a line in the log.** A value with a carriage return in it could close the real entry and open what read as another genuine one. Values that came from outside are escaped to a single line before they are logged.
+
+- **Base images updated:** python 3.11.18-alpine and a current nginx 1.30.6-alpine digest.
 
 ## [1.3.5] - 2026-11-06
 

@@ -4,6 +4,7 @@ import contextlib
 import gzip
 import io
 import socket
+import ssl
 import zipfile
 from unittest import mock
 
@@ -1035,3 +1036,210 @@ def test_spf_on_a_host_without_one_does_not_borrow_the_parents():
     with mock.patch.object(email_security, "_dns_txt_records", _txt(records)):
         spf = email_security._check_spf("mail1.example.com")
     assert spf["found"] is False
+
+
+# --- email security: DKIM -----------------------------------------------------------
+# Issue #40 asked for all three checks to be reduced to the parent domain. SPF
+# must not be (the two tests above pin that), DMARC inherits by RFC, and DKIM
+# is the third case: nothing is inherited, but the key is published under the
+# domain a message is signed as, which is usually not the sending host.
+
+def _no_cname(name):
+    return None
+
+
+def _cname(mapping):
+    return lambda name: mapping.get(name)
+
+
+def test_dkim_key_found_under_the_organisational_domain_is_labelled():
+    from app.services import email_security
+    records = {"mail._domainkey.example.com": ["v=DKIM1; t=s; p=AAAA"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("mail1.example.com")
+    assert dkim["found"] is True
+    assert dkim["inherited_from"] == "example.com"
+    assert dkim["domains_searched"] == ["mail1.example.com", "example.com"]
+    assert [s["selector"] for s in dkim["selectors_found"]] == ["mail"]
+    assert dkim["selectors_found"][0]["found_at"] == "example.com"
+    assert any("Found under example.com" in w for w in dkim["warnings"])
+
+
+def test_dkim_under_the_host_itself_wins_and_the_parent_is_not_consulted():
+    from app.services import email_security
+    records = {
+        "default._domainkey.mail1.example.com": ["v=DKIM1; p=HOSTKEY"],
+        "default._domainkey.example.com": ["v=DKIM1; p=PARENTKEY"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("mail1.example.com")
+    assert dkim["selectors_found"][0]["record"] == "v=DKIM1; p=HOSTKEY"
+    assert dkim["selectors_found"][0]["found_at"] == "mail1.example.com"
+    assert dkim["inherited_from"] is None
+    assert dkim["domains_searched"] == ["mail1.example.com"]
+    assert dkim["warnings"] == []
+
+
+def test_dkim_on_the_organisational_domain_is_not_marked_inherited():
+    from app.services import email_security
+    records = {"mail._domainkey.example.com": ["v=DKIM1; p=AAAA"]}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("example.com")
+    assert dkim["found"] is True and dkim["inherited_from"] is None
+    assert dkim["domains_searched"] == ["example.com"]
+
+
+def test_dkim_missing_everywhere_names_both_domains_it_looked_at():
+    from app.services import email_security
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("mail1.example.com")
+    assert dkim["found"] is False
+    assert dkim["domains_searched"] == ["mail1.example.com", "example.com"]
+    assert "mail1.example.com or example.com" in dkim["details"]
+
+
+def test_dkim_selector_delegated_by_cname_counts_as_published():
+    """Providers commonly delegate a selector with a CNAME rather than a TXT."""
+    from app.services import email_security
+    cnames = {"selector1._domainkey.example.com": "selector1-example-com._domainkey.provider.example."}
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})), \
+         mock.patch.object(email_security, "_dns_cname_record", _cname(cnames)):
+        dkim = email_security._check_dkim("example.com")
+    assert dkim["found"] is True
+    assert dkim["selectors_found"][0]["cname"].startswith("selector1-example-com")
+    assert dkim["selectors_found"][0]["record"] is None
+
+
+def test_dkim_is_not_searched_above_a_bare_public_suffix():
+    """registrable_domain returns None for a name that is not under a
+    registration, so there is nothing to fall back to."""
+    from app.services import email_security
+    with mock.patch.object(email_security, "_dns_txt_records", _txt({})), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        dkim = email_security._check_dkim("localhost")
+    assert dkim["domains_searched"] == ["localhost"]
+
+
+def test_a_key_at_the_organisational_domain_counts_toward_the_grade():
+    """The reporter's own shape in issue #40: a host with its own SPF, an
+    inherited DMARC policy and the domain's DKIM key grades A, not B."""
+    from app.services import email_security
+    records = {
+        "mail1.example.com": ["v=spf1 a ~all"],
+        "_dmarc.example.com": ["v=DMARC1; p=reject; sp=reject; rua=mailto:d@example.com"],
+        "mail._domainkey.example.com": ["v=DKIM1; t=s; p=AAAA"],
+    }
+    with mock.patch.object(email_security, "_dns_txt_records", _txt(records)), \
+         mock.patch.object(email_security, "_dns_cname_record", _no_cname):
+        result = email_security.check_email_security("mail1.example.com")
+    assert result["grade"] == "A"
+    assert result["spf"]["record"] == "v=spf1 a ~all"
+    assert result["dmarc"]["inherited_from"] == "example.com"
+    assert result["dkim"]["inherited_from"] == "example.com"
+
+
+# --- SSL: the TLS version, not only the certificate ---------------------------------
+# create_default_context refuses TLS 1.0 and 1.1, so a server stuck on one used
+# to come back as "SSL error: [SSL: TLSV1_ALERT_PROTOCOL_VERSION]" with no
+# verdict. It is now negotiated on a second attempt and reported as a finding.
+
+def test_an_obsolete_tls_version_is_reported_as_a_finding():
+    warnings = ssl_checker._tls_warnings(("ECDHE-RSA-AES256-SHA", "TLSv1.0", 256), None)
+    assert len(warnings) == 1
+    assert "Negotiated TLSv1.0" in warnings[0] and "RFC 8996" in warnings[0]
+
+
+def test_current_tls_produces_no_findings():
+    assert ssl_checker._tls_warnings(("TLS_AES_256_GCM_SHA384", "TLSv1.3", 256), None) == []
+    assert ssl_checker._tls_warnings(("ECDHE-RSA-AES128-GCM-SHA256", "TLSv1.2", 128), None) == []
+
+
+def test_a_short_key_is_reported_even_on_a_current_version():
+    warnings = ssl_checker._tls_warnings(("DES-CBC3-SHA", "TLSv1.2", 112), None)
+    assert warnings == ["DES-CBC3-SHA gives only 112-bit encryption."]
+
+
+def test_a_relaxed_retry_on_a_current_version_says_what_was_refused():
+    error = ssl.SSLError(1, "[SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure")
+    error.reason = "SSLV3_ALERT_HANDSHAKE_FAILURE"
+    warnings = ssl_checker._tls_warnings(("ECDHE-RSA-AES256-SHA", "TLSv1.2", 256), error)
+    assert len(warnings) == 1
+    assert "current TLS defaults" in warnings[0]
+    assert "SSLV3_ALERT_HANDSHAKE_FAILURE" in warnings[0]
+
+
+def test_a_certificate_error_is_not_retried_with_relaxed_settings():
+    """A bad chain is a real answer. Retrying it at a lower security level
+    would turn a failure into a pass."""
+    calls = []
+
+    def handshake(ip, port, hostname, context):
+        calls.append(context)
+        raise ssl.SSLCertVerificationError("certificate has expired")
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake):
+        with pytest.raises(ssl.SSLCertVerificationError):
+            ssl_checker._connect("192.0.2.1", 443, "host.example")
+    assert len(calls) == 1
+
+
+def test_a_version_error_gets_exactly_one_relaxed_retry():
+    attempts = []
+
+    def handshake(ip, port, hostname, context):
+        attempts.append(context.minimum_version)
+        if len(attempts) == 1:
+            raise ssl.SSLError(1, "unsupported protocol")
+        return {"notBefore": "Jan 1 00:00:00 2026 GMT"}, ("ECDHE-RSA-AES256-SHA", "TLSv1.0", 256)
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake):
+        cert, cipher, strict_error = ssl_checker._connect("192.0.2.1", 443, "host.example")
+    assert len(attempts) == 2
+    assert attempts[0] == ssl.TLSVersion.TLSv1_2          # as a mail client would
+    assert attempts[1] == ssl.TLSVersion.MINIMUM_SUPPORTED  # only to diagnose
+    assert cipher[1] == "TLSv1.0" and strict_error is not None
+
+
+def test_a_passing_server_is_only_connected_to_once():
+    attempts = []
+
+    def handshake(ip, port, hostname, context):
+        attempts.append(context)
+        return {"notBefore": "Jan 1 00:00:00 2026 GMT"}, ("TLS_AES_256_GCM_SHA384", "TLSv1.3", 256)
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake):
+        _, cipher, strict_error = ssl_checker._connect("192.0.2.1", 443, "host.example")
+    assert len(attempts) == 1 and strict_error is None and cipher[1] == "TLSv1.3"
+
+
+# --- log safety ---------------------------------------------------------------------
+
+def test_a_hostname_cannot_forge_a_log_line():
+    from app.core.logging_safety import for_log
+    forged = "ok.example\r\n2026-01-01 00:00:00 WARNING Nothing to see here"
+    assert "\n" not in for_log(forged) and "\r" not in for_log(forged)
+    assert for_log(forged).startswith("ok.example\\r\\n")
+
+
+def test_a_long_value_is_truncated_for_the_log():
+    from app.core.logging_safety import for_log
+    assert for_log("a" * 500).endswith("...")
+    assert len(for_log("a" * 500)) == 203
+
+
+def test_an_unexpected_check_failure_does_not_send_its_text_to_the_browser():
+    """The traceback belongs in the log. An exception's text carries file
+    paths and internals that a check result should not."""
+    from app.services import check_runner
+
+    def boom(hostname):
+        raise RuntimeError("/app/secret/path.py line 7: connection string pg://u:p@db")
+
+    with mock.patch("app.services.dnsbl.check_dnsbl_providers", boom):
+        results = check_runner.run_enabled_checks("host.example", {"check_blacklist": True})
+    assert "secret" not in results["blacklist"]["error"]
+    assert results["blacklist"]["error"] == "The blacklist check failed (RuntimeError). See the backend log."

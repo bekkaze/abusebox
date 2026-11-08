@@ -5,6 +5,92 @@ from typing import Any
 from urllib.parse import urlparse
 from app.core.network_safety import resolve_public_ipv4
 
+# Versions a server should no longer be answering on. Reported as a finding
+# rather than hidden behind a failed handshake: an operator whose mail server
+# is still on TLS 1.0 needs to be told that, not told "SSL error".
+_OBSOLETE_PROTOCOLS = {
+    "SSLv2": "SSLv2 has been prohibited since RFC 6176 (2011).",
+    "SSLv3": "SSLv3 is broken by POODLE and prohibited since RFC 7568 (2015).",
+    # OpenSSL reports these as "TLSv1.0" and "TLSv1.1"; the short spellings are
+    # kept as aliases because not every build agrees.
+    "TLSv1.0": "TLS 1.0 is deprecated by RFC 8996. Enable TLS 1.2 or later.",
+    "TLSv1": "TLS 1.0 is deprecated by RFC 8996. Enable TLS 1.2 or later.",
+    "TLSv1.1": "TLS 1.1 is deprecated by RFC 8996. Enable TLS 1.2 or later.",
+}
+
+_MIN_STRONG_BITS = 128
+
+
+def _diagnostic_context() -> ssl.SSLContext:
+    """A context that will negotiate versions a normal client refuses.
+
+    Only used after the default context has already failed, to find out what
+    an old server does speak. Two things have to give way, and both were
+    measured: create_default_context sets minimum_version to TLS 1.2, and
+    OpenSSL's security level rejects the cipher suites of TLS 1.0 and 1.1 even
+    when the version is allowed. Relax one and the handshake still dies with
+    "[SSL: TLSV1_ALERT_PROTOCOL_VERSION]" and no verdict at all.
+
+    The chain and the hostname are still verified. Only the algorithms allowed
+    to appear in them widen, which is the point: whatever comes back is
+    reported as a problem, never as a pass.
+    """
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
+    try:
+        context.set_ciphers("ALL:@SECLEVEL=0")
+    except ssl.SSLError:  # pragma: no cover - depends on the OpenSSL build
+        pass
+    return context
+
+
+def _handshake(ip: str, port: int, hostname: str, context: ssl.SSLContext):
+    # Connect to the address that was checked, not the name: resolving it
+    # again would let a rebinding DNS server point us at an internal host.
+    with socket.create_connection((ip, port), timeout=10) as sock:
+        with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+            return ssock.getpeercert(), ssock.cipher()
+
+
+def _connect(ip: str, port: int, hostname: str):
+    """The certificate and cipher, and why a normal client could not get them.
+
+    Tries as a mail client would first, so a server that passes is a server
+    real clients accept. Anything other than a certificate problem gets one
+    retry with relaxed versions, because an obsolete server is the finding we
+    most want to report and the strict attempt only says "SSL error".
+    """
+    try:
+        cert, cipher = _handshake(ip, port, hostname, ssl.create_default_context())
+        return cert, cipher, None
+    except ssl.SSLCertVerificationError:
+        # A real certificate problem, not a version one. Let it through.
+        raise
+    except ssl.SSLError as exc:
+        cert, cipher = _handshake(ip, port, hostname, _diagnostic_context())
+        return cert, cipher, exc
+
+
+def _tls_warnings(cipher, strict_error: ssl.SSLError | None) -> list[str]:
+    protocol = cipher[1] if cipher else ""
+    name = cipher[0] if cipher else ""
+    bits = cipher[2] if cipher else 0
+
+    warnings = []
+    obsolete = _OBSOLETE_PROTOCOLS.get(protocol)
+    if obsolete:
+        warnings.append(f"Negotiated {protocol}. {obsolete}")
+    elif strict_error is not None:
+        # Modern versions failed but the relaxed retry worked, and the version
+        # itself is not the known-bad list. Say what was refused.
+        warnings.append(
+            "A client using current TLS defaults could not complete a handshake "
+            f"({strict_error.reason or strict_error})."
+        )
+    if bits and bits < _MIN_STRONG_BITS:
+        warnings.append(f"{name} gives only {bits}-bit encryption.")
+    return warnings
+
 
 def check_ssl_certificate(hostname: str) -> dict[str, Any]:
     hostname = (hostname or "").strip()
@@ -22,15 +108,9 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
         return {"hostname": hostname, "error": str(exc)}
 
     port = 443
-    context = ssl.create_default_context()
 
     try:
-        # Connect to the address that was checked, not the name: resolving it
-        # again would let a rebinding DNS server point us at an internal host.
-        with socket.create_connection((ip, port), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                cert = ssock.getpeercert()
-                cipher = ssock.cipher()
+        cert, cipher, strict_error = _connect(ip, port, hostname)
 
         if not cert:
             return {"error": "No certificate returned by server."}
@@ -76,6 +156,7 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
                 "protocol": cipher[1] if cipher else "",
                 "bits": cipher[2] if cipher else 0,
             },
+            "warnings": _tls_warnings(cipher, strict_error),
         }
 
     except ssl.SSLCertVerificationError as exc:
