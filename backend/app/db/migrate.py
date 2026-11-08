@@ -5,6 +5,7 @@ up to the 1.3.0 baseline the way older releases did it (create missing tables,
 add missing columns), then stamped at the baseline and upgraded from there.
 """
 
+import importlib
 import logging
 from pathlib import Path
 
@@ -13,8 +14,12 @@ from alembic.config import Config
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
-import app.models  # noqa: F401  (registers every table on Base.metadata)
 from app.db.session import Base
+
+# Imported for the side effect, not for a name: this registers every table on
+# Base.metadata before create_all runs. import_module says that outright,
+# where a bare import reads like one nothing uses.
+importlib.import_module("app.models")
 
 logger = logging.getLogger(__name__)
 

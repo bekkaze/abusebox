@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from app.core.config import settings
 from app.core.domains import registrable_domain as _registrable_domain
 from app.core.logging_safety import for_log
+from app.core.failures import describe
 from app.core.network_safety import UnsafeDestinationError, resolve_public_addresses
 
 
@@ -432,7 +433,7 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
         # say so rather than papering over it with an older answer.
         return {"error": f"WHOIS query failed: {exc}"}
     except (socket.timeout, socket.error, OSError) as exc:
-        return _stale_or_error(domain, f"WHOIS query failed: {exc}")
+        return _stale_or_error(domain, f"WHOIS query failed: {describe(exc)}.")
 
     if not raw.strip():
         return _stale_or_error(domain, "Empty response from WHOIS server.")

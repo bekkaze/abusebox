@@ -69,7 +69,7 @@ def load_secret_key(database_url: str) -> str:
         if existing:
             return existing
     except FileNotFoundError:
-        pass
+        logger.debug("No secret key file at %s yet; generating one.", path)
     except OSError as exc:
         logger.warning("Could not read secret key file %s: %s", path, exc)
 

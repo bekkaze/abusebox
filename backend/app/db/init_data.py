@@ -37,7 +37,7 @@ def forget_initial_password() -> None:
     try:
         os.remove(initial_password_file())
     except FileNotFoundError:
-        pass
+        logger.debug("No saved initial password to remove; nothing to do.")
     except OSError as exc:
         logger.warning("Could not remove %s: %s", initial_password_file(), exc)
 

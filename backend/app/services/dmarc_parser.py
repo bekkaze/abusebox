@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import gzip
 import io
+import logging
 import zipfile
 from datetime import datetime, timezone
 from typing import Any
 from xml.etree import ElementTree
+
+logger = logging.getLogger(__name__)
 
 
 def _text(el: ElementTree.Element | None, path: str, default: str = "") -> str:
@@ -63,7 +66,7 @@ def extract_xml(data: bytes) -> str:
                     raise ValueError("Decompressed XML exceeds 10 MB limit.")
                 return content.decode("utf-8", errors="replace")
     except zipfile.BadZipFile:
-        pass
+        logger.debug("Report is not a zip archive; reading it as raw XML.")
 
     # Assume raw XML
     if len(data) > max_output_size:

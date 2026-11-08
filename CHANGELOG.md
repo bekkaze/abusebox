@@ -27,11 +27,19 @@ Upgrading: `docker compose pull && docker compose up -d`.
 
 - **An unexpected check failure put the exception's text in the browser.** A traceback's message carries file paths and internals. The failure's kind is shown and the traceback goes to the backend log, where it belongs.
 
+- **A rejected certificate now says which way it was rejected.** Expired, issued for a different hostname, self-signed, or signed by a root nobody trusts all came back as `SSL verification failed: CERTIFICATE_VERIFY_FAILED`. OpenSSL reports the reason as a number, so the four are told apart and named in plain words.
+
+- **Failure messages across the checks read as sentences.** `[Errno 101] Network is unreachable`, `[SSL: ...] (_ssl.c:1082)` and requests' own messages are gone from results; every check now reports the cause in words, chosen by the kind of failure. A bad CIDR says what a good one looks like instead of quoting the input back.
+
 ### Security
 
 - **The generated admin password is no longer written to the log.** The first start creates `admin` with a random password, and that line stayed in `docker compose logs` for the life of the install, in anything the logs were shipped to, and in logs pasted into bug reports. It is written to `initial_admin_password` in the data volume, readable only by the backend's user and deleted the moment the password is changed, and the log now names the file instead. The one exception is a volume that cannot be written: the password is logged there, because the alternative is being locked out of a fresh install.
 
 - **A hostname can no longer forge a line in the log.** A value with a carriage return in it could close the real entry and open what read as another genuine one. Values that came from outside are escaped to a single line before they are logged.
+
+- **No exception's own text reaches a check result.** A result gets forwarded to a list operator or pasted into a ticket, and an exception's message can carry a file path, a connection string or an SMTP server's reply. `app/core/failures.py` maps a failure to one of a fixed set of phrases by its type; where a number genuinely helps, such as an errno, an SMTP reply code or an X509 verify code, it is read from a field that holds an integer rather than from the message. The detail stays in the backend log.
+
+- **CodeQL's findings are addressed in code rather than dismissed.** Every alert the first scan raised is either fixed here or made correct where the analysis was reading the code the way it was written: handlers that absorbed an expected absence now say which absence and what happens next, the prune timestamp is held in a container instead of a module global rebound through `global`, the scheduler interval is an int before it is logged, the two imports that exist for their side effect say so with `importlib.import_module`, three unused imports are gone, and two test assertions compare whole values instead of substrings. The one intentional case is the relaxed TLS context, which is annotated in place with the reason it has to stay.
 
 - **Base images updated:** python 3.11.18-alpine and a current nginx 1.30.6-alpine digest.
 

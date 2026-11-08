@@ -1,9 +1,13 @@
+import logging
 import socket
 import ssl
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 from app.core.network_safety import resolve_public_ipv4
+from app.core.failures import describe
+
+logger = logging.getLogger(__name__)
 
 # Versions a server should no longer be answering on. Reported as a finding
 # rather than hidden behind a failed handshake: an operator whose mail server
@@ -35,12 +39,18 @@ def _diagnostic_context() -> ssl.SSLContext:
     to appear in them widen, which is the point: whatever comes back is
     reported as a problem, never as a pass.
     """
-    context = ssl.create_default_context()
+    context = ssl.create_default_context()  # codeql[py/insecure-protocol]
+    # Deliberate, and the whole point of this function. Anything negotiated
+    # here is reported as a finding by _tls_warnings, never as a pass, and a
+    # certificate error reaches the caller instead of being retried.
     context.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
     try:
         context.set_ciphers("ALL:@SECLEVEL=0")
     except ssl.SSLError:  # pragma: no cover - depends on the OpenSSL build
-        pass
+        # An OpenSSL build that will not go that low. The retry still happens
+        # with the version relaxed, and either it gets an answer or the
+        # original failure is reported.
+        logger.debug("This OpenSSL build does not accept SECLEVEL=0 cipher suites.")
     return context
 
 
@@ -160,9 +170,11 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
         }
 
     except ssl.SSLCertVerificationError as exc:
-        return {"hostname": hostname, "valid": False, "error": f"SSL verification failed: {exc.reason}"}
+        # describe() returns a whole clause, so it reads as the sentence it is
+        # rather than as a prefix with the same thing said twice after it.
+        return {"hostname": hostname, "valid": False, "error": f"{describe(exc).capitalize()}."}
     except ssl.SSLError as exc:
-        return {"hostname": hostname, "valid": False, "error": f"SSL error: {str(exc)}"}
+        return {"hostname": hostname, "valid": False, "error": f"{describe(exc).capitalize()}."}
     except socket.timeout:
         return {"hostname": hostname, "error": "Connection timed out."}
     except socket.gaierror:
@@ -170,4 +182,4 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
     except ConnectionRefusedError:
         return {"hostname": hostname, "error": "Connection refused on port 443."}
     except OSError as exc:
-        return {"hostname": hostname, "error": f"Connection error: {str(exc)}"}
+        return {"hostname": hostname, "error": f"Could not reach port {port}: {describe(exc)}."}

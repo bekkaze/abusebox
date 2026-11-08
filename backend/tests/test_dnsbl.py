@@ -274,8 +274,9 @@ class TestCrossValidation:
         )
 
         # At least zen.spamhaus.org should be listed for 127.0.0.2
-        if "zen.spamhaus.org" in comparable:
-            assert "zen.spamhaus.org" in abusebox_listed, (
+        spamhaus = {"zen.spamhaus.org"}
+        if spamhaus <= comparable:
+            assert spamhaus <= abusebox_listed, (
                 "Spamhaus test IP 127.0.0.2 must be listed on zen.spamhaus.org"
             )
 

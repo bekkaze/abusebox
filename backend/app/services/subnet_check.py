@@ -21,8 +21,8 @@ def check_subnet(cidr: str, providers: list[str] | None = None) -> dict[str, Any
 
     try:
         network = ipaddress.IPv4Network(cidr, strict=False)
-    except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, ValueError) as exc:
-        return {"error": f"Invalid CIDR notation: {exc}"}
+    except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, ValueError):
+        return {"error": "Not a valid IPv4 CIDR range. Expected something like 192.168.1.0/24."}
 
     if network.num_addresses > MAX_SUBNET_SIZE:
         return {"error": f"Subnet too large. Maximum /{32 - MAX_SUBNET_SIZE.bit_length() + 1} ({MAX_SUBNET_SIZE} addresses)."}

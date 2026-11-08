@@ -682,7 +682,7 @@ def test_whois_reports_the_failure_when_every_family_is_blocked(monkeypatch):
     monkeypatch.setattr(whois_lookup.socket, "create_connection", _connect)
     with _whois_settings(whois_cache_minutes=0):
         result = whois_lookup.whois_lookup("theyosh.nl")
-    assert result["error"] == "WHOIS query failed: timed out"
+    assert result["error"] == "WHOIS query failed: timed out."
 
 
 def test_whois_splits_its_timeout_when_a_family_hangs(monkeypatch):
@@ -1243,3 +1243,82 @@ def test_an_unexpected_check_failure_does_not_send_its_text_to_the_browser():
         results = check_runner.run_enabled_checks("host.example", {"check_blacklist": True})
     assert "secret" not in results["blacklist"]["error"]
     assert results["blacklist"]["error"] == "The blacklist check failed (RuntimeError). See the backend log."
+
+
+# --- what a failure is allowed to say -----------------------------------------------
+# A check result can be forwarded to a list operator or pasted into a ticket, so
+# no exception's own text goes into one. describe() picks from fixed phrases.
+
+def test_a_failure_is_described_without_quoting_the_exception():
+    from app.core.failures import describe
+    leak = RuntimeError("/app/app/core/config.py line 7: postgres://user:pw@db/app")
+    described = describe(leak)
+    assert described == "the request failed"
+    for fragment in ("/app/", "postgres://", "user:pw", "config.py"):
+        assert fragment not in described
+
+
+@pytest.mark.parametrize("exc, expected", [
+    (socket.timeout(), "timed out"),
+    (TimeoutError(), "timed out"),
+    (ConnectionRefusedError(), "the connection was refused"),
+    (ConnectionResetError(), "the connection was reset"),
+    (socket.gaierror(-2, "Name or service not known"), "the name could not be resolved"),
+])
+def test_ordinary_network_failures_are_named_plainly(exc, expected):
+    from app.core.failures import describe
+    assert describe(exc) == expected
+
+
+def test_an_ssl_reason_is_translated_not_echoed():
+    from app.core.failures import describe
+    exc = ssl.SSLError(1, "[SSL: TLSV1_ALERT_PROTOCOL_VERSION] tlsv1 alert (_ssl.c:1082)")
+    exc.reason = "TLSV1_ALERT_PROTOCOL_VERSION"
+    assert describe(exc) == "the server refused every TLS version offered"
+    assert "_ssl.c" not in describe(exc)
+
+
+def test_an_unknown_ssl_reason_still_says_nothing_specific():
+    from app.core.failures import describe
+    exc = ssl.SSLError(1, "[SSL: SOMETHING_NEW] detail (_ssl.c:99)")
+    exc.reason = "SOMETHING_NEW"
+    assert describe(exc) == "the TLS handshake failed"
+
+
+def test_an_smtp_reply_code_is_reported_but_not_the_servers_words():
+    import smtplib
+    from app.core.failures import describe_smtp
+    exc = smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
+    described = describe_smtp(exc)
+    assert described == "the mail server replied 535"
+    assert "Password" not in described
+
+
+def test_a_subnet_with_a_bad_mask_does_not_echo_the_input_back():
+    from app.services import subnet_check
+    result = subnet_check.check_subnet("203.0.113.0/99")
+    assert "99" not in result["error"]
+    assert result["error"].startswith("Not a valid IPv4 CIDR range")
+
+
+@pytest.mark.parametrize("code, expected", [
+    (10, "The certificate has expired."),
+    (62, "The certificate is not valid for this hostname."),
+    (18, "The certificate is self-signed."),
+    (19, "The chain ends in a self-signed certificate nobody trusts."),
+    (9999, "The certificate could not be verified."),
+])
+def test_a_rejected_certificate_says_which_way_it_was_rejected(code, expected):
+    """Every one of these used to come back as CERTIFICATE_VERIFY_FAILED.
+    OpenSSL's verify code is an integer, so the distinction costs nothing."""
+    exc = ssl.SSLCertVerificationError("certificate verify failed")
+    exc.verify_code = code
+
+    def handshake(ip, port, hostname, context):
+        raise exc
+
+    with mock.patch.object(ssl_checker, "_handshake", handshake), \
+         mock.patch.object(ssl_checker, "resolve_public_ipv4", lambda h: "192.0.2.1"):
+        result = ssl_checker.check_ssl_certificate("host.example")
+    assert result["error"] == expected
+    assert result["valid"] is False
