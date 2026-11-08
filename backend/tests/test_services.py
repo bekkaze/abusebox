@@ -1348,3 +1348,54 @@ def test_our_own_refusals_are_reported_in_our_words_not_the_exceptions(exc, expe
     reason itself rather than forwarding an exception's message."""
     from app.core.failures import describe
     assert describe(exc) == expected
+
+
+def test_describe_can_only_ever_return_a_literal_from_its_own_module():
+    """The property the module claims, pinned independently of any analyser.
+
+    Every phrase describe() can produce is written in failures.py. This walks
+    that file's own string constants, then throws exceptions carrying obvious
+    markers in every field it reads, and checks the answer is always one of
+    them. A future change that interpolates something from an exception fails
+    here.
+    """
+    import ast
+    import inspect
+    import smtplib
+    from app.core import failures
+
+    source = inspect.getsource(failures)
+    allowed = {
+        node.value for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+    marker = "SENTINEL-/app/secret.py-pg://u:pw@db"
+    nasty = [
+        RuntimeError(marker),
+        OSError(9999, marker),
+        ConnectionRefusedError(marker),
+        socket.gaierror(-2, marker),
+        network_safety.PrivateDestinationError(marker),
+        network_safety.UnresolvableHostError(marker),
+    ]
+
+    ssl_err = ssl.SSLError(1, marker)
+    ssl_err.reason = marker
+    nasty.append(ssl_err)
+
+    verify_err = ssl.SSLCertVerificationError(marker)
+    verify_err.verify_code = 9999
+    verify_err.verify_message = marker
+    nasty.append(verify_err)
+
+    for exc in nasty:
+        described = failures.describe(exc)
+        assert described in allowed, f"{type(exc).__name__} produced {described!r}"
+        assert marker not in described
+
+    for code in (421, 535, 451, 571, 9999):
+        smtp = smtplib.SMTPResponseException(code, marker.encode())
+        described = failures.describe_smtp(smtp)
+        assert described in allowed, f"SMTP {code} produced {described!r}"
+        assert marker not in described and str(code) not in described
