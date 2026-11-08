@@ -39,7 +39,7 @@ def _diagnostic_context() -> ssl.SSLContext:
     to appear in them widen, which is the point: whatever comes back is
     reported as a problem, never as a pass.
     """
-    context = ssl.create_default_context()  # codeql[py/insecure-protocol]
+    context = ssl.create_default_context()
     # Deliberate, and the whole point of this function. Anything negotiated
     # here is reported as a finding by _tls_warnings, never as a pass, and a
     # certificate error reaches the caller instead of being retried.
@@ -58,7 +58,9 @@ def _handshake(ip: str, port: int, hostname: str, context: ssl.SSLContext):
     # Connect to the address that was checked, not the name: resolving it
     # again would let a rebinding DNS server point us at an internal host.
     with socket.create_connection((ip, port), timeout=10) as sock:
-        with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+        # The old versions _diagnostic_context allows are deliberate and are
+        # what this check exists to report. See that function.
+        with context.wrap_socket(sock, server_hostname=hostname) as ssock:  # codeql[py/insecure-protocol]
             return ssock.getpeercert(), ssock.cipher()
 
 

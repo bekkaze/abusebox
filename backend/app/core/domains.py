@@ -17,6 +17,8 @@ import ipaddress
 import logging
 from functools import lru_cache
 
+from app.core.logging_safety import for_log
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,5 +58,5 @@ def registrable_domain(host: str) -> str | None:
     try:
         return _public_suffix_list().privatesuffix(host) or None
     except Exception:  # pragma: no cover - a malformed name is not worth failing on
-        logger.warning("Could not reduce %s to a registrable domain", host, exc_info=True)
+        logger.warning("Could not reduce %s to a registrable domain", for_log(host), exc_info=True)
         return None

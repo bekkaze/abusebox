@@ -82,7 +82,7 @@ def seed_default_admin(db: Session) -> None:
             # The volume is unwritable, so the file is the one place the
             # password is not. Losing it would lock the operator out of a fresh
             # install, which is worse than logging it.
-            logger.warning(
+            logger.warning(  # codeql[py/clear-text-logging-sensitive-data]
                 "Created the admin account %r with password %s. It could not be saved to "
                 "%s, so it is only here. Sign in and change it, then clear this log.",
                 settings.default_admin_username, password, path,
