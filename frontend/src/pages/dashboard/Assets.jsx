@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   HiChevronDown, HiOutlineArrowDownTray, HiOutlineArrowPath, HiOutlineBell, HiOutlineMagnifyingGlass, HiOutlinePlus,
@@ -15,7 +15,6 @@ import { SkeletonLine } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
 import { SeverityBadge, SeverityCode } from "../../components/shared/activity";
-import { SEVERITY_RANK } from "../../components/shared/severity";
 import {
   Alert, EmptyState, PageHeader, linkClass, primaryButtonClass, secondaryButtonClass, selectClass, inputClass,
 } from "../../components/shared/ui";
@@ -55,8 +54,10 @@ const FILTERS = [
   { key: 'clean', label: 'Clean' },
 ];
 
+// Keys are the server's, so the select's value goes straight into the query
+// rather than being translated on the way.
 const SORTS = [
-  { key: 'status', label: 'Most urgent first' },
+  { key: 'urgency', label: 'Most urgent first' },
   { key: 'name', label: 'Name (A–Z)' },
   { key: 'checked', label: 'Recently checked' },
   { key: 'created', label: 'Recently added' },
@@ -83,6 +84,16 @@ const clearButtonClass = 'inline-flex h-9 w-9 items-center justify-center rounde
 const thBase = 'py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule text-left whitespace-nowrap';
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/** A value that settles before it is used, so typing is not a request each. */
+function useDebounced(value, delay) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return settled;
+}
 
 function readPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
@@ -140,43 +151,9 @@ function healthOf(item) {
   return { severity: 'ok', label: 'Healthy' };
 }
 
-function urgency(item) {
-  if (item.is_blacklisted) return -1;
-  return SEVERITY_RANK[item.health?.status] ?? 4;
-}
-
-/** How many issues an asset has, by severity. */
-function issueTally(item) {
-  const issues = item.health?.issues || [];
-  return {
-    critical: issues.filter((issue) => issue.severity === 'critical').length,
-    warning: issues.filter((issue) => issue.severity === 'warning').length,
-    total: issues.length,
-  };
-}
-
-/**
- * Most urgent first, with ties broken on what is actually known.
- *
- * Severity alone sorts into four buckets, so with twenty assets the order
- * inside "critical" came down to the name. These tie-breaks are counts of
- * findings the checks produced, so the order is one you can see and verify in
- * the rows themselves. Deliberately not a single composite score: weighing a
- * listing against an expiring certificate would be an invented number, and a
- * reader could not tell whether it was right.
- */
-function byUrgency(a, b) {
-  const base = urgency(a) - urgency(b);
-  if (base !== 0) return base;
-  const ta = issueTally(a), tb = issueTally(b);
-  const listedA = a.health?.blacklist?.listed?.length || 0;
-  const listedB = b.health?.blacklist?.listed?.length || 0;
-  return (tb.critical - ta.critical)
-    || (listedB - listedA)
-    || (tb.warning - ta.warning)
-    || (tb.total - ta.total)
-    || a.hostname.localeCompare(b.hostname, undefined, { numeric: true });
-}
+// Ordering by urgency lives on the server now (see _sort_key in the hostname
+// router), so page one is the top of the whole set rather than of one page.
+// Keeping a second comparator here would only let the two drift apart.
 
 function exportAssetsCsv(assets) {
   const rows = [
@@ -390,7 +367,11 @@ export default function Assets() {
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [view, setView] = useState(() => readPref('abusebox.assets.view', 'table'));
-  const [sort, setSort] = useState(() => readPref('abusebox.assets.sort', 'status'));
+  const [sort, setSort] = useState(() => {
+    // 'status' is what this preference held before the sort moved server-side.
+    const stored = readPref('abusebox.assets.sort', 'urgency');
+    return SORTS.some((option) => option.key === stored) ? stored : 'urgency';
+  });
   const [selected, setSelected] = useState(() => new Set());
   const [pageSize, setPageSize] = useState(() => {
     const stored = Number(readPref('abusebox.assets.pageSize', DEFAULT_PAGE_SIZE));
@@ -400,6 +381,12 @@ export default function Assets() {
   const { token } = useAuth();
   const [formData, setFormData] = useState({ ...initialFormData });
   const [assets, setAssets] = useState([]);
+  const [pageMeta, setPageMeta] = useState({
+    total: 0, page: 1, pages: 1, page_size: DEFAULT_PAGE_SIZE,
+    counts: { all: 0, attention: 0, listed: 0, clean: 0 },
+  });
+  // Typing should not fire a request per keystroke.
+  const debouncedSearch = useDebounced(search, 300);
   const hostnameService = HostnameService();
 
   const filterStatus = FILTERS.some((f) => f.key === searchParams.get('filter')) ? searchParams.get('filter') : 'all';
@@ -425,22 +412,52 @@ export default function Assets() {
     if (quiet) setRefreshing(true); else setIsLoading(true);
     setErrorMessage("");
     try {
-      const list = await HostnameService().listHostname(false);
-      setAssets(list);
-      setSelected((prev) => new Set([...prev].filter((id) => list.some((item) => item.id === id))));
+      const data = await HostnameService().pageHostnames({
+        page: requestedPage, pageSize, sort, search: debouncedSearch, filter: filterStatus,
+      });
+      setAssets(data.items);
+      setPageMeta({
+        total: data.total, page: data.page, pages: data.pages,
+        page_size: data.page_size, counts: data.counts,
+      });
     } catch {
       setErrorMessage("Could not load assets. Check your connection and try again.");
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [requestedPage, pageSize, sort, debouncedSearch, filterStatus]);
 
-  useEffect(() => { if (token) fetchAssets(); }, [token, fetchAssets]);
+  useEffect(() => {
+    if (!token) return;
+    // fetchAssets changes whenever a query input does, which is what drives
+    // the refetch: no separate effect per control.
+    fetchAssets({ quiet: assets.length > 0 });
+  }, [token, fetchAssets]); // eslint-disable-line react-hooks/exhaustive-deps
   const refresh = useCallback(() => fetchAssets({ quiet: true }), [fetchAssets]);
   // A narrower result set can leave you past the end; searching or sorting
   // should put you back at the top of it either way.
-  useEffect(() => { goToPage(1); }, [search, sort, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { goToPage(1); }, [debouncedSearch, sort, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * CSV of everything the current filter and search match, not just this page.
+   * "Export" meaning one page of twenty would surprise anyone who clicked it,
+   * so this fetches the unpaged list and applies the same narrowing.
+   */
+  const exportAll = useCallback(async () => {
+    try {
+      const all = await HostnameService().listHostname(false);
+      const needle = search.trim().toLowerCase();
+      const rows = all.filter((item) => {
+        const haystack = [item.hostname, item.hostname_type, item.owner, item.description]
+          .filter(Boolean).join(' ').toLowerCase();
+        return (!needle || haystack.includes(needle)) && matchesFilter(item, filterStatus);
+      });
+      exportAssetsCsv(rows);
+    } catch {
+      toast.error('Could not build the export.');
+    }
+  }, [search, filterStatus]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -507,37 +524,14 @@ export default function Assets() {
     }
   };
 
-  const filterCounts = useMemo(
-    () => Object.fromEntries(FILTERS.map((f) => [f.key, assets.filter((item) => matchesFilter(item, f.key)).length])),
-    [assets],
-  );
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const matches = assets.filter((item) => {
-      const matchSearch = !query
-        || item.hostname.toLowerCase().includes(query)
-        || item.hostname_type.toLowerCase().includes(query)
-        || (item.description || '').toLowerCase().includes(query)
-        || (item.owner || '').toLowerCase().includes(query);
-      return matchSearch && matchesFilter(item, filterStatus);
-    });
-    const sorters = {
-      status: byUrgency,
-      name: (a, b) => a.hostname.localeCompare(b.hostname, undefined, { numeric: true }),
-      checked: (a, b) => String(b.last_checked || '').localeCompare(String(a.last_checked || '')),
-      created: (a, b) => String(b.created).localeCompare(String(a.created)),
-    };
-    return [...matches].sort(sorters[sort] || sorters.status);
-  }, [assets, search, filterStatus, sort]);
-
-  // Clamped, not trusted: deleting rows or narrowing a filter can leave the
-  // URL pointing past the end, and an empty page with no explanation is worse
-  // than quietly showing the last one.
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const page = Math.min(requestedPage, pageCount);
-  const firstIndex = (page - 1) * pageSize;
-  const shown = filtered.slice(firstIndex, firstIndex + pageSize);
+  // Filtering, searching, sorting and slicing all happen on the server, so
+  // page one is the top of the whole set rather than the top of whatever was
+  // fetched. These come back with the page.
+  const filterCounts = pageMeta.counts;
+  const shown = assets;
+  const page = pageMeta.page;
+  const pageCount = pageMeta.pages;
+  const firstIndex = (page - 1) * pageMeta.page_size;
   const listedCount = filterCounts.listed || 0;
   // Bulk actions apply to the whole selection, which can now reach past the
   // page you are looking at, so the count says how much of it is out of sight.
@@ -656,7 +650,7 @@ export default function Assets() {
               </button>
             ))}
           </div>
-          <button type="button" className={secondaryButtonClass} onClick={() => exportAssetsCsv(filtered)} title="Export the assets shown as CSV">
+          <button type="button" className={secondaryButtonClass} onClick={exportAll} title="Export the assets shown as CSV">
             <HiOutlineArrowDownTray className="text-base text-ink-2" aria-hidden="true" /> CSV
           </button>
         </div>
@@ -688,7 +682,7 @@ export default function Assets() {
         >
           Add a mail server IP or a domain you own. AbuseBox checks it against 24 blacklists right away, then again on a schedule, and alerts you when something changes.
         </EmptyState>
-      ) : filtered.length === 0 ? (
+      ) : pageMeta.total === 0 ? (
         <EmptyState
           icon={HiOutlineMagnifyingGlass}
           title="No matching assets"
@@ -728,7 +722,7 @@ export default function Assets() {
                 </button>
               </div>
             ) : (
-              <span aria-live="polite">Showing {shown.length} of {plural(filtered.length, 'asset')}</span>
+              <span aria-live="polite">Showing {shown.length} of {plural(pageMeta.total, 'asset')}</span>
             )}
           </div>
 
@@ -756,7 +750,7 @@ export default function Assets() {
             page={page}
             pageCount={pageCount}
             pageSize={pageSize}
-            total={filtered.length}
+            total={pageMeta.total}
             firstIndex={firstIndex}
             shownCount={shown.length}
             onPage={goToPage}

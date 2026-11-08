@@ -278,3 +278,77 @@ def test_cidr_import_tags_every_address_with_the_owner(client, admin_headers):
     listed = client.get("/hostname/list/", headers=admin_headers).json()
     imported = [a for a in listed if a["hostname"].startswith("203.0.113.1")]
     assert imported and all(a["owner"] == "Customer B" for a in imported)
+
+
+def _asset(client, headers, host, **kw):
+    payload = {"hostname_type": kw.pop("hostname_type", "ipv4"), "hostname": host, **kw}
+    return client.post("/hostname/", json=payload, headers=headers).json()
+
+
+def test_asset_page_slices_and_reports_the_totals(client, admin_headers):
+    for i in range(7):
+        _asset(client, admin_headers, f"203.0.113.{i + 20}")
+    first = client.get("/hostname/page/?page=1&page_size=3", headers=admin_headers).json()
+    assert len(first["items"]) == 3
+    assert first["total"] >= 7 and first["page"] == 1
+    assert first["pages"] == -(-first["total"] // 3)
+
+    second = client.get("/hostname/page/?page=2&page_size=3", headers=admin_headers).json()
+    assert len(second["items"]) == 3
+    ids = {item["id"] for item in first["items"]} & {item["id"] for item in second["items"]}
+    assert ids == set(), "pages must not repeat an asset"
+
+
+def test_a_page_past_the_end_returns_the_last_one(client, admin_headers):
+    """The page number comes from a URL that outlives the data behind it."""
+    _asset(client, admin_headers, "203.0.113.90")
+    page = client.get("/hostname/page/?page=999&page_size=5", headers=admin_headers).json()
+    assert page["page"] == page["pages"]
+    assert len(page["items"]) >= 1
+
+
+def test_the_page_search_and_filter_narrow_the_total(client, admin_headers):
+    _asset(client, admin_headers, "mail-needle.example.com", hostname_type="domain", owner="Findable team")
+    _asset(client, admin_headers, "203.0.113.91")
+    by_host = client.get("/hostname/page/?search=needle", headers=admin_headers).json()
+    assert by_host["total"] == 1 and by_host["items"][0]["hostname"] == "mail-needle.example.com"
+    # Owner is searchable too, which is most of the reason it exists.
+    by_owner = client.get("/hostname/page/?search=findable", headers=admin_headers).json()
+    assert by_owner["total"] == 1
+
+
+def test_the_page_is_ordered_by_risk_not_by_name(client, admin_headers):
+    """Page one has to be the top of the whole set, or paging hides the
+    urgent assets behind the alphabet."""
+    from app.db.session import SessionLocal
+    from app.models import CheckHistory, Hostname
+
+    quiet = _asset(client, admin_headers, "203.0.113.2")      # sorts first by name
+    urgent = _asset(client, admin_headers, "203.0.113.200")   # sorts last by name
+    with SessionLocal() as db:
+        db.add(CheckHistory(hostname_id=urgent["id"], status="current", result={
+            "blacklist": {"providers": [f"l{i}" for i in range(24)], "failed_providers": [],
+                          "detected_on": [{"provider": "zen.spamhaus.org", "severity": "critical"}]},
+        }))
+        db.add(CheckHistory(hostname_id=quiet["id"], status="current", result={
+            "blacklist": {"providers": [f"l{i}" for i in range(24)], "failed_providers": [], "detected_on": []},
+        }))
+        db.query(Hostname).filter(Hostname.id == urgent["id"]).update({"is_blacklisted": True})
+        db.commit()
+
+    page = client.get("/hostname/page/?sort=urgency&page_size=50", headers=admin_headers).json()
+    order = [item["hostname"] for item in page["items"]]
+    assert order.index("203.0.113.200") < order.index("203.0.113.2")
+
+    listed = [i for i in page["items"] if i["hostname"] == "203.0.113.200"][0]
+    assert listed["health"]["risk"]["score"] > 0
+    assert listed["health"]["risk"]["factors"][0]["factor"] == "blacklist"
+
+
+def test_the_unpaged_list_still_returns_a_plain_array(client, admin_headers):
+    """Documented in the README and used by scripts; adding paging elsewhere
+    must not change its shape."""
+    _asset(client, admin_headers, "203.0.113.92")
+    body = client.get("/hostname/list/", headers=admin_headers).json()
+    assert isinstance(body, list)
+    assert all("hostname" in item for item in body)

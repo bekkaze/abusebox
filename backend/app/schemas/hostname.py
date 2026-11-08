@@ -138,6 +138,23 @@ class HostnameListItem(HostnameResponse):
     checked: UTCDateTime | str
 
 
+class HostnamePage(BaseModel):
+    """One page of assets, with the counts the caller needs to draw a pager.
+
+    `total` is the size of the filtered set rather than the account's, so a
+    search that matches three of four hundred assets reports three.
+    """
+
+    items: list[HostnameListItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    # One count per filter, over the searched set rather than the page, so the
+    # filter tabs can say how many each would show without a request each.
+    counts: dict[str, int]
+
+
 class BulkHostnameCreateRequest(BaseModel):
     hostnames: list[HostnameCreateRequest] = Field(min_length=1, max_length=300)
 

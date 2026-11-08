@@ -21,6 +21,28 @@ const HostnameService = () => {
     }
   };
 
+  /**
+   * One page of assets, filtered, searched and sorted by the server.
+   *
+   * Paging has to happen where the sorting does, or page one is only the top
+   * of whatever happened to be fetched. Returns { items, total, page,
+   * page_size, pages }.
+   */
+  const pageHostnames = async ({ page = 1, pageSize = 25, sort = 'urgency', search = '', filter = 'all' } = {}) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize), sort });
+    if (search.trim()) params.set('search', search.trim());
+    if (filter && filter !== 'all') params.set('filter', filter);
+    try {
+      const response = await axios.get(`/api/hostname/page/?${params}`, {
+        headers: { Accept: 'application/json' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error retrieving asset page:', error);
+      throw error;
+    }
+  };
+
   // includeResult=false returns only the compact `health` summary per asset.
   const listHostname = async (includeResult = true) => {
     try {
@@ -118,6 +140,7 @@ const HostnameService = () => {
     updateHostname,
     recheckHostname,
     listHostname,
+    pageHostnames,
     deleteHostname,
     createBulk,
     importCidr,

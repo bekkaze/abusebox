@@ -10,14 +10,27 @@ export const SEVERITY = {
 
 export const SEVERITY_RANK = { critical: 0, warning: 1, info: 2, ok: 3 };
 
-/** Issues grouped per asset (worst asset first), for compact attention lists. */
+/**
+ * Issues grouped per asset, worst asset first, for compact attention lists.
+ *
+ * Ordered by the risk score the backend derives from these same findings, so
+ * "needs attention" is a ranking rather than four buckets: an asset on
+ * Spamhaus with a dead server comes before one on a minor list. Severity is
+ * the fallback for a result stored before the score existed, which keeps the
+ * old behaviour rather than sorting those to the bottom.
+ */
 export function groupIssuesByAsset(assets) {
   return assets
     .map((asset) => ({
       hostname: asset.hostname,
       hostnameId: asset.id,
+      risk: asset.health?.risk?.score ?? null,
       issues: [...(asset.health?.issues || [])].sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9)),
     }))
     .filter((group) => group.issues.length)
-    .sort((a, b) => (SEVERITY_RANK[a.issues[0].severity] ?? 9) - (SEVERITY_RANK[b.issues[0].severity] ?? 9) || b.issues.length - a.issues.length);
+    .sort((a, b) => {
+      if (a.risk !== null && b.risk !== null && a.risk !== b.risk) return b.risk - a.risk;
+      return (SEVERITY_RANK[a.issues[0].severity] ?? 9) - (SEVERITY_RANK[b.issues[0].severity] ?? 9)
+        || b.issues.length - a.issues.length;
+    });
 }
