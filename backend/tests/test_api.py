@@ -228,3 +228,53 @@ def test_api_docs_follow_the_proxy_prefix(client):
     # Direct access to the backend, and junk prefixes, are unaffected.
     assert "servers" not in client.get("/openapi.json").json()
     assert "servers" not in client.get("/openapi.json", headers={"X-Forwarded-Prefix": "/a\"<x>"}).json()
+
+
+def test_asset_owner_is_stored_and_blank_means_unset(client, admin_headers):
+    """The owner is a label, so "   " is the same as not saying who owns it.
+    Otherwise grouping by owner collects a bucket of invisible blanks."""
+    created = client.post(
+        "/hostname/",
+        json={"hostname_type": "ipv4", "hostname": "203.0.113.20", "owner": "  Mail team  "},
+        headers=admin_headers,
+    ).json()
+    assert created["owner"] == "Mail team"
+
+    payload = {
+        "hostname_type": "ipv4", "hostname": "203.0.113.20", "owner": "   ",
+        "is_alert_enabled": False, "is_monitor_enabled": True, "status": "active",
+    }
+    updated = client.put(f"/hostname/{created['id']}", json=payload, headers=admin_headers)
+    assert updated.status_code == 200
+    assert updated.json()["owner"] is None
+
+
+def test_asset_owner_defaults_to_unset_and_survives_a_listing(client, admin_headers):
+    created = client.post(
+        "/hostname/",
+        json={"hostname_type": "domain", "hostname": "owned.example"},
+        headers=admin_headers,
+    ).json()
+    assert created["owner"] is None
+
+    client.put(
+        f"/hostname/{created['id']}",
+        json={"hostname_type": "domain", "hostname": "owned.example", "owner": "Customer A",
+              "is_alert_enabled": False, "is_monitor_enabled": True, "status": "active"},
+        headers=admin_headers,
+    )
+    listed = client.get("/hostname/list/", headers=admin_headers).json()
+    assert [a["owner"] for a in listed if a["hostname"] == "owned.example"] == ["Customer A"]
+
+
+def test_cidr_import_tags_every_address_with_the_owner(client, admin_headers):
+    """Importing a range for a customer is the main reason to set an owner."""
+    response = client.post(
+        "/hostname/cidr-import/",
+        json={"cidr": "203.0.113.128/30", "owner": "Customer B"},
+        headers=admin_headers,
+    )
+    assert response.status_code == 200, response.text
+    listed = client.get("/hostname/list/", headers=admin_headers).json()
+    imported = [a for a in listed if a["hostname"].startswith("203.0.113.1")]
+    assert imported and all(a["owner"] == "Customer B" for a in imported)

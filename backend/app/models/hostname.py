@@ -14,6 +14,10 @@ class Hostname(Base):
     hostname_type: Mapped[str] = mapped_column(String(20), nullable=False)
     hostname: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Who is accountable for this asset: a team, a person, a customer. A free
+    # label rather than a user relation, because assets are private to the
+    # account that added them (see migration 0004).
+    owner: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_alert_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_monitor_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)

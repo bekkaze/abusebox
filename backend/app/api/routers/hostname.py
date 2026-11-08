@@ -47,6 +47,7 @@ def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
         hostname_type=hostname.hostname_type,
         hostname=hostname.hostname,
         description=hostname.description,
+        owner=hostname.owner,
         is_alert_enabled=hostname.is_alert_enabled,
         is_monitor_enabled=hostname.is_monitor_enabled,
         status=hostname.status,
@@ -63,6 +64,13 @@ def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
         created=hostname.created,
         updated=hostname.updated,
     )
+
+
+def _clean_owner(value: str | None) -> str | None:
+    """An owner label, or None. Whitespace only is the same as not set, so the
+    field does not quietly fill up with blanks that break grouping."""
+    cleaned = (value or "").strip()
+    return cleaned or None
 
 
 def _enforce_asset_limit(db: Session, user: User, adding: int) -> None:
@@ -93,6 +101,7 @@ def create_hostname(
         hostname_type=payload.hostname_type,
         hostname=payload.hostname,
         description=payload.description,
+        owner=_clean_owner(payload.owner),
         is_alert_enabled=payload.is_alert_enabled,
         is_monitor_enabled=payload.is_monitor_enabled,
         check_blacklist=payload.check_blacklist,
@@ -147,6 +156,7 @@ def create_hostnames_bulk(
                 hostname_type=item.hostname_type,
                 hostname=item.hostname,
                 description=item.description,
+                owner=_clean_owner(item.owner),
                 is_alert_enabled=item.is_alert_enabled,
                 is_monitor_enabled=item.is_monitor_enabled,
                 check_blacklist=item.check_blacklist,
@@ -206,6 +216,7 @@ def import_cidr(
                 hostname_type="ipv4",
                 hostname=ip_str,
                 description=payload.description or f"CIDR import: {payload.cidr}",
+                owner=_clean_owner(payload.owner),
                 is_alert_enabled=payload.is_alert_enabled,
                 is_monitor_enabled=payload.is_monitor_enabled,
                 check_blacklist=payload.check_blacklist,
@@ -389,6 +400,7 @@ def update_hostname(
     hostname.hostname_type = payload.hostname_type
     hostname.hostname = payload.hostname
     hostname.description = payload.description
+    hostname.owner = _clean_owner(payload.owner)
     hostname.is_alert_enabled = payload.is_alert_enabled
     hostname.is_monitor_enabled = payload.is_monitor_enabled
     hostname.status = payload.status

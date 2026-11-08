@@ -4,6 +4,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import {
   HiOutlineArrowLeft, HiOutlineArrowPath, HiOutlineDocumentChartBar, HiOutlinePencilSquare, HiOutlineTrash,
+  HiOutlineUserCircle,
 } from 'react-icons/hi2';
 import HistoryChart from '../../components/dashboard/home/HistoryChart';
 import ResultTable from '../../components/blacklist/ResultTable';
@@ -49,8 +50,11 @@ const CHECK_BADGES = [
   ['check_server_status', 'Server status'],
 ];
 
+// Text inputs need '' rather than null, or React logs an uncontrolled-input warning.
+const TEXT_FIELDS = new Set(['description', 'owner']);
+
 const EDITABLE_FIELDS = [
-  'hostname', 'hostname_type', 'description', 'is_alert_enabled', 'is_monitor_enabled', 'check_interval_minutes',
+  'hostname', 'hostname_type', 'description', 'owner', 'is_alert_enabled', 'is_monitor_enabled', 'check_interval_minutes',
   ...CHECK_BADGES.map(([key]) => key),
 ];
 
@@ -224,7 +228,7 @@ export default function AssetDetail() {
   };
 
   const openEdit = () => {
-    setEditForm(Object.fromEntries(EDITABLE_FIELDS.map((key) => [key, asset[key] ?? (key === 'description' ? '' : null)])));
+    setEditForm(Object.fromEntries(EDITABLE_FIELDS.map((key) => [key, asset[key] ?? (TEXT_FIELDS.has(key) ? '' : null)])));
     setEditOpen(true);
   };
 
@@ -236,7 +240,12 @@ export default function AssetDetail() {
   const handleEditSave = async () => {
     setSaving(true);
     try {
-      await hostnameService.updateHostname(id, { ...editForm, description: editForm.description || null, status: asset.status });
+      await hostnameService.updateHostname(id, {
+        ...editForm,
+        description: editForm.description || null,
+        owner: editForm.owner || null,
+        status: asset.status,
+      });
       toast.success('Asset updated');
       setEditOpen(false);
       fetchAsset({ quiet: true });
@@ -287,6 +296,12 @@ export default function AssetDetail() {
                 {asset.hostname_type === 'ipv4' ? 'IPv4' : 'Domain'}
               </span>
             </div>
+            {asset.owner && (
+              <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-sunk px-2 py-0.5 text-xs text-ink-2">
+                <HiOutlineUserCircle className="flex-shrink-0 text-sm" aria-hidden="true" />
+                <span className="truncate">{asset.owner}</span>
+              </p>
+            )}
             {asset.description && <p className="mt-1 text-sm text-ink-2 max-w-prose">{asset.description}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">

@@ -89,6 +89,14 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                 </div>
 
                 <div>
+                  <label htmlFor={`${id}-owner`} className={labelClass}>
+                    Owner <span className="font-normal text-ink-2">(optional)</span>
+                  </label>
+                  <input id={`${id}-owner`} type="text" name="owner" value={formData.owner || ""} onChange={handleInputChange} maxLength={100} placeholder="Mail team, or a customer" className={inputClass} />
+                  <p className="mt-1 text-xs text-ink-2">Who is accountable for this asset. Searchable, and in the CSV export.</p>
+                </div>
+
+                <div>
                   <label htmlFor={`${id}-description`} className={labelClass}>
                     Description <span className="font-normal text-ink-2">(optional)</span>
                   </label>

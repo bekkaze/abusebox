@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   HiChevronDown, HiOutlineArrowDownTray, HiOutlineArrowPath, HiOutlineBell, HiOutlineMagnifyingGlass, HiOutlinePlus,
   HiOutlineRectangleStack, HiOutlineServerStack, HiOutlineSquares2X2, HiOutlineSquaresPlus, HiOutlineTableCells,
-  HiOutlineTrash, HiXMark,
+  HiOutlineTrash, HiOutlineUserCircle, HiXMark,
 } from "react-icons/hi2";
 import { toast } from "react-toastify";
 import HostnameService from "../../services/hostname";
@@ -35,6 +35,7 @@ const initialFormData = {
   hostname_type: "",
   hostname: "",
   description: "",
+  owner: "",
   is_alert_enabled: false,
   is_monitor_enabled: true,
   check_blacklist: true,
@@ -145,10 +146,11 @@ function urgency(item) {
 
 function exportAssetsCsv(assets) {
   const rows = [
-    ['Hostname', 'Type', 'Description', 'Listed', 'Listed on', 'Status', 'Issues', 'Monitored', 'Alerts', 'Interval (min)', 'Last checked'],
+    ['Hostname', 'Type', 'Owner', 'Description', 'Listed', 'Listed on', 'Status', 'Issues', 'Monitored', 'Alerts', 'Interval (min)', 'Last checked'],
     ...assets.map((item) => [
       item.hostname,
       item.hostname_type,
+      item.owner || '',
       item.description || '',
       item.is_blacklisted ? 'Yes' : 'No',
       item.health?.blacklist?.listed?.join('; ') || '',
@@ -314,7 +316,7 @@ export default function Assets() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await hostnameService.createHostname({ ...formData, hostname: formData.hostname.trim(), description: formData.description || null });
+      await hostnameService.createHostname({ ...formData, hostname: formData.hostname.trim(), description: formData.description || null, owner: formData.owner || null });
       toast.success(`Added ${formData.hostname.trim()}`);
       setFormData({ ...initialFormData });
       setAddModalOpen(false);
@@ -382,7 +384,8 @@ export default function Assets() {
       const matchSearch = !query
         || item.hostname.toLowerCase().includes(query)
         || item.hostname_type.toLowerCase().includes(query)
-        || (item.description || '').toLowerCase().includes(query);
+        || (item.description || '').toLowerCase().includes(query)
+        || (item.owner || '').toLowerCase().includes(query);
       return matchSearch && matchesFilter(item, filterStatus);
     });
     const sorters = {
@@ -471,7 +474,7 @@ export default function Assets() {
             <input
               id="asset-search"
               type="search"
-              placeholder="Search hostname, type or description"
+              placeholder="Search hostname, type, owner or description"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={searchInputClass}
@@ -663,6 +666,12 @@ function AssetCard({ item, selected, onToggle, onDelete }) {
         {item.hostname}
       </Link>
       <p className="mt-0.5 text-xs text-ink-2">{meta.join(' · ')}</p>
+      {item.owner && (
+        <p className="relative z-10 mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-sunk px-2 py-0.5 text-xs text-ink-2" title={`Owner: ${item.owner}`}>
+          <HiOutlineUserCircle className="flex-shrink-0 text-sm" aria-hidden="true" />
+          <span className="truncate">{item.owner}</span>
+        </p>
+      )}
       {item.description && (
         <p className="mt-1.5 text-sm text-ink-2 truncate" title={item.description}>{item.description}</p>
       )}
@@ -728,6 +737,7 @@ function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSele
                   <Link to={`/dashboard/assets/${item.id}`} className="font-mono text-[13px] font-semibold leading-5 text-ink hover:text-accent break-all">
                     {item.hostname}
                   </Link>
+                  {item.owner && <p className="text-xs text-ink-2 mt-0.5 truncate" title={`Owner: ${item.owner}`}>{item.owner}</p>}
                   {item.description && <p className="text-xs text-ink-2 mt-0.5 truncate" title={item.description}>{item.description}</p>}
                 </td>
                 <td className="px-3 py-2 leading-5 text-ink-2 whitespace-nowrap">{typeLabel(item)}</td>

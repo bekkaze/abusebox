@@ -38,25 +38,24 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 				path: '/dashboard/activity',
 				icon: <HiOutlineClock />
 			},
-			{
-				key: 'settings',
-				label: 'Settings',
-				path: '/dashboard/settings',
-				icon: <HiOutlineCog6Tooth />
-			},
 		],
 	},
 	{
-		label: 'Check & lookup',
+		// Ten entries, so only the ones marked primary show until the group is
+		// expanded. Cmd+K reaches any of them without the nav being this tall.
+		label: 'Tools',
+		collapsible: true,
 		links: [
 			{
 				key: 'blacklist-check',
+				primary: true,
 				label: 'Blacklist check',
 				path: '/dashboard/blacklist-check',
 				icon: <HiOutlineShieldCheck />
 			},
 			{
 				key: 'bulk-check',
+				primary: true,
 				label: 'Bulk check',
 				path: '/dashboard/bulk-check',
 				icon: <HiOutlineRectangleStack />
@@ -87,12 +86,14 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 			},
 			{
 				key: 'ssl-checker',
+				primary: true,
 				label: 'SSL certificate',
 				path: '/dashboard/ssl-checker',
 				icon: <HiOutlineLockClosed />
 			},
 			{
 				key: 'email-security',
+				primary: true,
 				label: 'SPF/DKIM/DMARC',
 				path: '/dashboard/email-security',
 				icon: <HiOutlineEnvelope />
@@ -114,6 +115,12 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 ]
 
 export const DASHBOARD_SIDEBAR_BOTTOM_LINKS = [
+	{
+		key: 'settings',
+		label: 'Settings',
+		path: '/dashboard/settings',
+		icon: <HiOutlineCog6Tooth />
+	},
 	{
 		key: 'support',
 		label: 'API docs',

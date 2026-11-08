@@ -95,7 +95,8 @@ const Login = () => {
         </form>
 
         <p className="mt-4 text-center text-xs text-ink-2">
-          New install? The default sign-in is <span className="font-mono text-ink">admin</span> / <span className="font-mono text-ink">password123</span>. Change it in Settings after you sign in.
+          New install? Sign in as <span className="font-mono text-ink">admin</span> with the password from{' '}
+          <span className="font-mono text-ink break-all">docker compose exec backend cat /app/data/initial_admin_password</span>, then change it in Settings.
         </p>
       </div>
     </main>

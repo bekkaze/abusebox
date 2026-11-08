@@ -70,6 +70,7 @@ class HostnameCreateRequest(BaseModel):
     hostname_type: str = Field(pattern=_KEYWORD)
     hostname: Target
     description: str | None = Field(default=None, max_length=255)
+    owner: str | None = Field(default=None, max_length=100)
     is_alert_enabled: bool = False
     is_monitor_enabled: bool = False
 
@@ -87,6 +88,7 @@ class HostnameUpdateRequest(BaseModel):
     hostname_type: str = Field(pattern=_KEYWORD)
     hostname: Target
     description: str | None = Field(default=None, max_length=255)
+    owner: str | None = Field(default=None, max_length=100)
     is_alert_enabled: bool
     is_monitor_enabled: bool
     status: str = Field(pattern=_KEYWORD)
@@ -109,6 +111,7 @@ class HostnameResponse(BaseModel):
     hostname_type: str
     hostname: str
     description: str | None
+    owner: str | None = None
     is_alert_enabled: bool
     is_monitor_enabled: bool
     status: str
@@ -142,6 +145,7 @@ class BulkHostnameCreateRequest(BaseModel):
 class CidrImportRequest(BaseModel):
     cidr: str = Field(min_length=1, max_length=50, description="CIDR notation e.g. 192.168.1.0/24")
     description: str | None = Field(default=None, max_length=255)
+    owner: str | None = Field(default=None, max_length=100)
     is_alert_enabled: bool = False
     is_monitor_enabled: bool = False
     check_blacklist: bool = True

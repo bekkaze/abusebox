@@ -2,10 +2,21 @@
 
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
-from app.db.migrate import run_migrations
+from app.db.migrate import _MIGRATIONS_DIR, run_migrations
 from app.db.session import Base
+
+
+def _head() -> str:
+    """The newest revision on disk.
+
+    Read rather than written down, so adding a migration does not mean editing
+    these tests. What they are actually asserting is that a database ends up at
+    head, not that head happens to be any particular number.
+    """
+    return ScriptDirectory(str(_MIGRATIONS_DIR)).get_current_head()
 
 
 def _schema_drift(engine):
@@ -25,7 +36,7 @@ def test_fresh_database_is_created_at_head(tmp_path):
     tables = set(inspect(engine).get_table_names())
     assert {"users", "hostnames", "check_histories", "asset_events", "app_settings"} <= tables
     assert "blacklisted_hostnames" not in tables
-    assert _version(engine) == "0003"
+    assert _version(engine) == _head()
     assert _schema_drift(engine) == []
 
 
@@ -48,11 +59,13 @@ def test_pre_1_3_database_is_upgraded_without_losing_data(tmp_path):
 
     inspector = inspect(engine)
     assert "token_version" in {col["name"] for col in inspector.get_columns("users")}
+    # Added by 0004, and the legacy path has to arrive with it too.
+    assert "owner" in {col["name"] for col in inspector.get_columns("hostnames")}
     assert "hostnames" in inspector.get_table_names()
     assert "blacklisted_hostnames" not in inspector.get_table_names()
-    assert _version(engine) == "0003"
+    assert _version(engine) == _head()
     with engine.connect() as conn:
         assert conn.execute(text("SELECT username, token_version FROM users")).one() == ("admin", 0)
 
     run_migrations(engine)  # a second start is a no-op
-    assert _version(engine) == "0003"
+    assert _version(engine) == _head()
