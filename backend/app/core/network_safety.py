@@ -6,7 +6,28 @@ from urllib.parse import urlparse
 
 
 class UnsafeDestinationError(ValueError):
-    """Raised when a user-supplied destination resolves to a non-public address."""
+    """Raised when a user-supplied destination is not one we will contact.
+
+    Subclassed by reason rather than told apart by its message, so a caller
+    reports the refusal in its own words instead of forwarding ours. The
+    messages here are fixed sentences with nothing interpolated, and they stay
+    for the log and for anyone reading a traceback.
+    """
+
+
+class UnresolvableHostError(UnsafeDestinationError):
+    """The name does not resolve at all."""
+
+
+class PrivateDestinationError(UnsafeDestinationError):
+    """It resolves somewhere we will not reach: private, loopback, reserved, or mixed."""
+
+
+class UnsupportedUrlError(UnsafeDestinationError):
+    """Not an absolute HTTP or HTTPS URL."""
+
+
+_NOT_PUBLIC = "Private, loopback, link-local, reserved, or mixed DNS destinations are not allowed."
 
 
 def _is_public(address: str) -> bool:
@@ -21,9 +42,9 @@ def resolve_public_ipv4(hostname: str) -> str:
     try:
         addresses = {item[4][0] for item in socket.getaddrinfo(hostname, None, socket.AF_INET)}
     except (socket.gaierror, UnicodeError) as exc:
-        raise UnsafeDestinationError("Could not resolve hostname.") from exc
+        raise UnresolvableHostError("Could not resolve hostname.") from exc
     if not addresses or any(not _is_public(address) for address in addresses):
-        raise UnsafeDestinationError("Private, loopback, link-local, reserved, or mixed DNS destinations are not allowed.")
+        raise PrivateDestinationError(_NOT_PUBLIC)
     return sorted(addresses)[0]
 
 
@@ -41,7 +62,7 @@ def resolve_public_addresses(hostname: str) -> list[str]:
     try:
         infos = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
     except (socket.gaierror, UnicodeError) as exc:
-        raise UnsafeDestinationError("Could not resolve hostname.") from exc
+        raise UnresolvableHostError("Could not resolve hostname.") from exc
 
     every: list[str] = []
     preferred: dict[int, str] = {}
@@ -57,13 +78,13 @@ def resolve_public_addresses(hostname: str) -> list[str]:
     # Every answer is checked, not just the ones we would use, so a name that
     # mixes public and internal addresses is still refused.
     if not every or any(not _is_public(address) for address in every):
-        raise UnsafeDestinationError("Private, loopback, link-local, reserved, or mixed DNS destinations are not allowed.")
+        raise PrivateDestinationError(_NOT_PUBLIC)
     return [address for address in every if address in preferred.values()]
 
 
 def validate_public_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise UnsafeDestinationError("Only absolute HTTP(S) URLs are allowed.")
+        raise UnsupportedUrlError("Only absolute HTTP(S) URLs are allowed.")
     resolve_public_ipv4(parsed.hostname)
     return url

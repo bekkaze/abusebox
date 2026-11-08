@@ -83,7 +83,7 @@ def test_server_status_reports_private_target_clearly():
         result = server_status.check_server_status("router.test")
     assert result["dns_resolves"] is True
     assert result["is_up"] is False
-    assert "not allowed" in result["reason"]
+    assert result["reason"] == "Not checked: it does not resolve to a public address."
 
 
 # --- client IP ------------------------------------------------------------------
@@ -1322,3 +1322,19 @@ def test_a_rejected_certificate_says_which_way_it_was_rejected(code, expected):
         result = ssl_checker.check_ssl_certificate("host.example")
     assert result["error"] == expected
     assert result["valid"] is False
+
+
+@pytest.mark.parametrize("exc, expected", [
+    (network_safety.UnresolvableHostError("Could not resolve hostname."),
+     "the name could not be resolved"),
+    (network_safety.PrivateDestinationError("Private, loopback, ... are not allowed."),
+     "it does not resolve to a public address"),
+    (network_safety.UnsupportedUrlError("Only absolute HTTP(S) URLs are allowed."),
+     "only absolute HTTP and HTTPS URLs can be checked"),
+    (network_safety.UnsafeDestinationError("something else"), "the destination was refused"),
+])
+def test_our_own_refusals_are_reported_in_our_words_not_the_exceptions(exc, expected):
+    """These carry only literals we wrote, but a caller still states the
+    reason itself rather than forwarding an exception's message."""
+    from app.core.failures import describe
+    assert describe(exc) == expected

@@ -138,7 +138,7 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
         result["resolved_ip"] = None
         result["dns_resolves"] = True
         result["is_up"] = False
-        result["reason"] = str(exc)
+        result["reason"] = f"Not checked: {describe(exc)}."
         return result
     result["resolved_ip"] = ip
     result["dns_resolves"] = True
@@ -176,7 +176,7 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
     except UnsafeDestinationError as exc:
         # A redirect pointed at a private/reserved destination.
         result["is_up"] = False
-        result["reason"] = f"Redirect blocked: {exc}"
+        result["reason"] = f"Redirect blocked: {describe(exc)}."
     except requests.exceptions.ConnectionError:
         result["is_up"] = False
         result["reason"] = "Connection refused or unreachable"

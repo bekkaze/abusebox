@@ -186,9 +186,10 @@ def test_the_generated_admin_password_is_not_written_to_the_log(tmp_path, monkey
     assert "initial_admin_password" in logged
 
 
-def test_the_password_is_logged_only_when_it_could_not_be_saved(tmp_path, monkeypatch, caplog):
-    """An unwritable volume is the one case where the log is the only copy.
-    Losing it locks the operator out of a fresh install."""
+def test_no_account_is_created_when_the_password_cannot_be_saved(tmp_path, monkeypatch, caplog):
+    """An account whose generated password nobody can read is an account nobody
+    can sign in to, and the log is not an acceptable second home for it. The
+    next start tries again, and DEFAULT_ADMIN_PASSWORD is the way out."""
     from app.db import init_data
 
     patched = dataclasses.replace(settings, default_admin_username="nofileadmin",
@@ -198,11 +199,28 @@ def test_the_password_is_logged_only_when_it_could_not_be_saved(tmp_path, monkey
     monkeypatch.setattr(init_data, "_save_initial_password", lambda password: False)
     with caplog.at_level(logging.INFO), SessionLocal() as db:
         init_data.seed_default_admin(db)
-        admin = db.query(User).filter(User.username == "nofileadmin").one()
+        assert db.query(User).filter(User.username == "nofileadmin").first() is None
 
     logged = "\n".join(record.getMessage() for record in caplog.records)
-    assert any(pbkdf2_sha256.verify(word.rstrip("."), admin.hashed_password)
-               for word in logged.split() if len(word) >= 16)
+    assert "Not creating the admin account" in logged
+    assert "DEFAULT_ADMIN_PASSWORD" in logged
+
+
+def test_a_chosen_password_still_works_when_the_volume_is_unwritable(tmp_path, monkeypatch):
+    """Nothing has to be saved when the operator picked the password, so an
+    unwritable path is not a reason to refuse."""
+    from app.db import init_data
+
+    patched = dataclasses.replace(settings, default_admin_username="chosenadmin",
+                                  default_admin_email="chosen@example.com",
+                                  default_admin_password="a-chosen-password")
+    object.__setattr__(patched, "secret_key_file", str(tmp_path / ".secret_key"))
+    monkeypatch.setattr(init_data, "settings", patched)
+    monkeypatch.setattr(init_data, "_save_initial_password", lambda password: False)
+    with SessionLocal() as db:
+        init_data.seed_default_admin(db)
+        admin = db.query(User).filter(User.username == "chosenadmin").one()
+    assert pbkdf2_sha256.verify("a-chosen-password", admin.hashed_password)
 
 
 def test_existing_installs_on_the_old_default_are_flagged(client):

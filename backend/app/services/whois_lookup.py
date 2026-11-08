@@ -431,7 +431,7 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
     except UnsafeDestinationError as exc:
         # A safety refusal means the name now resolves somewhere it should not;
         # say so rather than papering over it with an older answer.
-        return {"error": f"WHOIS query failed: {exc}"}
+        return {"error": f"WHOIS query failed: {describe(exc)}."}
     except (socket.timeout, socket.error, OSError) as exc:
         return _stale_or_error(domain, f"WHOIS query failed: {describe(exc)}.")
 

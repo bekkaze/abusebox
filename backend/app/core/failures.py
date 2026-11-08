@@ -18,6 +18,13 @@ import errno
 import socket
 import ssl
 
+from app.core.network_safety import (
+    PrivateDestinationError,
+    UnresolvableHostError,
+    UnsafeDestinationError,
+    UnsupportedUrlError,
+)
+
 # OpenSSL's reason strings are a fixed enumeration, not free text, but only
 # the ones worth putting in front of someone are spelled out.
 _SSL_REASONS = {
@@ -52,6 +59,16 @@ def _errno_name(number: int | None) -> str | None:
 
 def describe(exc: BaseException, fallback: str = "the request failed") -> str:
     """A fixed phrase for *exc*, chosen by its type and never quoting it."""
+    # Our own refusals first: they are ValueError subclasses, so they would
+    # otherwise fall through to the fallback.
+    if isinstance(exc, UnresolvableHostError):
+        return "the name could not be resolved"
+    if isinstance(exc, PrivateDestinationError):
+        return "it does not resolve to a public address"
+    if isinstance(exc, UnsupportedUrlError):
+        return "only absolute HTTP and HTTPS URLs can be checked"
+    if isinstance(exc, UnsafeDestinationError):
+        return "the destination was refused"
     # Order matters: the specific socket and connection errors are subclasses
     # of OSError, so they have to be tested before it.
     if isinstance(exc, (socket.timeout, TimeoutError)):

@@ -58,9 +58,12 @@ def _handshake(ip: str, port: int, hostname: str, context: ssl.SSLContext):
     # Connect to the address that was checked, not the name: resolving it
     # again would let a rebinding DNS server point us at an internal host.
     with socket.create_connection((ip, port), timeout=10) as sock:
-        # The old versions _diagnostic_context allows are deliberate and are
-        # what this check exists to report. See that function.
-        with context.wrap_socket(sock, server_hostname=hostname) as ssock:  # codeql[py/insecure-protocol]
+        # Static analysis flags this wrap, because _diagnostic_context can
+        # arrive here allowing TLS 1.0 and 1.1. That is deliberate and is
+        # what the check exists to report; see that function for why both
+        # the version floor and the security level have to give way, and
+        # for what stops a weak result being read as a pass.
+        with context.wrap_socket(sock, server_hostname=hostname) as ssock:
             return ssock.getpeercert(), ssock.cipher()
 
 
@@ -117,7 +120,7 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
     try:
         ip = resolve_public_ipv4(hostname)
     except ValueError as exc:
-        return {"hostname": hostname, "error": str(exc)}
+        return {"hostname": hostname, "error": f"{describe(exc).capitalize()}."}
 
     port = 443
 

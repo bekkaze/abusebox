@@ -33,13 +33,19 @@ Upgrading: `docker compose pull && docker compose up -d`.
 
 ### Security
 
-- **The generated admin password is no longer written to the log.** The first start creates `admin` with a random password, and that line stayed in `docker compose logs` for the life of the install, in anything the logs were shipped to, and in logs pasted into bug reports. It is written to `initial_admin_password` in the data volume, readable only by the backend's user and deleted the moment the password is changed, and the log now names the file instead. The one exception is a volume that cannot be written: the password is logged there, because the alternative is being locked out of a fresh install.
+- **The generated admin password is no longer written to the log.** The first start creates `admin` with a random password, and that line stayed in `docker compose logs` for the life of the install, in anything the logs were shipped to, and in logs pasted into bug reports. It is written to `initial_admin_password` in the data volume, readable only by the backend's user and deleted the moment the password is changed, and the log now names the file instead.
+
+  **This changes first sign-in.** Read it with `docker compose exec backend cat /app/data/initial_admin_password`. Existing installs are untouched.
+
+  If that file cannot be written, no account is created: a generated password nobody can read is an account nobody can sign in to, and the log is not an acceptable second home for it. The start says so and the next one tries again, or set `DEFAULT_ADMIN_PASSWORD` and nothing needs saving at all.
 
 - **A hostname can no longer forge a line in the log.** A value with a carriage return in it could close the real entry and open what read as another genuine one. Values that came from outside are escaped to a single line before they are logged.
 
 - **No exception's own text reaches a check result.** A result gets forwarded to a list operator or pasted into a ticket, and an exception's message can carry a file path, a connection string or an SMTP server's reply. `app/core/failures.py` maps a failure to one of a fixed set of phrases by its type; where a number genuinely helps, such as an errno, an SMTP reply code or an X509 verify code, it is read from a field that holds an integer rather than from the message. The detail stays in the backend log.
 
-- **CodeQL's findings are addressed in code rather than dismissed.** Every alert the first scan raised is either fixed here or made correct where the analysis was reading the code the way it was written: handlers that absorbed an expected absence now say which absence and what happens next, the prune timestamp is held in a container instead of a module global rebound through `global`, the scheduler interval is an int before it is logged, the two imports that exist for their side effect say so with `importlib.import_module`, three unused imports are gone, and two test assertions compare whole values instead of substrings. The one intentional case is the relaxed TLS context, which is annotated in place with the reason it has to stay.
+  AbuseBox's own refusals are typed rather than told apart by their text, so `UnresolvableHostError`, `PrivateDestinationError` and `UnsupportedUrlError` let a caller state the reason in its own words instead of forwarding ours.
+
+- **CodeQL's findings are addressed in code rather than dismissed.** Every alert the first scan raised is either fixed here or made correct where the analysis was reading the code the way it was written: handlers that absorbed an expected absence now say which absence and what happens next, the prune timestamp is held in a container instead of a module global rebound through `global`, the scheduler interval is an int before it is logged, the two imports that exist for their side effect say so with `importlib.import_module`, three unused imports are gone, and two test assertions compare whole values instead of substrings. The one that stands is the relaxed TLS context above: it exists to negotiate what it is reporting on, so the only way to clear it would be to drop the capability. The reasoning sits in the code beside it.
 
 - **Base images updated:** python 3.11.18-alpine and a current nginx 1.30.6-alpine digest.
 

@@ -50,6 +50,21 @@ def seed_default_admin(db: Session) -> None:
 
     generated = not settings.default_admin_password
     password = settings.default_admin_password or secrets.token_urlsafe(12)
+
+    # Written before the account exists, not after. A generated password the
+    # operator cannot read is an account nobody can sign in to, and the log is
+    # not an acceptable second home for it: container logs are kept, shipped
+    # into other systems, and pasted into bug reports. So if it cannot be
+    # saved, no account is created and the next start tries again.
+    if generated and not _save_initial_password(password):
+        logger.error(
+            "Not creating the admin account: the generated password could not be saved to %s, "
+            "and it is not written to the log. Make that path writable, or set "
+            "DEFAULT_ADMIN_PASSWORD, and start again.",
+            initial_password_file(),
+        )
+        return
+
     db.add(
         User(
             username=settings.default_admin_username,
@@ -64,29 +79,13 @@ def seed_default_admin(db: Session) -> None:
     )
     db.commit()
     if generated:
-        # Not into the log. Container logs are kept, rotated into other
-        # systems, and pasted into bug reports, and this one would carry a
-        # working password for an account that is not yet locked down. It goes
-        # to a 0600 file in the data volume instead, and is deleted the moment
-        # the password is changed.
-        path = initial_password_file()
-        if _save_initial_password(password):
-            logger.warning(
-                "Created the admin account %r with a random password, saved to %s "
-                "and readable only by this user. Sign in and change it in Settings; "
-                "the saved copy is removed when you do. Under Docker: "
-                "docker compose exec backend cat /app/data/initial_admin_password",
-                settings.default_admin_username, path,
-            )
-        else:
-            # The volume is unwritable, so the file is the one place the
-            # password is not. Losing it would lock the operator out of a fresh
-            # install, which is worse than logging it.
-            logger.warning(  # codeql[py/clear-text-logging-sensitive-data]
-                "Created the admin account %r with password %s. It could not be saved to "
-                "%s, so it is only here. Sign in and change it, then clear this log.",
-                settings.default_admin_username, password, path,
-            )
+        logger.warning(
+            "Created the admin account %r with a random password, saved to %s "
+            "and readable only by this user. Sign in and change it in Settings; "
+            "the saved copy is removed when you do. Under Docker: "
+            "docker compose exec backend cat /app/data/initial_admin_password",
+            settings.default_admin_username, initial_password_file(),
+        )
 
 
 def _flag_published_password(db: Session, admin: User) -> None:

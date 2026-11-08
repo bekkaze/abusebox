@@ -77,11 +77,9 @@ def ssl_check(hostname: str | None = None):
     result = check_ssl_certificate(hostname.strip())
     if result.get("error") and "valid" not in result:
         # Every message that reaches here is one of ours: the service maps
-        # failures through app.core.failures, and a refusal from
-        # network_safety carries a fixed sentence with nothing interpolated.
-        raise HTTPException(  # codeql[py/stack-trace-exposure]
-            status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"]
-        )
+        # every failure through app.core.failures, so no exception's own
+        # text is in it.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
     return result
 
 

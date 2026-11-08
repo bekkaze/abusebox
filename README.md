@@ -82,7 +82,7 @@ docker compose up -d            # pulls the prebuilt images (add --build to buil
 
 Open `http://localhost:3000` and you're ready to go. To update later: `docker compose pull && docker compose up -d`.
 
-> **First sign-in:** the user is `admin`, and the first start generates a random password. Read it with `docker compose exec backend cat /app/data/initial_admin_password`; the backend log names the file but no longer prints the password itself, so a log you share with someone does not hand them the account. **Change it in Settings right after signing in**; the saved copy is deleted when you do. To choose it yourself, set `DEFAULT_ADMIN_PASSWORD` in `.env` before the first start.
+> **First sign-in:** the user is `admin`, and the first start generates a random password. Read it with `docker compose exec backend cat /app/data/initial_admin_password`; the backend log names the file but no longer prints the password itself, so a log you share with someone does not hand them the account. **Change it in Settings right after signing in**; the saved copy is deleted when you do. To choose it yourself, set `DEFAULT_ADMIN_PASSWORD` in `.env` before the first start. If the data path is not writable the account is not created at all, and the log says so rather than putting the password in it.
 >
 > The UI answers on any hostname, so you can open it from another machine right away. Put it behind your own HTTPS reverse proxy before exposing it to a network you don't trust.
 
