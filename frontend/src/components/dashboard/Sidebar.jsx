@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DASHBOARD_SIDEBAR_BOTTOM_LINKS, DASHBOARD_SIDEBAR_SECTIONS } from './constants'
 import { Link, useLocation } from 'react-router-dom'
-import { HiChevronDown, HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiXMark } from 'react-icons/hi2'
+import { HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiXMark } from 'react-icons/hi2'
 import classNames from 'classnames'
+import ToolsMenu from './ToolsMenu'
 
 const linkClass =
   'relative flex items-center h-8 gap-2.5 rounded-md text-sm transition-colors hover:no-underline'
 
 const RAIL_KEY = 'abusebox.sidebar.collapsed'
-const TOOLS_KEY = 'abusebox.sidebar.toolsExpanded'
 
 /** A preference that survives a reload, and shrugs if storage is unavailable. */
 function useStoredFlag(key, fallback) {
@@ -107,19 +107,19 @@ export default function Sidebar({ open, onClose }) {
 }
 
 function Section({ section, collapsed, pathname, onClose }) {
-  const [expanded, setExpanded] = useStoredFlag(TOOLS_KEY, false);
-
-  const hidden = useMemo(
+  const overflow = useMemo(
     () => (section.collapsible ? section.links.filter((item) => !item.primary) : []),
     [section]
   );
-  // If the page you are on is one of the hidden ones, show them. Otherwise the
-  // active page has no entry anywhere in the nav and nothing looks selected.
-  const activeIsHidden = hidden.some(
+  // The page you are on always has an entry in the nav, even when it lives in
+  // the flyout. Otherwise nothing looks selected and the page reads as
+  // orphaned; the flyout still lists it, marked as current.
+  const activeOverflowItem = overflow.find(
     (item) => pathname === item.path || pathname.startsWith(`${item.path}/`)
   );
-  const showAll = !section.collapsible || expanded || activeIsHidden || collapsed;
-  const visible = showAll ? section.links : section.links.filter((item) => item.primary);
+  const pinned = section.collapsible
+    ? section.links.filter((item) => item.primary || item === activeOverflowItem)
+    : section.links;
 
   return (
     <div>
@@ -127,23 +127,16 @@ function Section({ section, collapsed, pathname, onClose }) {
         <p className='px-2.5 mb-1 text-xs font-medium text-ink-2'>{section.label}</p>
       )}
       <div className='flex flex-col gap-px'>
-        {visible.map((item) => (
+        {pinned.map((item) => (
           <SidebarLink key={item.key} item={item} collapsed={collapsed} onClose={onClose} />
         ))}
-        {section.collapsible && !collapsed && !activeIsHidden && (
-          <button
-            type='button'
-            onClick={() => setExpanded(!expanded)}
-            className={classNames('w-full px-2.5 text-ink-2 hover:text-ink hover:bg-paper/70', linkClass)}
-            aria-expanded={expanded}
-          >
-            <span className='flex w-[18px] flex-shrink-0 justify-center' aria-hidden='true'>
-              <HiChevronDown className={classNames('text-base transition-transform', expanded && 'rotate-180')} />
-            </span>
-            <span className='truncate'>
-              {expanded ? 'Show fewer' : `Show all ${section.links.length} tools`}
-            </span>
-          </button>
+        {section.collapsible && (
+          <ToolsMenu
+            items={overflow}
+            collapsed={collapsed}
+            label={`More tools (${overflow.length})`}
+            onNavigate={onClose}
+          />
         )}
       </div>
     </div>
