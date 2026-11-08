@@ -1285,13 +1285,23 @@ def test_an_unknown_ssl_reason_still_says_nothing_specific():
     assert describe(exc) == "the TLS handshake failed"
 
 
-def test_an_smtp_reply_code_is_reported_but_not_the_servers_words():
+def test_an_smtp_reply_is_named_without_repeating_the_servers_words():
     import smtplib
     from app.core.failures import describe_smtp
     exc = smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
     described = describe_smtp(exc)
-    assert described == "the mail server replied 535"
-    assert "Password" not in described
+    assert described == "the mail server rejected the username or password"
+    # Neither the server's text nor its code: the code is compared, not echoed.
+    assert "Password" not in described and "535" not in described
+
+
+def test_an_unlisted_smtp_reply_falls_back_to_the_class_of_the_reply():
+    import smtplib
+    from app.core.failures import describe_smtp
+    transient = smtplib.SMTPResponseException(451, b"4.3.0 try again later")
+    permanent = smtplib.SMTPResponseException(571, b"5.7.1 blocked")
+    assert "worth retrying" in describe_smtp(transient)
+    assert describe_smtp(permanent) == "the mail server rejected it outright"
 
 
 def test_a_subnet_with_a_bad_mask_does_not_echo_the_input_back():
