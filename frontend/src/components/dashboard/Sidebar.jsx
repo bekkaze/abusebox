@@ -160,7 +160,7 @@ function Section({ section, collapsed, pathname, onClose }) {
           aria-hidden='true'
         />
         <span className='truncate'>{section.label}</span>
-        <span className='ml-auto tabular-nums text-ink-3'>{section.links.length}</span>
+        <span className='ml-auto tabular-nums text-ink-2'>{section.links.length}</span>
       </button>
       {expanded && (
         <div id={panelId} className='mt-1 flex flex-col gap-px'>

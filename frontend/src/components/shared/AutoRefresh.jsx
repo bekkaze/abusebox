@@ -39,7 +39,7 @@ export default function AutoRefresh({ onRefresh, loading = false }) {
         onChange={(e) => setInterval_(Number(e.target.value))}
         aria-label="Auto-refresh interval"
         title="Auto-refresh interval"
-        className="h-9 text-sm border border-rule-strong rounded-md pl-2 pr-7 bg-paper text-ink-2 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+        className="h-9 text-base sm:text-sm border border-rule-strong rounded-md pl-2 pr-7 bg-paper text-ink-2 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
       >
         {INTERVALS.map((opt) => (
           <option key={opt.value} value={opt.value}>

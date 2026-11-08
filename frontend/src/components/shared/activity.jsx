@@ -50,7 +50,7 @@ export function IssueRow({ issue, issues, hostname, hostnameId }) {
     <>
       <SeverityCode severity={worst.severity} className="pt-px" />
       <div className="min-w-0">
-        {hostname && <p className="font-mono text-sm font-semibold text-ink truncate">{hostname}</p>}
+        {hostname && <p title={hostname} className="font-mono text-sm font-semibold text-ink truncate">{hostname}</p>}
         {list.map((item) => (
           <p key={item.message} className="text-sm text-ink-2">{item.message}</p>
         ))}
