@@ -149,6 +149,16 @@ kbd {
     box-shadow: none;
     margin-inline: -1.25rem;
   }
+  /* The bleed above reaches the panel's own edges, which is only right for a
+     table that spans the panel. One sitting in a column of a nested grid has
+     no padding to bleed into, so it hangs over the gutter or over the page.
+     Such a table asks for `inset` and keeps its own card instead. */
+  .panel .table-wrap.inset {
+    border-width: 1px;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-1);
+    margin-inline: 0;
+  }
 }
 
 /* react-toastify, in the same paper-and-ink vocabulary. Set on the container so it
