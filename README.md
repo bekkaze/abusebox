@@ -84,7 +84,7 @@ cp backend/.env.example .env    # optional: alerts, API keys, admin account
 docker compose up -d            # pulls the prebuilt images (add --build to build from source)
 ```
 
-Open `http://localhost:3000` and you're ready to go. To update later: `docker compose pull && docker compose up -d`.
+Open `http://localhost:3000` and you're ready to go.
 
 > **First sign-in:** the user is `admin`, and the first start generates a random password. Read it with `docker compose exec backend cat /app/data/initial_admin_password`; the backend log names the file but no longer prints the password itself, so a log you share with someone does not hand them the account. **Change it in Settings right after signing in**; the saved copy is deleted when you do. To choose it yourself, set `DEFAULT_ADMIN_PASSWORD` in `.env` before the first start. If the data path is not writable the account is not created at all, and the log says so rather than putting the password in it.
 >
@@ -119,6 +119,8 @@ yarn dev
 
 Open `http://localhost:3000`.
 
+`frontend/.env` configures the dev server: `VITE_BASE_URL` is the backend it proxies `/api` to (default `http://localhost:8100`), and `VITE_ALLOWED_HOSTS` is the hostnames it answers to (default `localhost,127.0.0.1`). The Docker image does not use either; it serves the built UI with nginx and proxies `/api` to `BACKEND_URL`.
+
 </details>
 
 ### Unraid
@@ -151,8 +153,6 @@ Set **Allowed browser origins** to the address you open AbuseBox at, then go to 
 
 Data lives in `/DATA/AppData/abusebox/data`. The admin password is in `initial_admin_password` in that folder, which you can open in the CasaOS file manager.
 
-<a id="upgrading-to-v130"></a>
-
 ### Upgrading
 
 ```bash
@@ -161,44 +161,26 @@ docker compose pull && docker compose up -d
 
 The database is migrated automatically on start, and your data is kept. (Built from source? `git pull && docker compose up -d --build`.)
 
-**Notes for v1.3.4**
-
-- **Nothing is required**, the images upgrade on their own. Two new things live in the repository rather than the images, so `git pull` as well if you want them:
-  - The **`enable_ipv6`** block at the end of `docker-compose.yml`, commented out. Worth turning on if a registry blocks your server's IPv4 address, since Docker gives containers only IPv4 by default. See [WHOIS that times out](#whois-that-times-out).
-  - **Install templates** for Unraid, Portainer and CasaOS, in `templates/`.
-
-**Notes for v1.3.2**
-
-- **Pull the repository too** (`git pull`), not only the images: `docker-compose.yml` now adds a small DNS resolver (Unbound) for blacklist lookups. See [Blacklists that show "No answer"](#blacklists-that-show-no-answer).
-- **Still on `password123`?** Sign in with it as before; a banner asks you to change it. New installs get a random password instead.
-- **The backend's port 8100 now listens on this machine only.** The UI and the API docs at `http://localhost:3000/api/` are unchanged. Scripts on other machines should call the API through port 3000 (`http://your-server:3000/api/...`).
-- **The backend container runs as an unprivileged user.** On the first start it takes ownership of the existing data volume, so no action is needed.
-
-**Notes for v1.3.0**
-
-- **The frontend is now a production build served by nginx**, not the Vite dev server. `VITE_ALLOWED_HOSTS`, `VITE_BASE_URL` and `VITE_API_DOCS_URL` in `.env` are no longer used and can be removed. The API docs moved to `http://localhost:3000/api/swagger/`.
-- **Database migrations now use Alembic.** Existing databases are detected and upgraded on the first start.
-- **ISPs and other commercial users need a Spamhaus key.** Set `SPAMHAUS_DQS_KEY` (see [Configuration](#configuration)).
+Most releases need nothing else. The few that do are below, and the [changelog](CHANGELOG.md) has the full detail for every version.
 
 <details>
-<summary>Upgrading from v1.1.x</summary>
+<summary>Manual steps for releases before 1.3.5</summary>
 
-Back up your data first, then pull the new version. The database is migrated automatically on start.
+<a id="upgrading-to-v130"></a>
+<a id="upgrading-from-v11x"></a>
+
+**v1.3.4** — nothing required. Two additions live in the repository rather than the images, so `git pull` as well if you want them: the commented-out **`enable_ipv6`** block at the end of `docker-compose.yml` (see [WHOIS that times out](#whois-that-times-out)), and the **install templates** for Unraid, Portainer and CasaOS in `templates/`.
+
+**v1.3.2** — `git pull` as well as pulling the images: `docker-compose.yml` adds a DNS resolver (Unbound) for blacklist lookups, see [Blacklists that show "No answer"](#blacklists-that-show-no-answer). The backend's port 8100 now listens on this machine only, so scripts elsewhere should call the API through port 3000. The backend container runs as an unprivileged user and takes ownership of the data volume on first start, so no action is needed. Still on `password123`? It keeps working, with a banner asking you to change it.
+
+**v1.3.0** — the frontend is a production build served by nginx, so `VITE_ALLOWED_HOSTS`, `VITE_BASE_URL` and `VITE_API_DOCS_URL` in `.env` are unused and can be removed; the API docs moved to `http://localhost:3000/api/swagger/`. Migrations moved to Alembic and existing databases are upgraded on first start. ISPs and other commercial users need `SPAMHAUS_DQS_KEY` set, see [Configuration](#configuration).
+
+**From v1.1.x** — everyone is signed out once, because older Docker setups used a published JWT secret. The admin account probably still uses `password123`; change it in **Settings → Password**. The `/tools/*` API needs a token now, only `/blacklist/quick-check/` stays public. Public sign-up is gone, so admins add users in **Settings → Users**. The scheduler is on by default. Back up first:
 
 ```bash
 # The volume is named <folder>_abusebox-data; `docker volume ls` shows it.
 docker run --rm -v abusebox_abusebox-data:/data -v "$PWD":/backup alpine tar czf /backup/abusebox-data.tgz -C /data .
-git pull
-docker compose up -d --build
 ```
-
-Things that changed:
-
-- **Everyone is signed out once.** Older Docker setups used a published JWT secret; v1.2.0 generates a private one (or uses your `APP_SECRET_KEY`).
-- **Change the admin password.** Older Docker setups ignored `DEFAULT_ADMIN_PASSWORD` from `.env`, so the admin account probably still uses `password123`. A banner reminds you until you change it in **Settings → Password**.
-- **The `/tools/*` API needs a token.** Only `/blacklist/quick-check/` stays public. See [API Endpoints](#api-endpoints).
-- **No public sign-up.** Admins add users in **Settings → Users**.
-- **The scheduler is on by default** unless you turned it off in Settings before.
 
 </details>
 
@@ -206,74 +188,52 @@ Things that changed:
 
 ## Configuration
 
-Create a `.env` file in the project root (Docker Compose reads it automatically, and values in it override the compose defaults):
+AbuseBox runs with no configuration. To change anything, copy the full example and edit it:
 
-```env
-# Leave empty to auto-generate a secret (stored next to the database)
-APP_SECRET_KEY=
-APP_DEBUG=false
-APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
-DATABASE_URL=sqlite:///./app.db   # ignored by Docker Compose (always uses the data volume)
-
-# Default admin, created on first start only. Leave the password empty to
-# generate a random one, saved as initial_admin_password in the data path.
-DEFAULT_ADMIN_USERNAME=admin
-DEFAULT_ADMIN_PASSWORD=
-DEFAULT_ADMIN_EMAIL=admin@abusebox.local
-DEFAULT_ADMIN_PHONE=11111111
-
-# Optional: AbuseIPDB (free key at https://www.abuseipdb.com/account/api)
-ABUSEIPDB_API_KEY=
-
-# Optional: Spamhaus Data Query Service key (required for commercial use, including ISPs)
-SPAMHAUS_DQS_KEY=
-# Optional: your own DNS resolver for blacklist lookups (Docker Compose uses its bundled one)
-DNSBL_NAMESERVERS=
-
-# Optional: limits
-MAX_ASSETS_PER_USER=1000       # per non-admin user
-DISABLE_API_DOCS=false         # true hides /swagger/, /redoc/ and /openapi.json
-
-# Scheduled monitoring
-SCHEDULER_ENABLED=true
-SCHEDULER_INTERVAL_MINUTES=360
-
-# WHOIS lookups
-WHOIS_TIMEOUT_SECONDS=30       # total per lookup, split across IPv6 and IPv4
-WHOIS_CACHE_MINUTES=360        # reuse answers instead of re-asking; 0 disables
-
-# Email alerts (optional)
-SMTP_HOST=
-SMTP_PORT=587                  # 587 uses STARTTLS; 465 uses TLS from the start
-SMTP_USERNAME=
-SMTP_PASSWORD=
-SMTP_FROM_EMAIL=
-SMTP_USE_TLS=true
-
-# Webhook alerts (optional)
-WEBHOOK_URL=
+```bash
+cp backend/.env.example .env
 ```
 
-| Variable | Description | Required |
+Docker Compose reads `.env` from the project root automatically, and values in it override the compose defaults. The settings most installs touch:
+
+```env
+APP_CORS_ALLOWED_ORIGINS=http://localhost:3000   # the address you open AbuseBox at
+DEFAULT_ADMIN_PASSWORD=                          # empty generates a random one
+ABUSEIPDB_API_KEY=                               # optional, free key
+SPAMHAUS_DQS_KEY=                                # required for commercial use, including ISPs
+SMTP_HOST=                                       # optional, for email alerts
+```
+
+Everything available:
+
+| Variable | Description | Default |
 |---|---|---|
-| `APP_SECRET_KEY` | JWT signing secret. If unset, a random one is generated and saved as `.secret_key` next to the database | No |
-| `APP_DEBUG` | Show error tracebacks (development only) | No |
-| `APP_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the API | No |
-| `DATABASE_URL` | Database connection string (SQLite default) | No |
-| `DEFAULT_ADMIN_PASSWORD` | Password for the admin account created on the first start. If empty, a random one is generated and saved as `initial_admin_password` next to the database, readable only by the backend's user | No |
-| `ABUSEIPDB_API_KEY` | Enables AbuseIPDB reputation checks | No |
-| `SCHEDULER_ENABLED` | Run periodic background checks (default: `true`; can also be changed in Settings) | No |
-| `SCHEDULER_INTERVAL_MINUTES` | Check interval in minutes (default: 360) | No |
-| `WHOIS_TIMEOUT_SECONDS` | Total seconds for one WHOIS lookup (default: 30), split evenly across the server's IPv6 and IPv4 addresses. Some registries block a client on one family and answer it on the other | No |
-| `WHOIS_CACHE_MINUTES` | How long a successful WHOIS answer is reused before asking again (default: 360). `0` disables caching | No |
-| `SMTP_HOST` | SMTP server for email alerts. Alerts go to the email address of the asset's owner; each user sets theirs in **Settings → Notifications** | No |
-| `WEBHOOK_URL` | Webhook URL for alerts (Slack and Discord URLs get chat messages). A URL set in Settings → Notifications takes precedence | No |
-| `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers (IPs or hostnames) for blacklist lookups. Docker Compose sets it to its bundled resolver, `unbound`. Spamhaus and some others refuse public resolvers; see [Blacklists that show "No answer"](#blacklists-that-show-no-answer) | No |
-| `MAX_ASSETS_PER_USER` | How many assets each non-admin user can add (default: 1000) | No |
-| `DISABLE_API_DOCS` | `true` hides the Swagger and ReDoc pages and the OpenAPI schema | No |
-| `SPAMHAUS_DQS_KEY` | Spamhaus [Data Query Service](https://www.spamhaus.com/data-access/free-data-query-service/) key. When set, Spamhaus lookups use your key instead of the public mirror. Spamhaus's free public mirror is for non-commercial use only; ISPs and commercial users need a paid key | No |
+| `APP_SECRET_KEY` | JWT signing secret. If unset, a random one is generated and saved as `.secret_key` next to the database | generated |
+| `APP_DEBUG` | Show error tracebacks (development only) | `false` |
+| `APP_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the API | `http://localhost:3000` |
+| `DATABASE_URL` | Database connection string. Ignored by Docker Compose, which always uses the data volume | SQLite |
+| `DEFAULT_ADMIN_USERNAME` | Admin account created on the first start only | `admin` |
+| `DEFAULT_ADMIN_PASSWORD` | Password for that account. If empty, a random one is generated and saved as `initial_admin_password` next to the database, readable only by the backend's user | generated |
+| `DEFAULT_ADMIN_EMAIL`, `DEFAULT_ADMIN_PHONE` | Contact details for that account. The email is where its alerts go, and each user can change their own in **Settings → Notifications** | `admin@abusebox.local` |
+| `ABUSEIPDB_API_KEY` | Enables AbuseIPDB reputation checks ([free key](https://www.abuseipdb.com/account/api)) | unset |
+| `SPAMHAUS_DQS_KEY` | Spamhaus [Data Query Service](https://www.spamhaus.com/data-access/free-data-query-service/) key. When set, Spamhaus lookups use your key instead of the public mirror. The free public mirror is for non-commercial use only; ISPs and commercial users need a paid key | unset |
+| `DNSBL_NAMESERVERS` | Comma-separated DNS resolvers for blacklist lookups. Docker Compose sets this to its bundled `unbound`. Spamhaus and some others refuse public resolvers; see [Blacklists that show "No answer"](#blacklists-that-show-no-answer) | bundled resolver |
+| `SCHEDULER_ENABLED` | Run periodic background checks. Can also be changed in Settings | `true` |
+| `SCHEDULER_INTERVAL_MINUTES` | How often the scheduler checks due assets | `360` |
+| `WHOIS_TIMEOUT_SECONDS` | Total seconds for one WHOIS lookup, split evenly across IPv6 and IPv4. Some registries block a client on one family and answer it on the other | `30` |
+| `WHOIS_CACHE_MINUTES` | How long a successful WHOIS answer is reused before asking again. `0` disables caching | `360` |
+| `SMTP_HOST` | SMTP server for email alerts. Alerts go to the email address of the asset's owner; each user sets theirs in **Settings → Notifications** | unset |
+| `SMTP_PORT` | `587` uses STARTTLS, `465` uses TLS from the start | `587` |
+| `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_TLS` | The rest of the SMTP settings | unset |
+| `WEBHOOK_URL` | Webhook for alerts (Slack and Discord URLs get chat messages). A URL set in Settings → Notifications takes precedence | unset |
+| `MAX_ASSETS_PER_USER` | How many assets each non-admin user can add | `1000` |
+| `DISABLE_API_DOCS` | `true` hides the Swagger and ReDoc pages and the OpenAPI schema | `false` |
 
 > DNS Records, SSL Checker, WHOIS, SPF/DKIM/DMARC, and Server Status work out of the box with no API keys.
+
+---
+
+## Troubleshooting
 
 ### Blacklists that show "No answer"
 
@@ -326,13 +286,6 @@ A WHOIS lookup has one time budget (`WHOIS_TIMEOUT_SECONDS`, default 30) shared 
 Registries also rate limit hard: SIDN refuses a second query made soon after the first, answering `Error: ratelimit exceeded`. AbuseBox reports that as a failed check rather than an empty record, and reuses successful answers for `WHOIS_CACHE_MINUTES` (default 6 hours) so monitoring does not re-ask on every cycle.
 
 If a registry refuses anyway, the last good answer is served for up to four times that window rather than nothing, marked `stale` with the reason and its age. A registration does not change by the hour, so an asset keeps its registrar and expiry date instead of flipping to an error whenever the registry is busy. Once the stale window passes, the failure is reported normally.
-
-Frontend: the Docker image serves the built UI with nginx and proxies `/api` to `BACKEND_URL` (default `http://backend:8100`). For the development server (`yarn dev`), `frontend/.env` sets:
-
-| Variable | Description |
-|---|---|
-| `VITE_BASE_URL` | Backend URL for the dev server's `/api` proxy (default: `http://localhost:8100`) |
-| `VITE_ALLOWED_HOSTS` | Hostnames the dev server answers to (default: `localhost,127.0.0.1`) |
 
 ---
 
