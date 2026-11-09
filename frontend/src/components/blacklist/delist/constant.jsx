@@ -14,6 +14,13 @@ const REMOVAL_PAGES = {
   'dyna.spamrats.com': 'https://www.spamrats.com/removal.php',
   'noptr.spamrats.com': 'https://www.spamrats.com/removal.php',
   'spam.spamrats.com': 'https://www.spamrats.com/removal.php',
+  'bl.spameatingmonkey.net': 'https://spameatingmonkey.com/',
+  'bl.ipv6.spameatingmonkey.net': 'https://spameatingmonkey.com/',
+  'combined.mail.abusix.zone': 'https://lookup.abusix.com/',
+  // Domain lists: the name is looked up and delisted, not an address.
+  'dbl.spamhaus.org': 'https://check.spamhaus.org/',
+  'multi.surbl.org': 'https://surbl.org/surbl-analysis',
+  'multi.uribl.com': 'https://uribl.com/lookup.shtml',
 };
 
 export function removalPageFor(provider) {

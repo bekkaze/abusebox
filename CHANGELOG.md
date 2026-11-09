@@ -14,7 +14,8 @@ IPv6 and domain blacklists, finishing the list coverage.
 
 - **IPv6 blacklist checks** (#33). Addresses are queried as 32 reversed nibbles (RFC 5782 §2.4) against the five zones that answer IPv6: Spamhaus ZEN, Barracuda, SpamCop, UCEPROTECT level 1 and SpamEatingMonkey's IPv6 zone. IPv4-only zones are not queried, so they are never a false "no answer". IPv6 addresses can now be added as assets, stored in one canonical form.
 - **Domain blacklists** (#34): Spamhaus DBL, SURBL and URIBL, queried by name. DBL codes are decoded individually; SURBL and URIBL answers are bitmasks and every bit is decoded, so SURBL's `127.0.0.80` reads as malware and abuse. A domain asset is now checked both by its address and by its name, and a domain that does not resolve is still checked by name.
-- **Abusix Guardian Mail** as an optional keyed list via `ABUSIX_API_KEY`.
+- **Abusix Guardian Mail** as an optional keyed list via `ABUSIX_API_KEY`. The key is part of the query name and never appears in a result.
+- IPv6 addresses work in the public quick check, with the same public-address guard as IPv4.
 
 ### Fixed
 

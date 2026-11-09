@@ -368,3 +368,115 @@ def test_a_malformed_ipv6_address_is_still_rejected():
     for bad in ("2001:db8::zz", "2001:db8:::1", ":::"):
         with _pytest.raises(ValueError):
             _valid_target(bad)
+
+
+# --- keyed zones -------------------------------------------------------------
+
+
+def test_an_unkeyed_list_is_queried_at_its_public_zone(monkeypatch):
+    monkeypatch.delenv("SPAMHAUS_DQS_KEY", raising=False)
+    assert dnsbl._query_zone("zen.spamhaus.org") == "zen.spamhaus.org"
+
+
+def test_a_spamhaus_key_redirects_to_the_keyed_mirror(monkeypatch):
+    monkeypatch.setenv("SPAMHAUS_DQS_KEY", "sk123")
+    assert dnsbl._query_zone("zen.spamhaus.org") == "sk123.zen.dq.spamhaus.net"
+
+
+def test_a_keyed_list_puts_its_key_in_the_query(monkeypatch):
+    # Abusix answers nobody without a key. Querying the bare zone would leave
+    # the list permanently "no answer" while appearing to be enabled.
+    monkeypatch.setenv("ABUSIX_API_KEY", "ak456")
+    assert dnsbl._query_zone("combined.mail.abusix.zone") == "ak456.combined.mail.abusix.zone"
+
+
+def test_a_list_that_requires_a_key_is_skipped_without_one(monkeypatch):
+    monkeypatch.delenv("ABUSIX_API_KEY", raising=False)
+    assert "combined.mail.abusix.zone" not in dnsbl.providers_for("ip", "ipv4")
+
+
+def test_a_list_with_an_optional_key_is_queried_either_way(monkeypatch):
+    # Spamhaus has a free public mirror, so it is never skipped.
+    monkeypatch.delenv("SPAMHAUS_DQS_KEY", raising=False)
+    assert "zen.spamhaus.org" in dnsbl.providers_for("ip", "ipv4")
+    monkeypatch.setenv("SPAMHAUS_DQS_KEY", "sk123")
+    assert "zen.spamhaus.org" in dnsbl.providers_for("ip", "ipv4")
+
+
+# --- a query that cannot be asked -------------------------------------------
+
+
+def test_a_name_too_long_to_query_does_not_blame_the_zone():
+    # 253 is the DNS limit for a whole name. A long domain plus the zone's own
+    # suffix exceeds it, and the zone must not be recorded as "no answer" for
+    # a query it was never sent.
+    label = "a" * 60
+    long_domain = ".".join([label, label, label, label])  # 243 characters
+    assert len(long_domain) + 1 + len("dbl.spamhaus.org") > dnsbl._MAX_DNS_NAME
+
+    with mock.patch.object(dnsbl, "_resolve_ipv4", return_value="203.0.113.25"), \
+         mock.patch.object(dnsbl, "_lookup", _answers({})), \
+         mock.patch.object(dnsbl, "_answers_test_points", return_value=True):
+        result = dnsbl.check_dnsbl_providers(long_domain)
+
+    assert "dbl.spamhaus.org" not in result["providers"]
+    assert "dbl.spamhaus.org" not in result["failed_providers"]
+    # The IP zones are unaffected: the address is short.
+    assert "zen.spamhaus.org" in result["providers"]
+
+
+def test_a_short_domain_still_reaches_the_domain_zones():
+    with mock.patch.object(dnsbl, "_resolve_ipv4", return_value="203.0.113.25"), \
+         mock.patch.object(dnsbl, "_lookup", _answers({})), \
+         mock.patch.object(dnsbl, "_answers_test_points", return_value=True):
+        result = dnsbl.check_dnsbl_providers("example.com")
+    assert "dbl.spamhaus.org" in result["providers"]
+
+
+# --- target_address, which the public quick check guards with ----------------
+
+
+def test_target_address_passes_an_ipv6_literal_through():
+    assert dnsbl.target_address("2001:db8::1") == ("2001:db8::1", "ipv6")
+    assert dnsbl.target_address("[2001:db8::1]") == ("2001:db8::1", "ipv6")
+
+
+def test_target_address_passes_an_ipv4_literal_through():
+    assert dnsbl.target_address("203.0.113.25") == ("203.0.113.25", "ipv4")
+
+
+def test_target_address_resolves_a_name():
+    with mock.patch.object(dnsbl, "_resolve_ipv4", return_value="203.0.113.25"):
+        assert dnsbl.target_address("example.com") == ("203.0.113.25", "ipv4")
+
+
+def test_target_address_reports_an_unresolvable_name():
+    with mock.patch.object(dnsbl, "_resolve_ipv4", return_value=None):
+        assert dnsbl.target_address("nope.invalid") == (None, "")
+
+
+def test_a_private_ipv6_address_is_still_caught_by_the_public_guard():
+    # The quick check rejects anything not globally routable; the guard reads
+    # the address target_address returns, so it has to be a real address.
+    address, family = dnsbl.target_address("::1")
+    assert family == "ipv6"
+    assert not ipaddress.ip_address(address).is_global
+
+
+def test_an_api_key_never_reaches_the_result(monkeypatch):
+    # The key is part of the query name by necessity, so it reaches the
+    # operator's resolver. It must not reach the stored check result, which is
+    # handed to the browser, exported to CSV and pasted into tickets.
+    monkeypatch.setenv("ABUSIX_API_KEY", "secret-key-value")
+    monkeypatch.setenv("SPAMHAUS_DQS_KEY", "another-secret")
+
+    with mock.patch.object(dnsbl, "_lookup", _answers({"combined.mail.abusix.zone": "127.0.0.2"})), \
+         mock.patch.object(dnsbl, "_answers_test_points", return_value=True):
+        result = dnsbl.check_dnsbl_providers("203.0.113.25")
+
+    blob = repr(result)
+    assert "secret-key-value" not in blob
+    assert "another-secret" not in blob
+    # The zone is reported under its public name, not the keyed one.
+    assert "combined.mail.abusix.zone" in result["providers"]
+    assert "dq.spamhaus.net" not in blob
