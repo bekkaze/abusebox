@@ -1,528 +1,321 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented here.
+
+Upgrading is `docker compose pull && docker compose up -d` unless a release says otherwise. Migrations run on start.
 
 ## [Unreleased]
 
 ## [1.4.0] - 2026-11-09
 
-A risk score on every asset, paging that happens on the server rather than in
-the browser, and a navigation and identity rebuilt around them.
+A risk score on every asset, server-side paging, and a rebuilt navigation and identity.
 
-Upgrading: `docker compose pull && docker compose up -d`. No migration is
-needed for the score; it is derived from checks you already have. An `owner`
-column is added to assets and is empty until you fill it in.
+Adds an empty `owner` column. The score is derived from existing checks; no migration needed.
 
 ### Added
 
-- **A risk score, 0 to 100, on every asset.** Until now the dashboard ranked
-  what needed attention by counting findings, so an asset on one critical
-  blacklist sorted below one with three cosmetic problems. The score weighs
-  six factors out of a fixed 100: blacklists 40, reachability 20, certificate
-  14, domain 12, email authentication 8, reputation 6. Listings are weighted
-  by the severity the list's own return codes decode to, so being on Spamhaus
-  SBL is not the same as being on a list that marks dynamic ranges. The same
-  "listed on 1 of 24" scores 34 on a critical list and 10 on a low one.
-
-  Each factor saturates rather than adding up without limit, so a tenth
-  listing moves the number far less than the first. Missing evidence is not a
-  finding: an asset whose checks have not run is not scored as healthy or as
-  bad, it simply has nothing to score.
-
-  The number is shown with its working. The badge carries the factor
-  breakdown in its tooltip, and an asset's own page lists every factor with
-  what it contributed and out of what. It is a ranking aid, not a
-  probability, and nothing in it is calibrated against outcomes.
-
-- **An owner per asset.** A free-text field for the team or person
-  responsible, shown in the asset table and searchable along with the
-  hostname, type and description.
-
-- **`GET /hostname/page/`.** One page of assets, already filtered, searched,
-  sorted and counted by the server. `GET /hostname/list/` is unchanged and
-  still returns the whole array, so nothing built against it breaks.
-
-- **An account menu in the header**, holding the signed-in user, the theme
-  toggle and sign-out, instead of scattering them through the navigation.
+- **Risk score, 0-100, per asset.** Six factors out of a fixed 100: blacklists 40, reachability 20, certificate 14, domain 12, email auth 8, reputation 6. Listings weight by the severity the list's return codes decode to, so "listed on 1 of 24" is 34 on a critical list and 10 on a low one. Factors saturate. Unrun checks score nothing rather than scoring healthy. Every factor and its contribution is shown.
+- **Owner per asset.** Free text, searchable with hostname, type and description.
+- `GET /hostname/page/` returns one page, filtered, sorted and counted by the server. `GET /hostname/list/` is unchanged.
+- Account menu in the header holding user, theme toggle and sign-out.
 
 ### Changed
 
-- **Assets are paged on the server.** The list was fetched whole and sliced in
-  the browser, which meant page one was the top of whatever happened to have
-  loaded rather than the top of the sorted set. Sorting, filtering, searching
-  and paging now all happen in the same place, so page one is the first page
-  of the real order. Ties are broken on evidence, by issue count and then
-  name, rather than by whatever order the database returned.
-
-- **The navigation.** Icons and a rail, the overflow tools folded inline
-  rather than into a popup that covered the page, and the whole surface given
-  its own ink so it reads as navigation rather than as a tinted page.
-
-- **A new mark and a violet palette.** The interface already spent five hues
-  on meaning: red for listed, amber for no answer, green for clear and a
-  slate blue for informational. A brand colour near any of those reads as a
-  status rather than as a brand, which ruled out most of the wheel and blue
-  worst of all, it being the informational hue exactly. Violet clears its
-  nearest neighbour by 55 degrees. Every colour was solved against the
-  contrast ratios the previous palette was tuned to.
-
-  The mark is a box inside a box on true isometric projection, and it ships
-  as a component that inherits its colour, so it can never sit on the
-  navigation in the navigation's own colour and disappear.
-
-- **The favicon is a tile.** Tab strips run from white to near-black, and a
-  bare mark with a dark centre sinks into the dark ones until it reads as a
-  hollow ring. The tile brings its own background. The alert favicon shown
-  while something is listed matches it, rather than being the icon from two
-  designs ago.
-
-- **The dashboard's panels line up.** Two independent stacks meant the bands
-  down the page ended at different heights; they are one grid now.
+- Assets page, filter, sort and search on the server, so page one is the first page of the real order. Ties break on issue count, then name.
+- Navigation rebuilt as an icon rail with tools inline instead of in a popup.
+- New mark and violet palette. Five hues already carried status meaning; violet clears its nearest at 55 degrees. The mark inherits `currentColor`, so it cannot vanish on the rail.
+- The favicon is a tile, which keeps it legible on dark tab strips. The alert favicon matches it again.
+- Dashboard panels are one grid, so the bands line up.
 
 ### Fixed
 
-- **An upgrade could look like nothing happened.** `index.html` names the
-  hashed bundles and carried only an ETag, and a document with no cache
-  directive may be reused without asking, so a stale copy kept loading the
-  previous release. It revalidates every time now; the bundles it points at
-  keep their year.
-
-- **The history tab's tables bled out of their column.** A negative margin
-  meant for a full-width panel pulled them 20px past the grid, over whatever
-  sat beside them. The detail pane also gained room: the split moves to a
-  wider breakpoint and the list is narrower, taking the detail from 334px to
-  678px at 1024.
-
-- **Form fields under 16px zoomed the page on iOS Safari**, with a pinch as
-  the only way back. Eighteen fields were below that threshold.
-
-- **The Settings tabs hid the Security tab** on narrow screens, and two
-  truncated hostnames gave no way to read the full name. A contrast failure
-  in the tool counts is fixed as well.
+- `index.html` revalidates, so an upgrade no longer keeps loading the previous release.
+- History tables no longer bleed 20px past their column; the detail pane goes from 334px to 678px at 1024.
+- 18 form fields were under 16px and zoomed the page on iOS Safari.
+- Settings hid the Security tab on narrow screens; tool counts had a contrast failure.
 
 ## [1.3.6] - 2026-11-08
 
-Email security on a mail server's own hostname, and the TLS version a server
-actually speaks. Both came out of issue #40.
-
-Upgrading: `docker compose pull && docker compose up -d`.
+Email security on a mail server's own hostname, and the TLS version in use (#40).
 
 ### Fixed
 
-- **A mail server's hostname looked like it had no DMARC.** A host without a DMARC record of its own is covered by the organisational domain's, and the policy that applies to it is that record's `sp` tag (RFC 7489 §6.6.3). AbuseBox only ever asked for the exact name, so `mail1.example.com` was reported as having no DMARC while `example.com` published `p=reject; sp=reject`, and the grade dropped accordingly. The inherited policy is used now, and the result says which domain it came from (#40).
-
-  SPF is deliberately left as it was. A sending host publishes its own SPF record, and `mail1.example.com` having `v=spf1 a ~all` where its parent has `v=spf1 mx ~all` is normal; reporting the parent's would state a policy that is not the one in force.
-
-- **The same hostname looked like it had no DKIM.** A selector lives under the domain a message is signed as, which is the signature's `d=` tag and for most setups is the organisational domain rather than the sending host. Mail from `mail1.example.com` is normally signed as `example.com`, so the key is at `<selector>._domainkey.example.com` and looking only at the host found nothing. The organisational domain is now searched when the host itself publishes no key, and the result says which domain the key was found under (#40).
-
-  Nothing is inherited here, because DKIM defines no fallback. A key found at the organisational domain only applies if the host does sign as that domain, which DNS cannot tell us, so it is reported as found there rather than silently treated as the host's own.
-
-- **An obsolete TLS version was reported as an error instead of a problem.** `ssl.create_default_context()` will not negotiate below TLS 1.2, and OpenSSL's security level refuses those cipher suites as well, so a server still on TLS 1.0 produced `SSL error: [SSL: TLSV1_ALERT_PROTOCOL_VERSION]` and no verdict at all. The certificate check now tries as a mail client would first, and only if that fails retries with the versions relaxed, so the certificate is read and the old protocol is named as the finding. A short key is reported the same way.
-
-  A certificate problem is never retried that way. A chain that fails verification is a real answer, and re-asking at a lower security level would turn it into a pass.
-
-- **An unexpected check failure put the exception's text in the browser.** A traceback's message carries file paths and internals. The failure's kind is shown and the traceback goes to the backend log, where it belongs.
-
-- **A rejected certificate now says which way it was rejected.** Expired, issued for a different hostname, self-signed, or signed by a root nobody trusts all came back as `SSL verification failed: CERTIFICATE_VERIFY_FAILED`. OpenSSL reports the reason as a number, so the four are told apart and named in plain words.
-
-- **Failure messages across the checks read as sentences.** `[Errno 101] Network is unreachable`, `[SSL: ...] (_ssl.c:1082)` and requests' own messages are gone from results; every check now reports the cause in words, chosen by the kind of failure. A bad CIDR says what a good one looks like instead of quoting the input back.
+- A host with no DMARC record of its own now uses the organisational domain's `sp` policy (RFC 7489 §6.6.3) and says where it came from. SPF is unchanged: a sending host publishes its own.
+- DKIM selectors are searched at the organisational domain when the host publishes none, reported as found there rather than treated as the host's.
+- A server on TLS 1.0 returned an SSL error and no verdict. The check now retries with versions relaxed and names the old protocol as the finding. Certificate failures are never retried that way.
+- A rejected certificate says which way: expired, wrong hostname, self-signed or untrusted root.
+- Check failures read as sentences instead of `[Errno 101]` and `[SSL: ...]`.
 
 ### Security
 
-- **The generated admin password is no longer written to the log.** The first start creates `admin` with a random password, and that line stayed in `docker compose logs` for the life of the install, in anything the logs were shipped to, and in logs pasted into bug reports. It is written to `initial_admin_password` in the data volume, readable only by the backend's user and deleted the moment the password is changed, and the log now names the file instead.
-
-  **This changes first sign-in.** Read it with `docker compose exec backend cat /app/data/initial_admin_password`. Existing installs are untouched.
-
-  If that file cannot be written, no account is created: a generated password nobody can read is an account nobody can sign in to, and the log is not an acceptable second home for it. The start says so and the next one tries again, or set `DEFAULT_ADMIN_PASSWORD` and nothing needs saving at all.
-
-- **A hostname can no longer forge a line in the log.** A value with a carriage return in it could close the real entry and open what read as another genuine one. Values that came from outside are escaped to a single line before they are logged.
-
-- **No exception's own text reaches a check result.** A result gets forwarded to a list operator or pasted into a ticket, and an exception's message can carry a file path, a connection string or an SMTP server's reply. `app/core/failures.py` maps a failure to one of a fixed set of phrases by its type; where a number genuinely helps, such as an errno, an SMTP reply code or an X509 verify code, it is read from a field that holds an integer rather than from the message. The detail stays in the backend log.
-
-  AbuseBox's own refusals are typed rather than told apart by their text, so `UnresolvableHostError`, `PrivateDestinationError` and `UnsupportedUrlError` let a caller state the reason in its own words instead of forwarding ours.
-
-- **CodeQL's findings are addressed in code rather than dismissed.** Of the 26 alerts from the first scan, 24 are fixed here: handlers that absorbed an expected absence say which absence and what happens next, the prune timestamp is held in a container instead of a module global rebound through `global`, the scheduler interval is an int before it is logged, the two imports that exist for their side effect say so with `importlib.import_module`, three unused imports are gone, and two test assertions compare whole values instead of substrings.
-
-  Two are left standing and are reported as accepted rather than quietly suppressed. The relaxed TLS context exists to negotiate what it is reporting on, so the only way to clear it would be to drop the capability this release adds. And the SSL endpoint is read as exposing a stack trace because the analysis summarises `describe()` as passing its argument through to its return value; it does not, and a test now walks `failures.py` for its own string constants and checks that every answer is one of them even when the exception carries a marker in every field it reads.
-
-- **Base images updated:** python 3.11.18-alpine and a current nginx 1.30.6-alpine digest.
+- The generated admin password is no longer logged. **Read it with `docker compose exec backend cat /app/data/initial_admin_password`.** It is deleted once changed. If it cannot be written, no account is created.
+- Hostnames are escaped before logging, so a carriage return cannot forge a log line.
+- No exception text reaches a check result; `app/core/failures.py` maps failures to fixed phrases. Detail stays in the log.
+- 24 of 26 CodeQL alerts fixed. Two accepted and documented rather than suppressed.
+- Base images: python 3.11.18-alpine, nginx 1.30.6-alpine.
 
 ## [1.3.5] - 2026-11-06
 
-A follow-up to 1.3.4, from testing on the issue tracker.
-
-Upgrading: `docker compose pull && docker compose up -d`.
-
 ### Fixed
 
-- **WHOIS on a mail server's hostname failed.** A registry can only answer for the name someone registered, so a host such as `mail1.example.nl` is now looked up as `example.nl`, and the result says which host was asked about. Working out where the registered domain starts uses the Public Suffix List, so `mail.example.co.uk` reduces to `example.co.uk` rather than to a public suffix. Every host in one domain shares a single query and cache entry, which matters where a registry rate limits as hard as SIDN does. IP addresses are unchanged and still reach their RIR through IANA's referral (#39).
-
-- **A WHOIS record kept from an earlier check now says so.** 1.3.4 began serving the last good answer when a registry refuses, which is most of the time with a rate limit as tight as SIDN's. It read as current; it now says how old it is and why the registry did not answer.
+- WHOIS on a mail server hostname looked up the registered domain instead, via the Public Suffix List, sharing one query per domain (#39).
+- A WHOIS record kept from an earlier check now says how old it is and why the registry did not answer.
 
 ### Security
 
-- **follow-redirects updated to 1.16.2** ([GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p)). It reaches AbuseBox as a dependency of axios. The published frontend never contained it: axios uses the browser's own request API and its Node adapter is dropped from the build, so installs were not affected.
-- **CodeQL** now analyses the backend and the frontend on every pull request and weekly.
+- follow-redirects 1.16.2 ([GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p)). Never shipped: axios' Node adapter is dropped from the build.
+- CodeQL analyses backend and frontend on every PR and weekly.
 
 ## [1.3.4] - 2026-11-05
 
-WHOIS fixes and install templates. No upgrade steps.
-
-Upgrading: `docker compose pull && docker compose up -d`.
-
 ### Added
 
-- **IPv6 for the containers**, as a commented-out `enable_ipv6` block at the end of `docker-compose.yml`. Docker gives containers only IPv4 by default, whatever the host has, so a registry that blocks your IPv4 cannot be worked around without it. See [WHOIS that times out](README.md#whois-that-times-out).
-- **Install templates** for Unraid, Portainer and CasaOS, in `templates/`. The Portainer and CasaOS files are self-contained, with the bundled resolver's configuration inlined, so they install from a pasted copy without a clone of the repository (#31, #32).
-- **`WHOIS_TIMEOUT_SECONDS`** (default 30) and **`WHOIS_CACHE_MINUTES`** (default 360). The timeout was fixed at 10 seconds before. Successful answers are now reused for a while, which keeps the scheduler from asking a registry again for every monitored asset; failures are never cached.
+- Commented-out `enable_ipv6` block in `docker-compose.yml`, for registries that block your IPv4.
+- Install templates for Unraid, Portainer and CasaOS in `templates/` (#31, #32).
+- `WHOIS_TIMEOUT_SECONDS` (30) and `WHOIS_CACHE_MINUTES` (360). Failures are never cached.
 
 ### Fixed
 
-- **WHOIS failed where the `whois` command worked.** Lookups only ever used IPv4, so a registry that blocks a server's IPv4 address made the check time out even when the same query answered over IPv6. WHOIS now tries both, in the order the system prefers, the way the `whois` command does. The time budget is split between them, so a blocked address cannot use up the time the other one needs (#36).
-- **`.nl` lookups came back almost empty.** SIDN writes a record as indented blocks under a bare heading rather than as `key: value` lines, so the registrar was read as empty and the name servers and abuse contact were dropped. Those fields are filled in now. An expiry date stays blank for `.nl`: SIDN does not publish one (#36).
-- **One refusal wiped out a good record.** When a registry refuses, the last good answer is now served for up to four times `WHOIS_CACHE_MINUTES`, marked as stale with the reason and its age, instead of the asset losing its registrar and expiry date until the registry is willing again. A safety refusal is never covered up this way.
-- **`.it` and similar records came back nearly empty too.** Some registries write a bare heading with no colon and indent the block underneath it, and use short field names (`Domain`, `Created`, `Expire Date`) that were not recognised. Those are read now, including the name servers. Fields inside a contact block stay with that contact: the date under "Admin Contact" is no longer taken as the domain's creation date, and a contact's organisation is no longer taken as the registrar.
-- **A refused WHOIS query looked like an empty record.** Registries answer "rate limit exceeded" and similar as plain text on port 43, with nothing to mark it as an error, and SIDN does so after as little as one query. Such a reply is now reported as a failed check instead of an empty but successful one, and is kept out of the cache.
-- **A WHOIS check on a subdomain showed a blank result.** A host like `mail1.example.nl` cannot be looked up, and the registry says so in plain text, which was being read as an empty but successful record. It is reported as a failed check now. Looking up the domain the host belongs to, rather than failing, is still to come.
-- **A failed WHOIS check said nothing.** Blacklist, SSL and server checks all report their failures on the dashboard and the asset page; WHOIS was the one that did not.
-- **Assets could show "Scheduled check overdue" forever.** Releases before 1.3.2 accepted any per-asset interval, including negative ones. The scheduler ignores those and checks on time, but the health summary took them at face value and warned on every page load.
-- **Saving the scheduler settings during a check cycle threw that cycle's results away.** The checks had already run; only saving them was skipped.
+- WHOIS now tries IPv6 and IPv4 in system order, splitting the time budget (#36).
+- `.nl`, `.it` and similar indented-block records are parsed; contact fields no longer leak into domain fields (#36).
+- A refusal serves the last good answer, marked stale with its age, instead of blanking the record.
+- Rate-limit replies are reported as failed checks, not empty successes, and stay out of the cache.
+- Failed WHOIS checks are reported on the dashboard like every other check.
+- Assets could show "Scheduled check overdue" forever from a pre-1.3.2 negative interval.
+- Saving scheduler settings mid-cycle threw that cycle's results away.
 
 ### Security
 
-- **Vite updated to 6.4.5** ([GHSA-8g5g-mxqh-grgj](https://github.com/advisories/GHSA-8g5g-mxqh-grgj), CVE-2026-118662: `server.fs.deny` bypassed with queries). A development dependency: the published frontend image serves the built files with nginx and never runs Vite's dev server, so installs were not affected.
+- Vite 6.4.5 ([GHSA-8g5g-mxqh-grgj](https://github.com/advisories/GHSA-8g5g-mxqh-grgj)). Dev-only; the image serves static files.
 
 ## [1.3.3] - 2026-10-30
 
-Small fixes, no upgrade steps.
-
-Upgrading: `docker compose pull && docker compose up -d`.
-
 ### Added
 
-- **Copy report.** When an IP or domain is listed, the next step is usually a ticket or an email to the blacklist operator. **Copy report** puts the result on the clipboard as plain text, in the header style the UI uses: the target, when it was checked, the verdict, one line per list with its severity and why it lists you, and the lists that did not answer. It sits next to **Export CSV** on the blacklist check, the public quick check and the Blacklist tab of an asset (#29).
+- **Copy report**, plain text for a ticket or an email to a list operator, on the blacklist check, quick check and an asset's Blacklist tab (#29).
 
 ### Fixed
 
-- **The activity timeline was hard to see.** Its line was drawn in the faintest hairline colour and every dot was the same grey, so events on the dashboard and the Activity page read as stray bullets. The line is stronger now and each dot carries its event's severity colour (#30).
-- **Copying over plain HTTP did nothing.** Browsers only give a page the clipboard in a secure context, so the copy buttons silently failed on installs reached over `http://` on a LAN address. They now fall back to the older copy method, and say so if the browser blocks copying outright.
+- The activity timeline was drawn in the faintest hairline with identical grey dots; dots now carry severity colour (#30).
+- Copying over plain HTTP silently failed; there is a fallback now.
 
 ## [1.3.2] - 2026-10-28
 
 A security release, and blacklist lookups that work out of the box.
 
-Upgrading: `git pull && docker compose pull && docker compose up -d`. Pull the repository too: `docker-compose.yml` adds a DNS resolver service. See [Upgrading](README.md#upgrading).
+**Pull the repository too** (`git pull`): compose adds a DNS resolver service.
 
 ### Security
 
-Found in a security review of 1.3.1. None were reported as exploited.
+From a review of 1.3.1. None reported as exploited.
 
-- **Login rate limit could be bypassed** from a private network. A client could set its own `X-Forwarded-For` header and get a fresh limit for every password guess. nginx now sets the client address itself and the API ignores `X-Forwarded-For`.
-- **Random first admin password.** New installs no longer start with the published `admin` / `password123`: a random password is generated, printed in the logs and saved in the data volume until you change it. Existing installs still using `password123` get the banner asking to change it.
-- **Regular users could overload the server.** The per-asset check interval accepted any number, including negative ones, so an asset could be checked every minute and get the server's IP rate-limited by the blacklists. Intervals are now 15 minutes to 7 days, and each non-admin user can add up to `MAX_ASSETS_PER_USER` assets (default 1000).
-- **Alert messages could be abused.** Asset names went into Slack and Discord messages as-is, so a user could make the shared webhook ping `@everyone` or post a disguised link. Asset names are now validated (domain, IPv4 or URL), Slack markup is escaped and Discord mentions are turned off.
-- **Server-status and SSL checks could reach internal hosts through DNS rebinding.** They now connect to the address that was checked instead of resolving the name a second time.
-- **dnspython updated to 2.9.0** ([GHSA-45c3-73f7-pv4m](https://github.com/advisories/GHSA-45c3-73f7-pv4m): excessive CPU use on crafted DNS names).
-- The public quick check only checks public addresses (internal names could be probed, and private IPs were sent to outside blacklists).
-- Passwords are hashed with 600,000 PBKDF2 rounds (was 29,000); existing hashes are upgraded at the next sign-in.
-- Signing in with an unknown username takes as long as with a known one, so usernames can't be guessed from response times.
-- WHOIS only follows referrals from IANA, only to public servers, and stops reading after 256 KB.
-- **Sign out now ends the session on the server**, on every device. Before, a copied token kept working until it expired.
-- The UI sends a Content-Security-Policy. The backend container runs as an unprivileged user, and its port (8100) only listens on the machine itself.
-- `APP_DEBUG` now defaults to `false` outside Docker too. `DISABLE_API_DOCS=true` hides the API docs.
+- Login rate limit could be bypassed with a self-set `X-Forwarded-For`. nginx sets the client address; the API ignores the header.
+- New installs get a random admin password instead of the published `password123`.
+- Per-asset intervals accepted any number, including negative. Now 15 minutes to 7 days, with `MAX_ASSETS_PER_USER` (1000).
+- Asset names went into Slack and Discord as-is, so a user could ping `@everyone`. Names are validated, markup escaped, mentions off.
+- Server-status and SSL checks could reach internal hosts via DNS rebinding; they connect to the checked address now.
+- dnspython 2.9.0 ([GHSA-45c3-73f7-pv4m](https://github.com/advisories/GHSA-45c3-73f7-pv4m)).
+- The public quick check only accepts public addresses.
+- PBKDF2 rounds 29,000 to 600,000, upgraded at next sign-in.
+- Unknown usernames take as long as known ones.
+- WHOIS follows only IANA referrals, only to public servers, stopping at 256 KB.
+- Sign-out ends the session server-side, on every device.
+- CSP on the UI. Backend runs unprivileged and binds to localhost only.
+- `APP_DEBUG` defaults to false outside Docker. `DISABLE_API_DOCS=true` hides the docs.
 
 ### Added
 
-- **Bundled DNS resolver.** Docker Compose now runs Unbound and sends blacklist lookups through it, so Spamhaus and others see your server's IP instead of a public resolver they refuse. If your network blocks the direct DNS traffic it needs, AbuseBox falls back to the system resolver.
-- **A warning when Spamhaus doesn't answer your resolver**, on the dashboard and the blacklist check, with a link to the fix.
+- Bundled Unbound resolver, so lists see your IP rather than a public resolver they refuse. Falls back to the system resolver.
+- A warning when Spamhaus does not answer your resolver.
 
 ### Fixed
 
-- Opening the dashboard right after a fresh install could fail once with a server error (two requests creating the settings at the same time).
-- Invalid values in forms (asset name, interval) now show a readable message instead of a blank or garbled error.
+- A fresh install could fail once on first dashboard load (two requests creating settings at once).
+- Invalid form values show a readable message.
 
 ## [1.3.1] - 2026-10-26
 
-Email alerts now reach you, and a certificate-store security update.
-
-Upgrading: `docker compose pull && docker compose up -d`. Then open **Settings → Notifications** and check that **Your alert email** is a real address.
+Open **Settings → Notifications** afterwards and set a real alert address.
 
 ### Security
 
-- certifi updated to 2026.10.23. Earlier versions trust emSign intermediate certificates whose private keys were compromised ([GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2)). This affects the outbound HTTPS calls AbuseBox makes (AbuseIPDB, webhooks, server status).
+- certifi 2026.10.23; earlier versions trust compromised emSign intermediates ([GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2)).
 
 ### Fixed
 
-- Email alerts went to the default admin's placeholder address (`admin@abusebox.local`), which can't receive mail, and there was no way to change it (#28). Each user now sets their alert email in **Settings → Notifications**, a warning shows while it's still a placeholder, and alerts and the test notification report the problem instead of sending into the void.
-- SMTP on port 465 (TLS from the start) now works; previously only STARTTLS on 587 did.
+- Email alerts went to the unreachable `admin@abusebox.local` with no way to change it. Each user sets their own, with a warning while it is a placeholder (#28).
+- SMTP on port 465 works; previously only STARTTLS on 587.
 
 ## [1.3.0] - 2026-10-26
 
-A redesigned interface, decoded blacklist results, and a production-grade frontend.
+A redesigned interface, decoded blacklist results, and a production frontend.
 
-Upgrading: `docker compose pull && docker compose up -d`. The database is migrated automatically. `VITE_ALLOWED_HOSTS`, `VITE_BASE_URL` and `VITE_API_DOCS_URL` in `.env` are no longer used. See [Upgrading to v1.3.0](README.md#upgrading-to-v130).
+`VITE_ALLOWED_HOSTS`, `VITE_BASE_URL` and `VITE_API_DOCS_URL` are no longer used.
 
-### Highlights
+### Added
 
-- **New interface.** Every result now reads like a mail delivery report: a status line with an SMTP-style class (5.x listed, 4.x no answer, 3.x pending, 2.x clear), the reason in plain words, and details as header-style fields. The redesign covers the dashboard, assets (table view first, sortable columns, per-row actions), asset detail, every check tool, settings, sign-in, the command palette and the public landing page. Main regions sit on white panels over a tinted canvas with a soft elevation scale. Light theme leads; dark mode is supported throughout. Fonts are self-hosted (Public Sans, Commit Mono), so the UI no longer loads anything from Google Fonts.
-- **Blacklist results say why.** Each listing is decoded with its meaning and a severity (critical, high, medium, low, info), e.g. Spamhaus SBL spam source vs. PBL end-user range. Results are sorted most serious first and exported to CSV with severity and meaning.
-- **Two more blacklists.** Added `bl.spameatingmonkey.net` and `bip.virusfree.cz`, and switched Mailspike to `bl.mailspike.net`, which adds graded reputation (its neutral L2 answer is not treated as a listing). AbuseBox now checks 24 blacklists.
-- **Spamhaus key support.** Set `SPAMHAUS_DQS_KEY` to query Spamhaus through its Data Query Service. The free public mirror is for non-commercial use only; ISPs and commercial users need a key.
+- **New interface.** Every result reads as a mail delivery report: an SMTP-style class (5.x listed, 4.x no answer, 3.x pending, 2.x clear), the reason in words, details as header fields. Covers every page. Fonts self-hosted, so nothing loads from Google Fonts.
+- **Listings are decoded** with meaning and severity (Spamhaus SBL spam source vs PBL end-user range), sorted most serious first, exported with both.
+- `bl.spameatingmonkey.net` and `bip.virusfree.cz` added, Mailspike moved to `bl.mailspike.net`. 24 lists.
+- `SPAMHAUS_DQS_KEY` for Spamhaus Data Query Service. The public mirror is non-commercial only.
 
 ### Changed
 
-- The frontend image is now a static production build served by nginx, which also proxies `/api` to the backend. Node.js is no longer in the runtime image, the UI answers on any hostname, and the API docs are at `/api/swagger/`.
-- Database schema changes now use Alembic migrations. Databases from 1.x are detected, brought up to the baseline and stamped on first start.
-- Docker images: `:latest` now follows stable releases only, and `main` publishes `:edge`.
-- Removed the unused `blacklisted_hostnames` table and the `react-typed` dependency.
+- The frontend image is a static build served by nginx, which proxies `/api`. No Node.js at runtime; API docs at `/api/swagger/`.
+- Schema changes use Alembic. 1.x databases are detected and stamped on first start.
+- `:latest` follows stable releases; `main` publishes `:edge`.
+- Removed the unused `blacklisted_hostnames` table and `react-typed`.
 
 ## [1.2.2] - 2026-10-25
 
 ### Fixed
 
-- A blacklist that starts listing every address would have reported all your assets as listed. This happens when a list shuts down (AHBL did it in 2015) or its domain expires. Each blacklist must now also leave its "never listed" test address (127.0.0.1) unlisted, as RFC 5782 requires; otherwise its result, listed or clean, is ignored and shown as "No answer".
-- Answers outside 127.0.0.x (other error codes, or a web server's IP from a parked domain) were counted as clean. They now count as "No answer".
-- Subnet scans now skip blacklists that fail their test addresses and show which were skipped, instead of possibly flagging the whole range or reporting it clean.
-- Subnet scans counted a failed lookup as clean, so a blacklist that started rate limiting partway through a scan made every remaining IP look clean. IPs with lookups that didn't answer are now marked **Incomplete**, with the lists that didn't answer, in the results and CSV.
-- Rate-limit and refusal answers (e.g. Spamhaus 127.255.255.255) were retried immediately, which made the rate limiting worse. Only timeouts and server failures are retried now.
+- A list that starts listing everything would have flagged every asset. Each list must now leave 127.0.0.1 unlisted as RFC 5782 requires, or its result is ignored.
+- Answers outside 127.0.0.x counted as clean; they count as "No answer" now.
+- Subnet scans skip lists failing their test addresses and name them, and mark IPs with unanswered lookups **Incomplete** instead of clean.
+- Rate-limit answers were retried immediately, worsening the limit. Only timeouts and server failures retry.
 
 ### Changed
 
-- Removed five lists that only added noise. AbuseBox now checks 22 blacklists.
-  - `bogons.cymru.com` lists unallocated address space (including 127.0.0.1), not abusers.
-  - `blackholes.five-ten-sg.com` is retired and lists nothing, so it always reported "clean".
-  - `cbl.abuseat.org` is now Spamhaus XBL, which `zen.spamhaus.org` already includes, so one listing showed twice.
-  - `korea.services.net` blocks most Korean address space by country, not for abuse.
-  - `dnsbl-2.uceprotect.net` and `dnsbl-3.uceprotect.net` list whole networks and providers' ASNs, mostly innocent neighbours. Level 1 (`dnsbl-1`), which lists individual IPs, is kept.
-- Lists AbuseBox stops checking no longer count as delistings. An asset listed only on a removed list is marked clean on its next check without a "No longer listed" alert.
+- Removed five lists that added only noise (`bogons.cymru.com`, `blackholes.five-ten-sg.com`, `cbl.abuseat.org`, `korea.services.net`, UCEPROTECT levels 2 and 3). 22 lists.
+- Lists AbuseBox stops checking no longer count as delistings.
 
 ## [1.2.1] - 2026-10-25
 
 ### Security
 
-- Frontend image moved to Node.js 22.23.4, the patched 22.x release from the [October 2026 Node.js security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases), which fixes the Brotli decoder out-of-bounds write CVE-2026-111497 among others (#24, #25, thanks @mkaand). The base image is now pinned by digest.
-- Added Dependabot version updates for the Docker base images and GitHub Actions, so the pinned image keeps getting patch releases.
+- Frontend on Node 22.23.4, the patched October 2026 release (CVE-2026-111497 among others), base image pinned by digest (#24, #25, thanks @mkaand).
+- Dependabot updates for Docker base images and GitHub Actions.
 
 ### Fixed
 
-- Blacklists that always showed "No answer" (#23). 36 providers had shut down or stopped answering (all SORBS zones, MSRBL, abuse.ch, NiX Spam `ix.dnsbl.manitu.net`, WPBL `db.wpbl.info`, AUPADS, gweep.ca, TransIP, kundenserver.de, nether.net, imp.ch, Lashback, woody.ch, matrix.spfbl.net and others) and were removed. Added `bl.0spam.org`, `bl.blocklist.de`, `dnsbl.spfbl.net` (the current SPFBL zone) and `truncate.gbudb.net`. AbuseBox now checks 28 blacklists, each verified to answer its test address.
-- Spamhaus could silently report "clean". Through some public resolvers it answers "not listed" for everything, including its own test address. Each blacklist's clean answer now only counts if it also lists its test address (127.0.0.2, rechecked every 30 minutes); otherwise it is shown as "No answer".
+- 36 providers had shut down or stopped answering and always showed "No answer"; removed, and `bl.0spam.org`, `bl.blocklist.de`, `dnsbl.spfbl.net` and `truncate.gbudb.net` added. 28 lists, each verified (#23).
+- Spamhaus could silently report clean through some public resolvers. A clean answer only counts if the list also lists 127.0.0.2, rechecked every 30 minutes.
 - The subnet check no longer queries the defunct `dnsbl.sorbs.net`.
 
 ### Changed
 
-- `DNSBL_NAMESERVERS` accepts hostnames, e.g. a Docker Compose service name. See [Blacklists that show "No answer"](README.md#blacklists-that-show-no-answer) for running your own resolver.
+- `DNSBL_NAMESERVERS` accepts hostnames, such as a Compose service name.
 
 ## [1.2.0] - 2026-10-07
 
-Monitoring that tells you what needs attention, plus a security and accessibility overhaul. (Supersedes the unreleased 1.1.3.)
+Monitoring that says what needs attention, plus a security and accessibility overhaul.
 
-Upgrading from 1.1.x: everyone is signed out once, the `/tools/*` API now needs a token, and public sign-up is off. See [Upgrading from v1.1.x](README.md#upgrading-from-v11x).
+**Everyone is signed out once.** `/tools/*` now needs a token and public sign-up is off.
 
-### Highlights
+### Added
 
-- **"Needs attention" dashboard**: one list of everything that's wrong across your assets (listed on blacklists, SSL certificate invalid or expiring, domain registration expiring, server down or returning 5xx, weak SPF/DKIM/DMARC grade, high AbuseIPDB score, overdue scheduled checks), plus scheduler status with a "Check due assets now" button.
-- **Activity log**: every check is compared with the previous one and changes are recorded as events (newly listed / delisted / provider changes, server down / recovered, certificate expiring / invalid / renewed, domain expiring). See them on the dashboard, on each asset, and on the new Activity page with severity filters.
-- **Smarter alerts**: alerts for recoveries, outages and expiry warnings, not only new listings. A new Notifications settings tab shows which channels are configured, lets admins set a webhook URL (overrides `WEBHOOK_URL`), choose which events alert, and send a test. Slack and Discord webhooks receive formatted chat messages; other webhooks get JSON (the v1.1 `blacklist_detected` fields are kept).
-- **Assets at scale**: card or table view, sort by urgency/name/last checked/added, a "Needs attention" filter, per-asset health hints, multi-select with bulk re-check (runs in the background), monitoring/alerts on-off and delete, CSV export, and paging for large CIDR imports.
-- **Check history**: browse past checks of an asset and see which blacklists were added or removed compared with the check before.
-- **User management**: admins can add users, grant or revoke admin, deactivate accounts and reset passwords from Settings. A banner warns while the default admin password is still in use.
-- **Data retention**: optionally delete check history and activity older than 30/90/180/365 days (latest results are always kept).
-- **Command palette** (Ctrl/Cmd + K): jump to any asset, page or setting, or type a domain/IP to run a blacklist check.
-
-### Added (API)
-
-- `GET /events/` (filters: `severity`, `before_id`), `GET /hostname/{id}/events/`, `GET /hostname/{id}/checks/{check_id}`.
-- `POST /hostname/bulk-action/` (`recheck`, `delete`, `enable_monitoring`, `disable_monitoring`, `enable_alerts`, `disable_alerts`).
-- `GET /hostname/list/?include_result=false` for a lighter list; list and detail responses now include `health` (status + issues) and `last_checked`.
-- `GET /settings/scheduler/status/`, `POST /settings/scheduler/run/`, `GET|PUT /settings/notifications/`, `POST /settings/notifications/test/`; `history_retention_days` in scheduler settings.
-- `GET /user/list/`, `PATCH /user/{id}/` (admin); `/user/me/` reports `using_default_password`. `phone_number` is now optional when creating users.
+- **"Needs attention" dashboard**: everything wrong across all assets in one list, with scheduler status.
+- **Activity log**: every check compared with the previous one, recorded as events, with severity filters.
+- **Smarter alerts** for recoveries, outages and expiry, not only new listings. Slack and Discord get formatted messages; other webhooks get JSON.
+- **Assets at scale**: card or table view, sorting, bulk re-check and toggles, CSV export, paging for CIDR imports.
+- Check history per asset, showing which lists changed since the previous check.
+- User management for admins, and data retention (30/90/180/365 days).
+- Command palette (Ctrl/Cmd+K).
+- API: `GET /events/`, `GET /hostname/{id}/events/`, `GET /hostname/{id}/checks/{check_id}`, `POST /hostname/bulk-action/`, scheduler and notification settings endpoints, `GET /user/list/`, `PATCH /user/{id}/`.
+- Bulk monitoring list and bulk check uploads, up to 300 targets (#22, thanks @lokiee0).
+- Custom DKIM selectors (#22). CI running backend tests and frontend lint/build.
 
 ### Security
 
-- **Docker: `.env` values were silently ignored.** `docker-compose.yml` hard-coded `APP_SECRET_KEY`, `DEFAULT_ADMIN_PASSWORD` and `APP_DEBUG=true`, overriding `.env`. Every default Docker deployment shared the public JWT secret `change-me-in-production`, so anyone could forge an admin token. Compose now uses `${VAR:-default}`, and `APP_DEBUG` defaults to `false`.
-- When `APP_SECRET_KEY` is unset (or set to a documented placeholder), a random secret is generated and saved as `.secret_key` next to the database, in the Docker volume.
-- Public sign-up is disabled: `POST /user/create/` now requires an admin. Changing scheduler settings is admin-only.
-- New `POST /user/change-password/` and a Settings form. Changing the password revokes all previously issued tokens.
-- `/tools/*` endpoints now require sign-in (they make outbound connections and use the AbuseIPDB quota). Only `/blacklist/quick-check/` stays public, rate limited to 10 requests per minute per client.
-- SSRF guards: Server Status and SSL checks refuse private, loopback, link-local and cloud-metadata addresses, including through redirects (every hop is re-validated).
-- Login lockout after 5 failed attempts per client and username for 15 minutes. Rate limits key on the real client IP behind the bundled proxy, so one client can't lock out everyone.
-- DMARC uploads: decompressed size is capped at 10 MB (gzip/zip bomb protection).
-- Replaced `python-jose` (unpatched CVE, plus `ecdsa`/`pyasn1`) with `PyJWT`. Existing sessions remain valid.
-- Dependency updates for all open advisories: FastAPI 0.142 / Starlette 1.7, python-multipart 0.0.32, requests 2.34, axios 1.20, Vite 6.4.4, react-router 7.18, PostCSS 8.5.29, and refreshed transitive packages. Test tools moved to `requirements-dev.txt` so they no longer ship in the image.
-- Added `.dockerignore` files so local databases, secrets and `node_modules` aren't copied into images.
+- **Compose hard-coded `APP_SECRET_KEY`, overriding `.env`.** Every default deployment shared the public secret `change-me-in-production`, so anyone could forge an admin token. Compose uses `${VAR:-default}` now and `APP_DEBUG` defaults to false.
+- An unset secret generates a random one, saved as `.secret_key` in the volume.
+- Public sign-up disabled; `POST /user/create/` needs an admin. Changing a password revokes issued tokens.
+- `/tools/*` requires sign-in. Only `/blacklist/quick-check/` stays public, at 10 requests a minute.
+- SSRF guards on Server Status and SSL, re-validating every redirect hop.
+- Login lockout after 5 failures per client and username for 15 minutes.
+- DMARC uploads capped at 10 MB decompressed.
+- Replaced `python-jose` (unpatched CVE) with PyJWT. Dependency updates across all open advisories.
+- `.dockerignore` files so local databases and secrets are not copied into images.
 
 ### Fixed
 
 - Scheduled monitoring stopped after its first run with `can't subtract offset-naive and offset-aware datetimes` (#20).
-- Creating an asset could be checked twice at once by the scheduler, leaving two "current" results.
-- Asset detail: the Server Status tab showed blanks and the WHOIS tab showed only raw output (field-name mismatches with the API).
+- A new asset could be checked twice at once, leaving two current results.
 - Dashboard "Currently listed" was always 0, so the favicon alert never showed.
-- Delist requests from the asset page always failed (missing check id), and the backend updated the wrong part of the stored result. Requests are now saved reliably.
-- SPF check ignored `redirect=` (e.g. Google's `v=spf1 redirect=_spf.google.com`), grading those domains as having no SPF policy. The redirected record is now followed.
-- Long TXT records (split into several strings by DNS) were parsed with stray quotes, which could break SPF and DMARC parsing.
-- Spamhaus/CBL "refused" answers (`127.255.255.x`, e.g. when queried through public resolvers) were counted as clean. They are now reported as "no answer".
-- Results where many providers don't answer are marked inconclusive and don't flip an asset's listed/clean status.
-- Timestamps from the API now carry a UTC offset, so "x minutes ago" is correct outside UTC.
-- CSV export didn't work for the public quick check and re-ran the whole DNSBL check; it's now generated in the browser from the results on screen.
-- Bulk asset creation ignored `check_interval_minutes`.
-- Automatic schema migration could fail when adding a non-nullable column to a SQLite table with rows.
-- Asset list loaded every historical check result for every asset; it now loads only the latest one.
-- Toasts were shown twice on pages with nested toast containers.
-
-### Added
-
-- Edit an asset's checks, monitoring, alerts and interval from its detail page.
-- Bulk monitoring list (up to 300 targets, paste or upload TXT/CSV/XLSX) and bulk check uploads, thanks to @lokiee0 (#22).
-- Signed-in users opening `/login` are sent to the dashboard instead of a 404.
-- Custom DKIM selectors for the SPF/DKIM/DMARC check (#22).
-- DMARC reports keep every DKIM/SPF result per record (#22).
-- Delist flow links to each provider's removal page and tracks "removal requested" for any listed provider.
-- `GET /user/me/`, `POST /tools/bulk-check/` (JSON body for long lists).
-- CI workflow running the backend tests (71 offline tests) and frontend lint/build on every PR.
-- 404 page.
+- Delist requests from the asset page always failed.
+- SPF ignored `redirect=`, grading those domains as having no policy.
+- Long TXT records split by DNS were parsed with stray quotes.
+- Timestamps carry a UTC offset, so relative times are right outside UTC.
+- The asset list loaded every historical result for every asset.
 
 ### Changed
 
-- The scheduler is enabled by default (`SCHEDULER_ENABLED=true`). New assets have scheduled monitoring on by default.
-- UI pass across all pages: consistent dark mode (tool pages, tables and dialogs were light-only), labelled form fields, visible keyboard focus, skip link, ARIA tabs on the asset page, `prefers-reduced-motion` support, real API health indicator, and keyboard-accessible asset cards.
-- Removed unused pages/components and the unused `@mantine/*`, `@heroicons/react` and `jwt-decode` dependencies.
-- Docker frontend image uses Node 22 (react-router 7 needs Node 20+).
-- The sidebar and top bar stay in place while scrolling long pages.
-- A server whose certificate is rejected is reported as "HTTPS requests fail" instead of "down".
-
-### Known issues
-
-- `braces` (pulled in by Tailwind CSS 3's file watcher) has an advisory with no patched release; it only affects the build tooling.
+- The scheduler is on by default, as is monitoring for new assets.
+- Accessibility pass: consistent dark mode, labelled fields, visible focus, skip link, ARIA tabs, `prefers-reduced-motion`.
+- Removed unused pages and the `@mantine/*`, `@heroicons/react` and `jwt-decode` dependencies.
 
 ## [1.1.2] - 2026-03-26
 
 ### Added
 
-- Bulk asset creation endpoint (`POST /hostname/bulk/`) — create up to 50 assets in one request.
-- CIDR import endpoint (`POST /hostname/cidr-import/`) and UI dialog — import an IP range (max /24) as monitored assets.
-- Automatic token refresh — axios interceptor silently refreshes expired access tokens using the refresh token, with request queuing for concurrent calls.
-- DMARC aggregate report parsing — upload XML/gz/zip reports, view pass/fail rates per sender, link to monitored domains.
-- Persistent database storage — Docker Compose now uses a named volume (`abusebox-data`) so data survives container restarts.
+- Bulk asset creation (`POST /hostname/bulk/`) and CIDR import (`POST /hostname/cidr-import/`, max /24).
+- Automatic token refresh with request queuing.
+- DMARC aggregate report parsing (XML/gz/zip).
+- Named volume `abusebox-data`, so data survives restarts.
 
 ### Fixed
 
-- DNSBL false positives from Spamhaus and CBL — now validates response codes, only `127.0.0.x` counts as a real listing (#9).
-- Session expiry after 30 minutes of inactivity — frontend now auto-refreshes tokens in the background (#11).
-- API Docs sidebar link pointing to internal Docker hostname `backend:8100` instead of browser-accessible URL (#12).
-- Data loss on Docker restart — SQLite database was stored inside the container with no volume mount (#13).
-- ReDoc page failing to load due to unstable `@next` CDN tag — pinned to stable v2.1.5 (#7).
-- Swagger UI returning "invalid version field" when accessed via Vite proxy — link now opens backend directly.
-- `python-multipart` arbitrary file write vulnerability (upgraded to 0.0.22).
+- DNSBL false positives from Spamhaus and CBL; only `127.0.0.x` counts as a listing (#9).
+- Session expiry after 30 minutes of inactivity (#11).
+- API docs link pointed at the internal `backend:8100` (#12).
+- Data loss on restart: the database was inside the container (#13).
+- ReDoc pinned to 2.1.5 instead of the unstable `@next` tag (#7).
+- `python-multipart` arbitrary file write (0.0.22).
 
 ## [1.1.1] - 2026-03-25
 
 ### Added
 
-- Re-check button on Asset Detail page to re-run all enabled checks on demand.
-- Search and filter on Assets page (by hostname/type, clean/listed status).
-- Auto-refresh toggle (Off/30s/1m/5m) on Dashboard and Assets pages.
-- Copy-to-clipboard buttons on IPs, DNS records, WHOIS data, and SSL details.
-- Relative timestamps ("2 hours ago") with full datetime tooltip on hover.
-- Responsive sidebar with hamburger menu on mobile.
-- Favicon red badge when any monitored asset is blacklisted.
-- Loading skeleton placeholders on Dashboard, Assets, and Asset Detail pages.
-- React error boundary wrapping dashboard routes.
-- Submit button shows spinner during asset creation.
+- Re-check button, search and filter on Assets, auto-refresh toggle, copy buttons, relative timestamps.
+- Responsive sidebar, favicon badge when listed, loading skeletons, error boundary.
 
 ### Changed
 
-- Code splitting via lazy loading — main bundle reduced from 806KB to 324KB.
-- Unified toast library: removed react-hot-toast, kept react-toastify.
-- Auth token now set synchronously at module load, fixing first-request 401 race condition.
-- Backend `int()` env var parsing replaced with safe `parse_int()` helper.
-- Docker Compose `.env` file made optional (`required: false`).
+- Code splitting cut the main bundle from 806KB to 324KB.
+- One toast library; auth token set synchronously, fixing a first-request 401 race.
 
 ### Fixed
 
-- ResultTable/ResultTableQuick crash when `providers` or `detected_on` is null.
-- AssetDetail crash on null API response data.
-- `VITE_BASE_URL` empty fallback breaking API Docs sidebar link.
-- 5 dependency security alerts (flatted, micromatch, requests, js-yaml, nanoid).
+- Crashes on null `providers`, `detected_on` and AssetDetail API data.
+- 5 dependency advisories (flatted, micromatch, requests, js-yaml, nanoid).
 
 ## [1.1.0] - 2026-03-23
 
 ### Added
 
-- Asset management with per-asset check toggles (Blacklist, AbuseIPDB, DNS, SSL, WHOIS, SPF/DKIM/DMARC, Server Status).
-- Asset Detail page with summary cards, history chart, and tabbed results.
-- AbuseIPDB integration for IP reputation scores, abuse reports, ISP & geolocation.
-- DNS Record Viewer (A, AAAA, MX, TXT, CNAME, NS, SOA, PTR).
-- SSL Certificate Checker (validity, expiry, issuer, cipher, SAN list).
-- SPF / DKIM / DMARC email authentication validation with A-F grading.
-- WHOIS Lookup with parsed table and raw output views.
-- Is Server Up? checker (DNS, port scan, HTTP status, response time).
-- Bulk Check for up to 20 IPs/domains in a single request.
-- Subnet / CIDR Check to scan entire /24 ranges against DNSBL providers.
-- Scheduled monitoring with configurable interval and email/webhook alerts.
-- Historical charts showing blacklist detection history per asset.
-- CSV export for blacklist and subnet results.
-- Dark mode toggle persisted to localStorage.
+- Asset management with per-asset check toggles, and an Asset Detail page with history chart.
+- AbuseIPDB, DNS records, SSL checker, SPF/DKIM/DMARC with A-F grading, WHOIS, server-up check.
+- Bulk check (20 targets) and subnet/CIDR scanning.
+- Scheduled monitoring with email and webhook alerts; CSV export; dark mode.
 
 ### Changed
 
-- Sidebar reorganized into "Monitor" and "Check & Lookup" sections.
-- Assets page redesigned with card-based grid layout.
 - DNSBL providers expanded from 40 to 60+.
-- Quick check now includes AbuseIPDB data alongside blacklist results.
-- Refresh token endpoint validates user exists and is active.
-- Docker Compose supports `env_file` for `.env` loading.
-- Default backend port changed from 8000 to 8100.
-- Logo added to sidebar, navbar, favicon, and README.
+- Default backend port 8000 to 8100.
 
 ### Fixed
 
-- `setRequestHeader` ISO-8859-1 crash on authenticated requests.
-- `datetime.utcnow()` deprecation replaced with `datetime.now(timezone.utc)`.
-- Global `socket.setdefaulttimeout()` side effect in DNSBL service.
-- SSL certificate date parsing crash with `%Z` timezone format.
-- ViewReport and HostnameTable crashes on null result data.
-- Asset list error on empty state (auth race condition).
-- `DelistService` typo and unused variables.
-- 25 dependency security alerts (Vite, axios, rollup, react-router-dom, etc.).
+- `setRequestHeader` ISO-8859-1 crash; `datetime.utcnow()` deprecation; global `socket.setdefaulttimeout()` side effect.
+- SSL date parsing crash on `%Z`; crashes on null result data.
+- 25 dependency advisories.
 
 ## [1.0.1] - 2026-03-19
 
 ### Added
 
-- AbuseIPDB integration for IP reputation scores and abuse reports.
-- WHOIS Lookup service with parsed and raw output.
-- Is Server Up? checker with DNS, port scan, and HTTP status.
-- Quick check now fetches AbuseIPDB data alongside DNSBL results.
-- CONTRIBUTING.md guide for contributors.
-- CONTRIBUTORS.txt with project contributors.
-
-### Changed
-
-- Sidebar expanded with AbuseIPDB, WHOIS, and Server Status links.
-- Backend Dockerfile updated for improved build caching.
-- README updated with new features and configuration details.
+- AbuseIPDB, WHOIS and server-up checks; CONTRIBUTING.md.
 
 ### Fixed
 
-- Vite security hardening (strict fs, CORS, allowed hosts).
-- Frontend dependency security updates (package.json resolutions).
-- Backend dependency version pinning for passlib and cryptography.
+- Vite hardening (strict fs, CORS, allowed hosts) and frontend dependency updates.
 
 ## [1.0.0] - 2026-03-02
 
 ### Added
 
-- FastAPI backend architecture with modular routing and services.
-- DNSBL blacklist monitoring against 40+ providers.
-- JWT-based authentication and seeded default admin account.
-- Dashboard with monitoring summary and hostname management.
-- Delist workflow for requesting removal from supported providers.
-- Landing page with instant blacklist quick check.
-- Docker Compose deployment.
+- FastAPI backend, DNSBL monitoring against 40+ providers, JWT auth, dashboard, delist workflow, landing page with quick check, Docker Compose deployment.
 
 ### Changed
 
-- Frontend UI/UX overhaul for landing, login, dashboard, and tables.
-- Project license migrated to MIT.
-- Project marked as actively maintained.
+- Licensed MIT.
