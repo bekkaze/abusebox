@@ -179,7 +179,7 @@ function SidebarLink({ item, collapsed, onClose }) {
   const isActive = !isExternal && (pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(`${item.path}/`)))
   const classes = classNames(
     isActive
-      ? 'bg-rail-active text-rail-ink font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent'
+      ? 'bg-rail-active text-rail-ink font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-rail-marker'
       : 'text-rail-ink-2 hover:text-rail-ink hover:bg-rail-active/60',
     collapsed ? 'justify-center px-0' : 'px-2.5',
     linkClass

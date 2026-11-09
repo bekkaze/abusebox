@@ -16,6 +16,7 @@ module.exports = {
         rail: {
           DEFAULT: token('rail'), ink: token('rail-ink'),
           'ink-2': token('rail-ink-2'), rule: token('rail-rule'), active: token('rail-active'),
+          marker: token('rail-marker'),
         },
         sunk: token('sunk'),
         ink: { DEFAULT: token('ink'), 2: token('ink-2'), 3: token('ink-3') },
