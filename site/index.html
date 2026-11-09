@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AbuseBox: self-hosted blacklist and email security monitor</title>
-  <meta name="description" content="AbuseBox watches your own IPs and domains: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime. Self-hosted, MIT licensed, and honest about blacklists that refuse to answer.">
+  <meta name="description" content="AbuseBox watches your own IPs and domains: 24 DNS blacklists, SSL and domain expiry, SPF/DKIM/DMARC and uptime. It scores every asset out of 100 so you know which to fix first. Self-hosted, MIT licensed, and honest about blacklists that refuse to answer.">
   <meta name="theme-color" content="#f1f3f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0c0e12" media="(prefers-color-scheme: dark)">
   <link rel="icon" type="image/png" href="logo.png">
@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="style.css">
   <meta property="og:type" content="website">
   <meta property="og:title" content="AbuseBox">
-  <meta property="og:description" content="Self-hosted monitor for your IPs and domains: blacklists, certificates, email authentication and uptime.">
+  <meta property="og:description" content="Self-hosted monitor for your IPs and domains: blacklists, certificates, email authentication and uptime, with a risk score that ranks what to fix first.">
   <meta property="og:url" content="https://bekkaze.github.io/abusebox/">
   <meta property="og:image" content="https://bekkaze.github.io/abusebox/screens/dashboard.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -38,7 +38,7 @@
       <div class="wrap">
         <div>
           <h1 id="hero-title">Find the blacklist listing before your users find the bounce.</h1>
-          <p class="lede">AbuseBox is a self-hosted monitor for the IPs and domains you run. It checks them on a schedule against 24 DNS blacklists, SSL and domain expiry, SPF, DKIM and DMARC, and uptime, then tells you what changed and why.</p>
+          <p class="lede">AbuseBox is a self-hosted monitor for the IPs and domains you run. It checks them on a schedule against 24 DNS blacklists, SSL and domain expiry, SPF, DKIM and DMARC, and uptime, scores each one out of 100, and tells you what changed and why.</p>
           <div class="actions">
             <a class="btn btn-primary" href="#install">Install with Docker</a>
             <a class="btn btn-secondary" href="https://github.com/bekkaze/abusebox">View on GitHub</a>
@@ -91,6 +91,20 @@
       </div>
     </section>
 
+    <section class="band" id="rank" aria-labelledby="rank-title">
+      <div class="wrap">
+        <div>
+          <h2 id="rank-title">Which one to fix first</h2>
+          <p class="intro">Counting findings puts the harmless asset on top. One Spamhaus listing stops your mail; three cosmetic warnings do not.</p>
+        </div>
+        <div class="body">
+          <p>Every asset scores out of 100, weighted by what the finding actually costs you. A listing counts by the severity that list's own return codes decode to, so the same "listed on 1 of 24" is 34 on a critical list and 10 on one that only marks dynamic ranges.</p>
+          <p>Six factors share the 100, ordered by how directly each stops mail being delivered: blacklists 40, reachability 20, certificate 14, domain 12, email authentication 8, reputation 6. Each one saturates, so a tenth listing moves the number far less than the first.</p>
+          <p>The score shows its working: every factor, what it contributed and out of what. An asset whose checks have not run is not scored as healthy, because missing evidence is not a finding. It ranks your assets against each other and is not calibrated against delivery outcomes.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="band" aria-labelledby="checks-title">
       <div class="wrap">
         <div>
@@ -105,6 +119,7 @@
           <dt>DNS</dt><dd>A, AAAA, MX, TXT, CNAME, NS, SOA and PTR records.</dd>
           <dt>Email-Auth</dt><dd>SPF, DKIM and DMARC, graded A to F, plus DMARC report parsing.</dd>
           <dt>Server-Status</dt><dd>DNS resolution, ports 80 and 443, HTTP status and response time.</dd>
+          <dt>Owner</dt><dd>The team or person responsible for an asset, searchable with its hostname.</dd>
         </dl>
       </div>
     </section>
@@ -117,8 +132,8 @@
         </figure>
         <div class="shot-grid">
           <figure class="panel shot">
-            <img src="screens/asset_details.png" alt="One asset's report: verdict, header fields and the blacklist table" width="1440" height="900" loading="lazy">
-            <figcaption>Every asset gets a full report and a history of its checks.</figcaption>
+            <img src="screens/asset_details.png" alt="One asset's report: the verdict, a risk score of 43 out of 100 and the factors that produced it" width="1440" height="900" loading="lazy">
+            <figcaption>Every asset gets a score with its factors, a full report and a history of its checks.</figcaption>
           </figure>
           <figure class="panel shot">
             <img src="screens/dashboard_dark.png" alt="The dashboard in dark mode" width="1440" height="900" loading="lazy">
