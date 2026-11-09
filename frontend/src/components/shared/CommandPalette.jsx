@@ -5,6 +5,7 @@ import { HiOutlineArrowRight, HiOutlineCog6Tooth, HiOutlineMagnifyingGlass } fro
 import { DASHBOARD_SIDEBAR_SECTIONS } from '../dashboard/constants';
 import HostnameService from '../../services/hostname';
 import { SeverityCode } from './activity';
+import { assetTypeLabel } from '../dashboard/blacklistMonitor/assetForm';
 
 const SETTINGS_SHORTCUTS = [
   { key: 'settings-notifications', label: 'Notification settings', to: '/dashboard/settings?tab=notifications' },
@@ -52,7 +53,7 @@ export default function CommandPalette({ open, onClose }) {
     key: `asset-${a.id}`,
     label: a.hostname,
     mono: true,
-    hint: a.health?.issues?.[0]?.message || a.description || (a.hostname_type === 'ipv4' ? 'IPv4' : 'Domain'),
+    hint: a.health?.issues?.[0]?.message || a.description || assetTypeLabel(a.hostname_type),
     to: `/dashboard/assets/${a.id}`,
     icon: <SeverityCode severity={assetSeverity(a)} />,
     group: q ? 'Assets' : 'Needs attention',

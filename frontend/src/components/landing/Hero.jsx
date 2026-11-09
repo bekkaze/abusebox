@@ -109,7 +109,7 @@ const Hero = () => {
 
             <div className='mt-8'>
               <LookupForm
-                label='Check a domain or IPv4 address now'
+                label='Check a domain or IP address now'
                 value={hostname}
                 onChange={setHostname}
                 onSubmit={handleCheck}

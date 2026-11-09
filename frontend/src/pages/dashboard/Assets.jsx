@@ -11,6 +11,7 @@ import { useAuth } from "../../services/auth/authProvider";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
 import CidrImportDialog from "../../components/dashboard/blacklistMonitor/CidrImportDialog";
 import BulkMonitorDialog from "../../components/dashboard/blacklistMonitor/BulkMonitorDialog";
+import { assetTypeLabel } from "../../components/dashboard/blacklistMonitor/assetForm";
 import { SkeletonLine } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
@@ -178,7 +179,7 @@ function exportAssetsCsv(assets) {
   downloadCsv(rows, `abusebox-assets-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
-const typeLabel = (item) => (item.hostname_type === 'ipv4' ? 'IPv4' : 'Domain');
+const typeLabel = (item) => assetTypeLabel(item.hostname_type);
 
 function HealthBadge({ item }) {
   const health = healthOf(item);
