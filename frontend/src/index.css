@@ -12,10 +12,11 @@
   The navigation sits a step behind the canvas in both themes, so the content
   is what comes forward. Light goes darker, dark goes darker still; either way
   the rail recedes and `paper` advances, which is what keeps the selected item
-  legible against it. The navigation is the exception and sits outside that
-  scheme: it is one dark navy in both themes, drawn from the logo's blue end
-  (mean rgb(11,72,151) over 27k pixels) while `accent` takes the teal, and it
-  carries its own ink because the page's would be unreadable on it.
+  legible against it. The navigation sits outside that scheme and carries its
+  own ink, because the page's would be unreadable on it. It is navy, drawn from
+  the logo's blue end (mean rgb(11,72,151) over 27k pixels) while `accent`
+  takes the teal, and it follows the theme: lighter in light, and darker than
+  the page in dark so it recedes like everything else.
   White paper, ink, hairline rules; status classes borrowed from SMTP
   (5.x listed, 4.x no answer, 2.x clear); the logo's teal is the only accent.
   Colours are RGB channels so Tailwind opacity modifiers work.
@@ -23,15 +24,16 @@
 :root {
   --canvas: 241 243 246;       /* page background the panels sit on */
   --paper: 255 255 255;        /* panels and content */
-  /* The navigation is its own dark surface in both themes, not a tint of the
-     page, so it carries its own ink. The navy is the logo's blue taken down to
-     a value that reads as navy rather than as the mark's blue: 14:1 against the
-     light page and still distinct against the dark one. */
-  --rail: 5 35 72;
-  --rail-ink: 232 238 247;     /* 13.6:1 on the rail */
-  --rail-ink-2: 169 189 216;   /* 8.3:1, for anything not selected */
-  --rail-rule: 20 58 104;
-  --rail-active: 22 74 133;    /* the selected row, 1.8 against the rail */
+  /* The navigation is its own dark surface, not a tint of the page, so it
+     carries its own ink. Navy rather than teal on purpose: `accent` is the
+     teal, and an accent sitting on its own hue reads as a shade of the chrome
+     rather than as a separate signal. The two are the ends of the logo's
+     gradient doing two different jobs. */
+  --rail: 11 55 108;           /* 10.6:1 against the page */
+  --rail-ink: 232 238 247;     /* 10.1:1 on the rail */
+  --rail-ink-2: 169 189 216;   /* 6.2:1, for anything not selected */
+  --rail-rule: 27 74 133;
+  --rail-active: 26 82 150;    /* the selected row, 1.5 against the rail */
   --sunk: 248 249 250;         /* table heads, inset fields */
   --ink: 20 23 28;
   --ink-2: 88 96 108;          /* field names, secondary text (6.3:1 on paper) */
@@ -61,13 +63,13 @@
 .dark {
   --canvas: 12 14 18;
   --paper: 23 26 32;
-  /* Same navy in dark mode. One nav, one colour: it reads as a surface of its
-     own rather than a slightly different shade of the page. */
-  --rail: 5 35 72;
+  /* Darker than the page here, so the nav recedes in dark the way everything
+     else does, while keeping the blue: red stays at 0 and blue at 12. */
+  --rail: 0 5 12;              /* 1.06 against the page, ink-2 at 10.7:1 */
   --rail-ink: 232 238 247;
   --rail-ink-2: 169 189 216;
-  --rail-rule: 20 58 104;
-  --rail-active: 22 74 133;
+  --rail-rule: 10 31 58;
+  --rail-active: 13 48 88;     /* 1.54 against the rail */
   --sunk: 28 32 38;
   --ink: 231 234 238;
   --ink-2: 158 166 177;
