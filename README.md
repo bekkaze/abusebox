@@ -12,7 +12,7 @@ Self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL a
 
 [![Release](https://img.shields.io/github/v/release/bekkaze/abusebox)](https://github.com/bekkaze/abusebox/releases)
 [![CI](https://github.com/bekkaze/abusebox/actions/workflows/ci.yml/badge.svg)](https://github.com/bekkaze/abusebox/actions/workflows/ci.yml)
-[![Docker images](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-0d757f?logo=docker&logoColor=white)](https://github.com/bekkaze?tab=packages&repo_name=abusebox)
+[![Docker images](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-942fed?logo=docker&logoColor=white)](https://github.com/bekkaze?tab=packages&repo_name=abusebox)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/bekkaze/abusebox?style=social)](https://github.com/bekkaze/abusebox/stargazers)
 
@@ -34,6 +34,7 @@ Open `http://localhost:3000` and sign in as `admin` with the password from `dock
 - **Results you can trust.** Before trusting a blacklist, AbuseBox checks it against its test addresses (RFC 5782). A list that refuses your resolver shows **No answer**, not a false "clean". Try it: through Google DNS, Spamhaus says "not listed" for everything.
 - **Every listing explained.** Spamhaus SBL (a spam source) and PBL (an end-user range) are not the same problem. Each listing comes with its meaning and a severity, so you know what to fix first.
 - **Mail-server health in one place.** 24 blacklists, AbuseIPDB, SSL and domain expiry, SPF/DKIM/DMARC grades, DMARC reports and uptime.
+- **Ranked by what actually matters.** Every asset gets a risk score out of 100, weighted by the severity each blacklist's own return codes decode to, so one critical listing outranks three cosmetic ones. The score shows its working: every factor, what it contributed, and out of what.
 - **Tells you what changed.** Scheduled checks, an activity log, and alerts by email, Slack, Discord or webhook when something is listed, delisted, goes down or is about to expire.
 - **Yours.** Self-hosted, MIT licensed, no telemetry, no paid tier.
 
@@ -46,7 +47,8 @@ If AbuseBox saves you a bounce, a star helps other mail operators find it.
 **Monitoring**
 - Add IPs and domains as assets (one by one, a list of up to 300, or a whole /24) and choose which checks run on each
 - Scheduled re-checks on a global or per-asset interval, plus a "check due assets now" button
-- A dashboard that opens on what needs action: listings, invalid or expiring certificates, expiring domains, servers down, weak email security
+- A dashboard that opens on what needs action, ordered by a 0-100 risk score built from each asset's own findings
+- A risk score per asset with its factors broken out: blacklists, reachability, certificate, domain, email authentication and reputation
 - An activity log of every change, check history with what changed between checks, and blacklist history charts
 - Alerts by email, Slack, Discord or webhook for new listings, removals, outages, recoveries and expiry warnings
 
@@ -62,7 +64,9 @@ If AbuseBox saves you a bounce, a star helps other mail operators find it.
 
 **Day to day**
 - Delist tracking with links to each blacklist's removal page
-- Table or card view, search, filters, sorting, bulk actions and CSV export
+- Table or card view, with search, filters, sorting and paging all done on the server, so page one is the top of the real order however many assets you have
+- An owner per asset, searchable alongside hostname, type and description
+- Bulk actions and CSV export
 - Command palette (Ctrl/Cmd + K), light and dark themes, a mobile layout
 - Multiple users with admin roles, optional history retention, and a REST API with Swagger docs
 - A public quick-check page (rate limited) that needs no account; everything else requires sign-in
@@ -355,6 +359,7 @@ POST /hostname/cidr-import/
 POST /hostname/{id}/recheck/
 POST /hostname/bulk-action/             # {"ids": [1, 2], "action": "recheck"}
 GET  /hostname/list/?include_result=false
+GET  /hostname/page/?page=1&page_size=25&sort=urgency&filter=attention&search=mail
 GET  /hostname/{id}/checks/{check_id}
 GET  /hostname/{id}/events/
 GET  /events/?severity=critical
@@ -433,6 +438,7 @@ abusebox/
 
 | Version | Date | Highlights |
 |---|---|---|
+| **v1.4.0** | November 9, 2026 | A 0-100 risk score per asset, weighted by listing severity and shown with its working; assets paged, sorted and searched on the server; an owner per asset; a rebuilt navigation with an account menu; a new mark, violet palette and favicon |
 | **v1.3.6** | November 8, 2026 | A mail server's hostname gets the DMARC policy and DKIM key of the domain it belongs to (#40), an obsolete TLS version is reported instead of failing the check, the first admin password is no longer written to the log |
 | **v1.3.5** | November 6, 2026 | WHOIS on a mail server's hostname looks up the domain it belongs to (#39), a record kept from an earlier check says how old it is, CodeQL analysis |
 | **v1.3.4** | November 5, 2026 | WHOIS works where a registry blocks IPv4 but answers over IPv6, `.nl` records read correctly, rate-limit replies no longer look like empty records (#36), install templates for Unraid, Portainer and CasaOS (#31, #32) |
