@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Logo from "../components/shared/Logo";
 
 import { useAuth } from "../services/auth/authProvider";
 import { loginUser } from "../services/auth/authService";
@@ -45,7 +46,7 @@ const Login = () => {
     <main className="min-h-screen bg-canvas flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2.5 mb-6">
-          <img src="/logo.png" alt="" className="h-9 w-9 rounded-md object-cover" />
+          <Logo className="h-9 w-9 text-accent" title="" />
           <span className="text-xl font-semibold tracking-tight text-ink">AbuseBox</span>
         </div>
 

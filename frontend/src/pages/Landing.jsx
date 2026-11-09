@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/landing/Navbar';
 import Hero from '../components/landing/Hero';
 import CopyButton from '../components/shared/CopyButton';
+import Logo from '../components/shared/Logo';
 import { Field, Fields, StatusTag, linkClass } from '../components/shared/ui';
 import { useAuth } from '../services/auth/authProvider';
 
@@ -88,7 +89,7 @@ const LandingPage = () => {
       <footer className='border-t border-rule bg-paper'>
         <div className='max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-wrap items-center justify-between gap-4 text-sm'>
           <p className='flex items-center gap-2 text-ink-2'>
-            <img src='/logo.png' alt='' className='h-5 w-5 rounded object-cover' />
+            <Logo className='h-5 w-5 text-accent' title="" />
             <span className='font-semibold text-ink'>AbuseBox</span>
             <span>MIT licensed</span>
           </p>

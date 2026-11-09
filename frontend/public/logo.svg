@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="AbuseBox">
+  <title>AbuseBox</title>
+  <!--
+    The mark is an A whose counter is a box, so it reads as the initial and as
+    the product name at once. One colour, one stroke weight, no gradient: it
+    has to hold at 16px in a favicon and at a metre on a slide, and anything
+    that only works at one of those is decoration rather than a mark.
+
+    The teal is set here because a file used as a favicon or in a README has
+    nothing to inherit it from. The app uses components/shared/Logo.jsx, which
+    keeps currentColor so the navigation can colour it with its own ink.
+  -->
+  <g fill="none" stroke="#0d757f" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9.5 38 L14 28 V14.5 A4.5 4.5 0 0 1 18.5 10 H29.5 A4.5 4.5 0 0 1 34 14.5 V28 L38.5 38"/>
+    <path d="M14 28 H34"/>
+  </g>
+</svg>

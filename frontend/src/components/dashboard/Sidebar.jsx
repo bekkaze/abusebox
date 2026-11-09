@@ -3,6 +3,7 @@ import { DASHBOARD_SIDEBAR_BOTTOM_LINKS, DASHBOARD_SIDEBAR_SECTIONS } from './co
 import { Link, useLocation } from 'react-router-dom'
 import { HiChevronRight, HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiXMark } from 'react-icons/hi2'
 import classNames from 'classnames'
+import Logo from '../shared/Logo'
 
 const linkClass =
   'relative flex items-center h-8 gap-2.5 rounded-md text-sm transition-colors hover:no-underline'
@@ -65,7 +66,7 @@ export default function Sidebar({ open, onClose }) {
             // would otherwise fall back to its title for an accessible name.
             aria-label={collapsed ? 'AbuseBox, go to dashboard' : undefined}
           >
-            <img src="/logo.png" alt="" className='h-7 w-7 flex-shrink-0 rounded-md object-cover' />
+            <Logo className='h-7 w-7 flex-shrink-0 text-rail-ink' title="" />
             {!collapsed && <span className='text-[15px] font-semibold tracking-tight text-rail-ink truncate'>AbuseBox</span>}
           </Link>
           <button
