@@ -12,10 +12,10 @@
   The navigation sits a step behind the canvas in both themes, so the content
   is what comes forward. Light goes darker, dark goes darker still; either way
   the rail recedes and `paper` advances, which is what keeps the selected item
-  legible against it. Its tint comes from the logo rather than being picked:
-  the mark is a teal-to-blue gradient, and the nav takes the blue end
-  (mean rgb(11,72,151) over 27k pixels) while `accent` takes the teal. Light is
-  that blue mixed 8% into the canvas, dark is it at 4% of its value.
+  legible against it. The navigation is the exception and sits outside that
+  scheme: it is one dark navy in both themes, drawn from the logo's blue end
+  (mean rgb(11,72,151) over 27k pixels) while `accent` takes the teal, and it
+  carries its own ink because the page's would be unreadable on it.
   White paper, ink, hairline rules; status classes borrowed from SMTP
   (5.x listed, 4.x no answer, 2.x clear); the logo's teal is the only accent.
   Colours are RGB channels so Tailwind opacity modifiers work.
@@ -23,7 +23,15 @@
 :root {
   --canvas: 241 243 246;       /* page background the panels sit on */
   --paper: 255 255 255;        /* panels and content */
-  --rail: 223 229 238;         /* navigation: the logo's blue, 8% into the canvas */
+  /* The navigation is its own dark surface in both themes, not a tint of the
+     page, so it carries its own ink. The navy is the logo's blue taken down to
+     a value that reads as navy rather than as the mark's blue: 14:1 against the
+     light page and still distinct against the dark one. */
+  --rail: 5 35 72;
+  --rail-ink: 232 238 247;     /* 13.6:1 on the rail */
+  --rail-ink-2: 169 189 216;   /* 8.3:1, for anything not selected */
+  --rail-rule: 20 58 104;
+  --rail-active: 22 74 133;    /* the selected row, 1.8 against the rail */
   --sunk: 248 249 250;         /* table heads, inset fields */
   --ink: 20 23 28;
   --ink-2: 88 96 108;          /* field names, secondary text (6.3:1 on paper) */
@@ -53,7 +61,13 @@
 .dark {
   --canvas: 12 14 18;
   --paper: 23 26 32;
-  --rail: 4 6 9;              /* the logo's blue at 4% value */
+  /* Same navy in dark mode. One nav, one colour: it reads as a surface of its
+     own rather than a slightly different shade of the page. */
+  --rail: 5 35 72;
+  --rail-ink: 232 238 247;
+  --rail-ink-2: 169 189 216;
+  --rail-rule: 20 58 104;
+  --rail-active: 22 74 133;
   --sunk: 28 32 38;
   --ink: 231 234 238;
   --ink-2: 158 166 177;

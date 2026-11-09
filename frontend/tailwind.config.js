@@ -13,7 +13,10 @@ module.exports = {
       colors: {
         canvas: token('canvas'),
         paper: token('paper'),
-        rail: token('rail'),
+        rail: {
+          DEFAULT: token('rail'), ink: token('rail-ink'),
+          'ink-2': token('rail-ink-2'), rule: token('rail-rule'), active: token('rail-active'),
+        },
         sunk: token('sunk'),
         ink: { DEFAULT: token('ink'), 2: token('ink-2'), 3: token('ink-3') },
         rule: { DEFAULT: token('rule'), strong: token('rule-strong') },

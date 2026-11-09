@@ -49,7 +49,7 @@ export default function Sidebar({ open, onClose }) {
       )}
 
       <aside aria-label='Main navigation' className={classNames(
-        'bg-rail px-3 pb-3 flex flex-col border-r border-rule/70 overflow-y-auto overflow-x-hidden',
+        'bg-rail px-3 pb-3 flex flex-col border-r border-rail-rule overflow-y-auto overflow-x-hidden',
         'fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:flex-shrink-0',
         'transition-[transform,width] duration-200 ease-out',
         collapsed ? 'w-60 lg:w-[4.25rem]' : 'w-60',
@@ -66,12 +66,12 @@ export default function Sidebar({ open, onClose }) {
             aria-label={collapsed ? 'AbuseBox, go to dashboard' : undefined}
           >
             <img src="/logo.png" alt="" className='h-7 w-7 flex-shrink-0 rounded-md object-cover' />
-            {!collapsed && <span className='text-[15px] font-semibold tracking-tight text-ink truncate'>AbuseBox</span>}
+            {!collapsed && <span className='text-[15px] font-semibold tracking-tight text-rail-ink truncate'>AbuseBox</span>}
           </Link>
           <button
             type='button'
             onClick={onClose}
-            className='lg:hidden p-1.5 rounded-md text-ink-2 hover:bg-paper hover:text-ink'
+            className='lg:hidden p-1.5 rounded-md text-rail-ink-2 hover:bg-rail-active hover:text-rail-ink'
             aria-label='Close navigation'
           >
             <HiXMark className='text-lg' aria-hidden='true' />
@@ -84,14 +84,14 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </nav>
 
-        <div className='flex flex-col gap-px pt-3 mt-4 border-t border-rule'>
+        <div className='flex flex-col gap-px pt-3 mt-4 border-t border-rail-rule'>
           {DASHBOARD_SIDEBAR_BOTTOM_LINKS.map(item => (
             <SidebarLink key={item.key} item={item} collapsed={collapsed} onClose={onClose} />
           ))}
           <button
             type='button'
             onClick={() => setRailed(!railed)}
-            className={classNames('hidden lg:flex w-full text-ink-2 hover:text-ink hover:bg-paper/70 px-2.5', linkClass)}
+            className={classNames('hidden lg:flex w-full text-rail-ink-2 hover:text-rail-ink hover:bg-rail-active/60 px-2.5', linkClass)}
             aria-label={railed ? 'Expand navigation' : 'Collapse navigation'}
             title={railed ? 'Expand navigation' : 'Collapse navigation'}
           >
@@ -118,7 +118,7 @@ function Section({ section, collapsed, pathname, onClose }) {
   if (!section.collapsible) {
     return (
       <div>
-        {!collapsed && <p className='px-2.5 mb-1 text-xs font-medium text-ink-2'>{section.label}</p>}
+        {!collapsed && <p className='px-2.5 mb-1 text-xs font-medium text-rail-ink-2'>{section.label}</p>}
         <div className='flex flex-col gap-px'>
           {section.links.map((item) => (
             <SidebarLink key={item.key} item={item} collapsed={collapsed} onClose={onClose} />
@@ -152,7 +152,7 @@ function Section({ section, collapsed, pathname, onClose }) {
         onClick={() => setOpen(!expanded)}
         aria-expanded={expanded}
         aria-controls={panelId}
-        className='group flex w-full items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-ink-2 transition-colors hover:text-ink'
+        className='group flex w-full items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-rail-ink-2 transition-colors hover:text-rail-ink'
       >
         {/* A caret, which is what people expect of a section that opens. */}
         <HiChevronRight
@@ -160,7 +160,7 @@ function Section({ section, collapsed, pathname, onClose }) {
           aria-hidden='true'
         />
         <span className='truncate'>{section.label}</span>
-        <span className='ml-auto tabular-nums text-ink-2'>{section.links.length}</span>
+        <span className='ml-auto tabular-nums text-rail-ink-2'>{section.links.length}</span>
       </button>
       {expanded && (
         <div id={panelId} className='mt-1 flex flex-col gap-px'>
@@ -179,8 +179,8 @@ function SidebarLink({ item, collapsed, onClose }) {
   const isActive = !isExternal && (pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(`${item.path}/`)))
   const classes = classNames(
     isActive
-      ? 'bg-paper text-ink font-semibold ring-1 ring-rule shadow-[0_1px_2px_rgb(20_23_28/0.06)] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-px before:bg-accent'
-      : 'text-ink-2 hover:text-ink hover:bg-paper/70',
+      ? 'bg-rail-active text-rail-ink font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent'
+      : 'text-rail-ink-2 hover:text-rail-ink hover:bg-rail-active/60',
     collapsed ? 'justify-center px-0' : 'px-2.5',
     linkClass
   )
