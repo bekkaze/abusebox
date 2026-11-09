@@ -206,44 +206,36 @@ Monitoring that says what needs attention, plus a security and accessibility ove
 ### Added
 
 - **"Needs attention" dashboard**: everything wrong across all assets in one list, with scheduler status.
-- **Activity log**: every check compared with the previous one, recorded as events, with severity filters.
-- **Smarter alerts** for recoveries, outages and expiry, not only new listings. Slack and Discord get formatted messages; other webhooks get JSON.
-- **Assets at scale**: card or table view, sorting, bulk re-check and toggles, CSV export, paging for CIDR imports.
-- Check history per asset, showing which lists changed since the previous check.
-- User management for admins, and data retention (30/90/180/365 days).
-- Command palette (Ctrl/Cmd+K).
-- API: `GET /events/`, `GET /hostname/{id}/events/`, `GET /hostname/{id}/checks/{check_id}`, `POST /hostname/bulk-action/`, scheduler and notification settings endpoints, `GET /user/list/`, `PATCH /user/{id}/`.
-- Bulk monitoring list and bulk check uploads, up to 300 targets (#22, thanks @lokiee0).
-- Custom DKIM selectors (#22). CI running backend tests and frontend lint/build.
+- **Activity log**: every check compared with the previous one and recorded as events.
+- **Alerts** for recoveries, outages and expiry, not only new listings. Slack and Discord get formatted messages.
+- **Assets at scale**: card or table view, sorting, bulk actions, CSV export, paging for CIDR imports.
+- Check history, user management, data retention, command palette (Ctrl/Cmd+K).
+- API: `/events/`, `/hostname/{id}/events/`, `/hostname/{id}/checks/{id}`, `/hostname/bulk-action/`, scheduler and notification settings, `/user/list/`, `PATCH /user/{id}/`.
+- Bulk monitoring and check uploads, up to 300 targets, and custom DKIM selectors (#22, thanks @lokiee0).
 
 ### Security
 
-- **Compose hard-coded `APP_SECRET_KEY`, overriding `.env`.** Every default deployment shared the public secret `change-me-in-production`, so anyone could forge an admin token. Compose uses `${VAR:-default}` now and `APP_DEBUG` defaults to false.
-- An unset secret generates a random one, saved as `.secret_key` in the volume.
-- Public sign-up disabled; `POST /user/create/` needs an admin. Changing a password revokes issued tokens.
-- `/tools/*` requires sign-in. Only `/blacklist/quick-check/` stays public, at 10 requests a minute.
+- **Compose hard-coded `APP_SECRET_KEY`, overriding `.env`.** Every default deployment shared the public secret `change-me-in-production`, so anyone could forge an admin token. Fixed, and `APP_DEBUG` defaults to false.
+- Public sign-up disabled; `/tools/*` requires sign-in. Only `/blacklist/quick-check/` stays public, at 10 a minute.
 - SSRF guards on Server Status and SSL, re-validating every redirect hop.
-- Login lockout after 5 failures per client and username for 15 minutes.
+- Login lockout after 5 failures for 15 minutes. Changing a password revokes issued tokens.
 - DMARC uploads capped at 10 MB decompressed.
-- Replaced `python-jose` (unpatched CVE) with PyJWT. Dependency updates across all open advisories.
-- `.dockerignore` files so local databases and secrets are not copied into images.
+- Replaced `python-jose` (unpatched CVE) with PyJWT, plus updates across all open advisories.
 
 ### Fixed
 
-- Scheduled monitoring stopped after its first run with `can't subtract offset-naive and offset-aware datetimes` (#20).
+- Scheduled monitoring stopped after its first run (#20).
 - A new asset could be checked twice at once, leaving two current results.
 - Dashboard "Currently listed" was always 0, so the favicon alert never showed.
 - Delist requests from the asset page always failed.
 - SPF ignored `redirect=`, grading those domains as having no policy.
-- Long TXT records split by DNS were parsed with stray quotes.
 - Timestamps carry a UTC offset, so relative times are right outside UTC.
 - The asset list loaded every historical result for every asset.
 
 ### Changed
 
 - The scheduler is on by default, as is monitoring for new assets.
-- Accessibility pass: consistent dark mode, labelled fields, visible focus, skip link, ARIA tabs, `prefers-reduced-motion`.
-- Removed unused pages and the `@mantine/*`, `@heroicons/react` and `jwt-decode` dependencies.
+- Accessibility pass: dark mode throughout, labelled fields, visible focus, skip link, ARIA tabs.
 
 ## [1.1.2] - 2026-03-26
 
