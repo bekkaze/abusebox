@@ -19,6 +19,7 @@ import {
   Alert, EmptyState, PageHeader, linkClass, primaryButtonClass, secondaryButtonClass, selectClass, inputClass,
 } from "../../components/shared/ui";
 import { downloadCsv } from "../../services/tools";
+import { RiskBadge } from "../../components/shared/RiskScore";
 
 const CHECK_BADGE_MAP = {
   check_blacklist: 'BL',
@@ -157,12 +158,13 @@ function healthOf(item) {
 
 function exportAssetsCsv(assets) {
   const rows = [
-    ['Hostname', 'Type', 'Owner', 'Description', 'Listed', 'Listed on', 'Status', 'Issues', 'Monitored', 'Alerts', 'Interval (min)', 'Last checked'],
+    ['Hostname', 'Type', 'Owner', 'Description', 'Risk', 'Listed', 'Listed on', 'Status', 'Issues', 'Monitored', 'Alerts', 'Interval (min)', 'Last checked'],
     ...assets.map((item) => [
       item.hostname,
       item.hostname_type,
       item.owner || '',
       item.description || '',
+      item.health?.risk?.score ?? '',
       item.is_blacklisted ? 'Yes' : 'No',
       item.health?.blacklist?.listed?.join('; ') || '',
       item.health?.status || 'unchecked',
@@ -810,6 +812,7 @@ function AssetCard({ item, selected, onToggle, onDelete }) {
         {item.hostname}
       </Link>
       <p className="mt-0.5 text-xs text-ink-2">{meta.join(' · ')}</p>
+      <RiskBadge risk={item.health?.risk} className="relative z-10 mt-1.5 mr-1.5" />
       {item.owner && (
         <p className="relative z-10 mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-sunk px-2 py-0.5 text-xs text-ink-2" title={`Owner: ${item.owner}`}>
           <HiOutlineUserCircle className="flex-shrink-0 text-sm" aria-hidden="true" />
@@ -830,8 +833,9 @@ function AssetCard({ item, selected, onToggle, onDelete }) {
   );
 }
 
-const SORTABLE = { name: 'Asset', status: 'Health', checked: 'Last-Checked' };
-const ARIA_SORT = { name: 'ascending', status: 'other', checked: 'descending' };
+// Keys are the server's sort names, so a header's key is what goes in the query.
+const SORTABLE = { name: 'Asset', urgency: 'Risk', checked: 'Last-Checked' };
+const ARIA_SORT = { name: 'ascending', urgency: 'descending', checked: 'descending' };
 
 function SortHeader({ sortKey, sort, onSort, className = '' }) {
   const active = sort === sortKey;
@@ -861,7 +865,8 @@ function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSele
             </th>
             <SortHeader sortKey="name" sort={sort} onSort={onSort} />
             <th scope="col" className={`${thBase} px-3`}>Type</th>
-            <SortHeader sortKey="status" sort={sort} onSort={onSort} />
+            <th scope="col" className={`${thBase} px-3`}>Health</th>
+            <SortHeader sortKey="urgency" sort={sort} onSort={onSort} />
             <th scope="col" className={`${thBase} px-3 w-full`}>Findings</th>
             <SortHeader sortKey="checked" sort={sort} onSort={onSort} />
             <th scope="col" className={`${thBase} px-3`}>Checks</th>
@@ -886,6 +891,7 @@ function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSele
                 </td>
                 <td className="px-3 py-2 leading-5 text-ink-2 whitespace-nowrap">{typeLabel(item)}</td>
                 <td className="px-3 py-2 whitespace-nowrap"><HealthBadge item={item} /></td>
+                <td className="px-3 py-2 whitespace-nowrap"><RiskBadge risk={item.health?.risk} /></td>
                 <td className="px-3 py-2 min-w-[16rem]"><FindingList item={item} /></td>
                 <td className="px-3 py-2 leading-5 whitespace-nowrap"><LastChecked item={item} /></td>
                 <td className="px-3 py-2.5 min-w-[7rem]"><CheckTags item={item} /></td>

@@ -7,6 +7,7 @@ import {
   HiOutlineUserCircle,
 } from 'react-icons/hi2';
 import HistoryChart from '../../components/dashboard/home/HistoryChart';
+import { RiskBreakdown } from '../../components/shared/RiskScore';
 import ResultTable from '../../components/blacklist/ResultTable';
 import { ResultVerdict } from '../../components/blacklist/ResultTableQuick';
 import { blacklistReportText } from '../../components/blacklist/reportText';
@@ -344,6 +345,13 @@ export default function AssetDetail() {
       </div>
 
       <div className="mt-6 space-y-8">
+        {/* Why this asset ranks where it does in the list it came from. */}
+        {asset.health?.risk && (
+          <Section title="Risk score">
+            <RiskBreakdown risk={asset.health.risk} />
+          </Section>
+        )}
+
         {(issues.length > 1 || inconclusive) && (
           <div className="space-y-4">
             {issues.length > 1 && (
