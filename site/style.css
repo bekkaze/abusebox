@@ -1,5 +1,5 @@
 /* AbuseBox project site. Same world as the app: results read like a mail
-   delivery report; white panels on a tinted canvas; teal is the only accent. */
+   delivery report; white panels on a tinted canvas; violet is the only accent. */
 
 @font-face {
   font-family: 'Public Sans';
@@ -27,8 +27,8 @@
   --ink: #14171c;
   --ink-2: #58606c;
   --rule: #e2e5ea;
-  --accent: #0d757f;
-  --accent-hover: #095f68;
+  --accent: #942fed;
+  --accent-hover: #7b23c8;
   --accent-ink: #ffffff;
   --s5: #b42318;
   --s5-soft: #fef2f1;
@@ -51,9 +51,9 @@
     --ink: #e7eaee;
     --ink-2: #9ea6b1;
     --rule: #2d323a;
-    --accent: #48c4cc;
-    --accent-hover: #6ed6dc;
-    --accent-ink: #061618;
+    --accent: #cfa0f8;
+    --accent-hover: #dcbdf6;
+    --accent-ink: #110917;
     --s5: #fa786e;
     --s5-soft: #3c1a18;
     --s4: #e8ac4c;

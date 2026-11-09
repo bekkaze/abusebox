@@ -3,9 +3,9 @@
  * and as the product name at once.
  *
  * Inlined rather than loaded as an image so it inherits `currentColor`. The
- * navigation is a dark teal now, and a mark with teal baked into it would sit
- * on teal and disappear; this way each place that uses it says what colour it
- * should be, and a theme change cannot strand it.
+ * navigation is a deep violet, and a mark with that colour baked into it
+ * would sit on it and disappear; this way each place that uses it says what
+ * colour it should be, and a theme change cannot strand it.
  *
  * One stroke weight, no gradient, nothing that only works large: it has to
  * hold at 16px in a favicon and at a metre on a slide.

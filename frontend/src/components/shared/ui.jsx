@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 
 /* Shared building blocks: one vocabulary for surfaces, controls and states,
-   in the Delivery Report world (paper, ink, hairline rules, one teal accent). */
+   in the Delivery Report world (paper, ink, hairline rules, one violet accent). */
 
 export const cardClass = 'panel';
 
