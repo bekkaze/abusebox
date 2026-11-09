@@ -16,7 +16,7 @@ import { getSchedulerStatus, runSchedulerNow } from "../../services/settings";
 import { useAuth } from "../../services/auth/authProvider";
 import useCurrentUser from "../../services/users/useCurrentUser";
 
-const DEFAULT_FAVICON = "/logo.png";
+const DEFAULT_FAVICON = "/favicon.svg";
 const ALERT_FAVICON = "/favicon-alert.svg";
 const ATTENTION_LIMIT = 8;
 
