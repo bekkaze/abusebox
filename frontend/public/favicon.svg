@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="AbuseBox">
+  <title>AbuseBox</title>
+  <!--
+    The favicon is a tile, not the bare mark. A tab bar is light in one browser
+    and near-black in another, and the bare mark's dark inner cube sinks into
+    the dark ones until the whole thing reads as a hollow ring. The tile brings
+    its own background, so contrast is the same everywhere.
+
+    The cube's centre is left the tile's own violet rather than given a third
+    tone: at 16px two tones stay crisp and three turn to mud, and a centre that
+    matches the tile reads as a hole straight through the box, which is the
+    idea anyway.
+  -->
+  <rect width="48" height="48" rx="11" fill="#942fed"/>
+  <g transform="translate(4.80 4.80) scale(0.8)"><g fill="#ffffff"><path d="M24.00 3.00 L40.59 12.58 L34.15 16.29 L24.00 10.43 L13.85 16.29 L7.41 12.58Z"/><path d="M5.81 15.35 L12.25 19.06 L12.25 30.78 L22.40 36.64 L22.40 44.08 L5.81 34.50Z"/><path d="M35.75 19.06 L42.19 15.35 L42.19 34.50 L25.60 44.08 L25.60 36.64 L35.75 30.78Z"/></g><path d="M24.00 14.13 L32.55 19.07 L24.00 24.00 L15.45 19.07Z" fill="#942fed"/><path d="M15.45 19.07 L24.00 24.00 L32.55 19.07 L32.55 28.93 L24.00 33.87 L15.45 28.93Z" fill="#942fed"/></g>
+</svg>

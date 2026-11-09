@@ -1,5 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#0f172a"/>
-  <text x="16" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="18" fill="#22d3ee">A</text>
-  <circle cx="26" cy="6" r="6" fill="#ef4444"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="AbuseBox: assets need action">
+  <title>AbuseBox: assets need action</title>
+  <!--
+    Shown while something is listed. Same tile and mark as favicon.svg so it is
+    recognisably the same product, with a red badge that is legible at 16px.
+    The badge sits on a tile-coloured ring so it detaches from the cube instead
+    of merging with it.
+  -->
+  <rect width="48" height="48" rx="11" fill="#942fed"/>
+  <g transform="translate(4.80 4.80) scale(0.8)"><g fill="#ffffff"><path d="M24.00 3.00 L40.59 12.58 L34.15 16.29 L24.00 10.43 L13.85 16.29 L7.41 12.58Z"/><path d="M5.81 15.35 L12.25 19.06 L12.25 30.78 L22.40 36.64 L22.40 44.08 L5.81 34.50Z"/><path d="M35.75 19.06 L42.19 15.35 L42.19 34.50 L25.60 44.08 L25.60 36.64 L35.75 30.78Z"/></g><path d="M24.00 14.13 L32.55 19.07 L24.00 24.00 L15.45 19.07Z" fill="#942fed"/><path d="M15.45 19.07 L24.00 24.00 L32.55 19.07 L32.55 28.93 L24.00 33.87 L15.45 28.93Z" fill="#942fed"/></g>
+  <circle cx="36.5" cy="11.5" r="11" fill="#942fed"/>
+  <circle cx="36.5" cy="11.5" r="8" fill="#e5322d"/>
 </svg>

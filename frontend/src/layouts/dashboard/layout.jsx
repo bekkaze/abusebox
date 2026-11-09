@@ -26,7 +26,7 @@ function DefaultPasswordBanner() {
         You&apos;re still using this account&apos;s initial password.{' '}
         <Link to='/dashboard/settings?tab=security' className='font-semibold underline'>Change it now</Link>
       </p>
-      <button type='button' onClick={dismiss} className='p-1 -m-1 rounded hover:bg-s4/10' aria-label='Dismiss for this session'>
+      <button type='button' onClick={dismiss} className='grid h-6 w-6 place-items-center -m-0.5 rounded hover:bg-s4/10' aria-label='Dismiss for this session'>
         <HiXMark aria-hidden='true' />
       </button>
     </div>

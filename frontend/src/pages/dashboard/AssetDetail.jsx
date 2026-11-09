@@ -4,8 +4,10 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import {
   HiOutlineArrowLeft, HiOutlineArrowPath, HiOutlineDocumentChartBar, HiOutlinePencilSquare, HiOutlineTrash,
+  HiOutlineUserCircle,
 } from 'react-icons/hi2';
 import HistoryChart from '../../components/dashboard/home/HistoryChart';
+import { RiskBreakdown } from '../../components/shared/RiskScore';
 import ResultTable from '../../components/blacklist/ResultTable';
 import { ResultVerdict } from '../../components/blacklist/ResultTableQuick';
 import { blacklistReportText } from '../../components/blacklist/reportText';
@@ -49,8 +51,11 @@ const CHECK_BADGES = [
   ['check_server_status', 'Server status'],
 ];
 
+// Text inputs need '' rather than null, or React logs an uncontrolled-input warning.
+const TEXT_FIELDS = new Set(['description', 'owner']);
+
 const EDITABLE_FIELDS = [
-  'hostname', 'hostname_type', 'description', 'is_alert_enabled', 'is_monitor_enabled', 'check_interval_minutes',
+  'hostname', 'hostname_type', 'description', 'owner', 'is_alert_enabled', 'is_monitor_enabled', 'check_interval_minutes',
   ...CHECK_BADGES.map(([key]) => key),
 ];
 
@@ -224,7 +229,7 @@ export default function AssetDetail() {
   };
 
   const openEdit = () => {
-    setEditForm(Object.fromEntries(EDITABLE_FIELDS.map((key) => [key, asset[key] ?? (key === 'description' ? '' : null)])));
+    setEditForm(Object.fromEntries(EDITABLE_FIELDS.map((key) => [key, asset[key] ?? (TEXT_FIELDS.has(key) ? '' : null)])));
     setEditOpen(true);
   };
 
@@ -236,7 +241,12 @@ export default function AssetDetail() {
   const handleEditSave = async () => {
     setSaving(true);
     try {
-      await hostnameService.updateHostname(id, { ...editForm, description: editForm.description || null, status: asset.status });
+      await hostnameService.updateHostname(id, {
+        ...editForm,
+        description: editForm.description || null,
+        owner: editForm.owner || null,
+        status: asset.status,
+      });
       toast.success('Asset updated');
       setEditOpen(false);
       fetchAsset({ quiet: true });
@@ -287,6 +297,12 @@ export default function AssetDetail() {
                 {asset.hostname_type === 'ipv4' ? 'IPv4' : 'Domain'}
               </span>
             </div>
+            {asset.owner && (
+              <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-sunk px-2 py-0.5 text-xs text-ink-2">
+                <HiOutlineUserCircle className="flex-shrink-0 text-sm" aria-hidden="true" />
+                <span className="truncate">{asset.owner}</span>
+              </p>
+            )}
             {asset.description && <p className="mt-1 text-sm text-ink-2 max-w-prose">{asset.description}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -329,6 +345,13 @@ export default function AssetDetail() {
       </div>
 
       <div className="mt-6 space-y-8">
+        {/* Why this asset ranks where it does in the list it came from. */}
+        {asset.health?.risk && (
+          <Section title="Risk score">
+            <RiskBreakdown risk={asset.health.risk} />
+          </Section>
+        )}
+
         {(issues.length > 1 || inconclusive) && (
           <div className="space-y-4">
             {issues.length > 1 && (
@@ -758,9 +781,9 @@ function DmarcReportsPanel({ summary }) {
 }
 
 /* ---------- Activity & history ---------- */
-function ProviderList({ rows }) {
+function ProviderList({ rows, inset = false }) {
   return (
-    <ul className="table-wrap">
+    <ul className={`table-wrap${inset ? ' inset' : ''}`}>
       {rows.map(([provider, change]) => (
         <li key={`${provider}-${change}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm border-b border-rule last:border-b-0">
           <span className="font-mono text-[13px] text-ink break-all">{provider}</span>
@@ -855,10 +878,12 @@ function HistoryPanel({ hostnameId, refreshKey }) {
   const diff = detail ? blacklistDiff(detail.previous?.result, detail.current.result) : null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+    // Two columns only once there is room for both: at lg the detail side
+    // came out narrower than the list of checks next to it.
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
       <div className="min-w-0">
         <h3 className="font-mono text-xs text-ink-2 mb-2">Checks, newest first</h3>
-        <ul className="table-wrap" aria-label="Past checks">
+        <ul className="table-wrap inset" aria-label="Past checks">
           {checks.map((check, index) => {
             const selected = check.id === selectedId;
             return (
@@ -906,7 +931,7 @@ function HistoryPanel({ hostnameId, refreshKey }) {
               </Field>
             </Fields>
             {diff && (detail.previous ? [...diff.added, ...diff.removed] : diff.listed).length > 0 && (
-              <ProviderList rows={[
+              <ProviderList inset rows={[
                 ...(detail.previous ? diff.added : diff.listed).map((p) => [p, detail.previous ? 'new' : 'listed']),
                 ...diff.removed.map((p) => [p, 'removed']),
               ]} />
@@ -916,7 +941,7 @@ function HistoryPanel({ hostnameId, refreshKey }) {
                 <summary className={`text-sm cursor-pointer ${linkClass}`}>
                   Still listed on {plural(diff.kept.length, 'blacklist')}
                 </summary>
-                <div className="mt-2"><ProviderList rows={diff.kept.map((p) => [p, 'listed'])} /></div>
+                <div className="mt-2"><ProviderList inset rows={diff.kept.map((p) => [p, 'listed'])} /></div>
               </details>
             )}
           </div>

@@ -4,6 +4,102 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-09
+
+A risk score on every asset, paging that happens on the server rather than in
+the browser, and a navigation and identity rebuilt around them.
+
+Upgrading: `docker compose pull && docker compose up -d`. No migration is
+needed for the score; it is derived from checks you already have. An `owner`
+column is added to assets and is empty until you fill it in.
+
+### Added
+
+- **A risk score, 0 to 100, on every asset.** Until now the dashboard ranked
+  what needed attention by counting findings, so an asset on one critical
+  blacklist sorted below one with three cosmetic problems. The score weighs
+  six factors out of a fixed 100: blacklists 40, reachability 20, certificate
+  14, domain 12, email authentication 8, reputation 6. Listings are weighted
+  by the severity the list's own return codes decode to, so being on Spamhaus
+  SBL is not the same as being on a list that marks dynamic ranges. The same
+  "listed on 1 of 24" scores 34 on a critical list and 10 on a low one.
+
+  Each factor saturates rather than adding up without limit, so a tenth
+  listing moves the number far less than the first. Missing evidence is not a
+  finding: an asset whose checks have not run is not scored as healthy or as
+  bad, it simply has nothing to score.
+
+  The number is shown with its working. The badge carries the factor
+  breakdown in its tooltip, and an asset's own page lists every factor with
+  what it contributed and out of what. It is a ranking aid, not a
+  probability, and nothing in it is calibrated against outcomes.
+
+- **An owner per asset.** A free-text field for the team or person
+  responsible, shown in the asset table and searchable along with the
+  hostname, type and description.
+
+- **`GET /hostname/page/`.** One page of assets, already filtered, searched,
+  sorted and counted by the server. `GET /hostname/list/` is unchanged and
+  still returns the whole array, so nothing built against it breaks.
+
+- **An account menu in the header**, holding the signed-in user, the theme
+  toggle and sign-out, instead of scattering them through the navigation.
+
+### Changed
+
+- **Assets are paged on the server.** The list was fetched whole and sliced in
+  the browser, which meant page one was the top of whatever happened to have
+  loaded rather than the top of the sorted set. Sorting, filtering, searching
+  and paging now all happen in the same place, so page one is the first page
+  of the real order. Ties are broken on evidence, by issue count and then
+  name, rather than by whatever order the database returned.
+
+- **The navigation.** Icons and a rail, the overflow tools folded inline
+  rather than into a popup that covered the page, and the whole surface given
+  its own ink so it reads as navigation rather than as a tinted page.
+
+- **A new mark and a violet palette.** The interface already spent five hues
+  on meaning: red for listed, amber for no answer, green for clear and a
+  slate blue for informational. A brand colour near any of those reads as a
+  status rather than as a brand, which ruled out most of the wheel and blue
+  worst of all, it being the informational hue exactly. Violet clears its
+  nearest neighbour by 55 degrees. Every colour was solved against the
+  contrast ratios the previous palette was tuned to.
+
+  The mark is a box inside a box on true isometric projection, and it ships
+  as a component that inherits its colour, so it can never sit on the
+  navigation in the navigation's own colour and disappear.
+
+- **The favicon is a tile.** Tab strips run from white to near-black, and a
+  bare mark with a dark centre sinks into the dark ones until it reads as a
+  hollow ring. The tile brings its own background. The alert favicon shown
+  while something is listed matches it, rather than being the icon from two
+  designs ago.
+
+- **The dashboard's panels line up.** Two independent stacks meant the bands
+  down the page ended at different heights; they are one grid now.
+
+### Fixed
+
+- **An upgrade could look like nothing happened.** `index.html` names the
+  hashed bundles and carried only an ETag, and a document with no cache
+  directive may be reused without asking, so a stale copy kept loading the
+  previous release. It revalidates every time now; the bundles it points at
+  keep their year.
+
+- **The history tab's tables bled out of their column.** A negative margin
+  meant for a full-width panel pulled them 20px past the grid, over whatever
+  sat beside them. The detail pane also gained room: the split moves to a
+  wider breakpoint and the list is narrower, taking the detail from 334px to
+  678px at 1024.
+
+- **Form fields under 16px zoomed the page on iOS Safari**, with a pinch as
+  the only way back. Eighteen fields were below that threshold.
+
+- **The Settings tabs hid the Security tab** on narrow screens, and two
+  truncated hostnames gave no way to read the full name. A contrast failure
+  in the tool counts is fixed as well.
+
 ## [1.3.6] - 2026-11-08
 
 Email security on a mail server's own hostname, and the TLS version a server

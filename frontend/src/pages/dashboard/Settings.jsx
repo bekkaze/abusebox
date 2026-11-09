@@ -591,7 +591,10 @@ export default function Settings() {
           aria-label="Settings sections"
           aria-orientation={wide ? 'vertical' : 'horizontal'}
           onKeyDown={onKeyDown}
-          className="flex gap-px overflow-x-auto rounded-xl border border-rule/80 bg-paper shadow-e1 p-1 lg:flex-col lg:w-52 lg:flex-shrink-0 lg:sticky lg:top-20"
+          // Wraps rather than scrolls on a narrow screen. Five tabs do not fit, and a
+          // scroller with no visible edge hid Security entirely, which is where the
+          // password lives and where the dashboard banner points.
+          className="flex flex-wrap gap-px rounded-xl border border-rule/80 bg-paper shadow-e1 p-1 lg:flex-col lg:flex-nowrap lg:w-52 lg:flex-shrink-0 lg:sticky lg:top-20"
         >
           {tabs.map((tab) => {
             const on = active === tab.key;

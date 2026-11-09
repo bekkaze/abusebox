@@ -1,12 +1,15 @@
 import { useId, useState } from 'react';
 
 /* Shared building blocks: one vocabulary for surfaces, controls and states,
-   in the Delivery Report world (paper, ink, hairline rules, one teal accent). */
+   in the Delivery Report world (paper, ink, hairline rules, one violet accent). */
 
 export const cardClass = 'panel';
 
+// text-base below sm, text-sm above: iOS Safari zooms the whole page when a
+// field it focuses is smaller than 16px, and the way back out is a pinch. The
+// design keeps 14px fields on the widths where that does not happen.
 export const inputClass =
-  'h-9 w-full px-3 rounded-md border border-rule-strong bg-paper text-sm text-ink placeholder:text-ink-2 ' +
+  'h-9 w-full px-3 rounded-md border border-rule-strong bg-paper text-base sm:text-sm text-ink placeholder:text-ink-2 ' +
   'focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition-colors ' +
   'disabled:bg-sunk disabled:text-ink-2 aria-[invalid=true]:border-s5';
 

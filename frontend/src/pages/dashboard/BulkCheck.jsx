@@ -17,7 +17,7 @@ import {
 const MAX_TARGETS = 300;
 
 const textareaClass =
-  'w-full px-3 py-2 rounded-md border border-rule-strong bg-paper font-mono text-sm text-ink placeholder:text-ink-2 ' +
+  'w-full px-3 py-2 rounded-md border border-rule-strong bg-paper font-mono text-base sm:text-sm text-ink placeholder:text-ink-2 ' +
   'focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 transition-colors aria-[invalid=true]:border-s5';
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;

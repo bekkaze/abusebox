@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="AbuseBox">
+  <title>AbuseBox</title>
+  <!--
+    A box inside a box, on true isometric projection: every angle is exactly
+    30 degrees and the three faces are congruent. The seams are open rather
+    than white, so whatever the mark sits on shows through them.
+
+    The violet is baked here because a favicon or a README has nothing to
+    inherit it from. The app uses components/shared/Logo.jsx, which keeps
+    currentColor so the navigation can colour the mark with its own ink.
+  -->
+  <g fill="#942fed">
+    <path d="M24.00 3.00 L40.59 12.58 L34.15 16.29 L24.00 10.43 L13.85 16.29 L7.41 12.58Z"/>
+    <path d="M5.81 15.35 L12.25 19.06 L12.25 30.78 L22.40 36.64 L22.40 44.08 L5.81 34.50Z"/>
+    <path d="M35.75 19.06 L42.19 15.35 L42.19 34.50 L25.60 44.08 L25.60 36.64 L35.75 30.78Z"/>
+  </g>
+  <path d="M24.00 14.13 L32.55 19.07 L24.00 24.00 L15.45 19.07Z" fill="#6b22ab"/>
+  <path d="M15.45 19.07 L24.00 24.00 L32.55 19.07 L32.55 28.93 L24.00 33.87 L15.45 28.93Z" fill="#4d187b"/>
+</svg>

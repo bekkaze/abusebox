@@ -16,7 +16,7 @@ import { getSchedulerStatus, runSchedulerNow } from "../../services/settings";
 import { useAuth } from "../../services/auth/authProvider";
 import useCurrentUser from "../../services/users/useCurrentUser";
 
-const DEFAULT_FAVICON = "/logo.png";
+const DEFAULT_FAVICON = "/favicon.svg";
 const ALERT_FAVICON = "/favicon-alert.svg";
 const ATTENTION_LIMIT = 8;
 
@@ -211,44 +211,51 @@ export default function Home() {
         <AutoRefresh onRefresh={refresh} loading={refreshing} />
       </div>
 
-      <div className="mt-6 grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="space-y-8 min-w-0">
-          <Section
-            title={attention.length ? `Needs attention (${attention.length})` : "Needs attention"}
-            action={attention.length > ATTENTION_LIMIT && (
-              <Link to="/dashboard/assets?filter=attention" className={`text-sm ${linkClass}`}>All {attention.length}</Link>
-            )}
-          >
-            {attention.length === 0 ? (
-              <p className="py-2 text-sm text-ink-2">Nothing is listed, expiring or down. AbuseBox keeps checking on schedule.</p>
-            ) : (
-              <ul>
-                {attention.slice(0, ATTENTION_LIMIT).map((group) => (
-                  <IssueRow key={group.hostnameId} issues={group.issues} hostname={group.hostname} hostnameId={group.hostnameId} />
-                ))}
-              </ul>
-            )}
-          </Section>
-
-          <Section title="Recent activity" action={<Link to="/dashboard/activity" className={`text-sm ${linkClass}`}>View all</Link>}>
-            <EventList events={events} emptyText="No changes detected yet. Listings, recoveries and expiry warnings will show up here." />
-          </Section>
-        </div>
-
-        <aside className="space-y-8 min-w-0">
-          <Section title="Scheduler">
-            <Scheduler status={scheduler} isAdmin={Boolean(me?.is_superuser)} onRun={runNow} running={runningCycle} />
-          </Section>
-          {chartAssets.length > 0 && (
-            <Section title="Blacklist history">
-              <div className="space-y-6">
-                {chartAssets.map((asset) => (
-                  <HistoryChart key={asset.id} hostnameId={asset.id} hostname={asset.hostname} />
-                ))}
-              </div>
-            </Section>
+      {/* One grid, not a stack per column. With a stack each, the second panel
+          in each column began at a different height and the bands across the
+          page did not line up. Panels are grid items now, so a row's tops
+          agree, and items-start leaves each one its natural height instead of
+          padding the shorter one out to match. */}
+      <div className="mt-6 grid items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <Section
+          className="min-w-0"
+          title={attention.length ? `Needs attention (${attention.length})` : "Needs attention"}
+          action={attention.length > ATTENTION_LIMIT && (
+            <Link to="/dashboard/assets?filter=attention" className={`text-sm ${linkClass}`}>All {attention.length}</Link>
           )}
-        </aside>
+        >
+          {attention.length === 0 ? (
+            <p className="py-2 text-sm text-ink-2">Nothing is listed, expiring or down. AbuseBox keeps checking on schedule.</p>
+          ) : (
+            <ul>
+              {attention.slice(0, ATTENTION_LIMIT).map((group) => (
+                <IssueRow key={group.hostnameId} issues={group.issues} hostname={group.hostname} hostnameId={group.hostnameId} />
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        <Section className="min-w-0" title="Scheduler">
+          <Scheduler status={scheduler} isAdmin={Boolean(me?.is_superuser)} onRun={runNow} running={runningCycle} />
+        </Section>
+
+        <Section
+          className="min-w-0"
+          title="Recent activity"
+          action={<Link to="/dashboard/activity" className={`text-sm ${linkClass}`}>View all</Link>}
+        >
+          <EventList events={events} emptyText="No changes detected yet. Listings, recoveries and expiry warnings will show up here." />
+        </Section>
+
+        {chartAssets.length > 0 && (
+          <Section className="min-w-0" title="Blacklist history">
+            <div className="space-y-6">
+              {chartAssets.map((asset) => (
+                <HistoryChart key={asset.id} hostnameId={asset.id} hostname={asset.hostname} />
+              ))}
+            </div>
+          </Section>
+        )}
       </div>
     </div>
   );

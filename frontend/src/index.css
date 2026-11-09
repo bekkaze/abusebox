@@ -9,24 +9,53 @@
 /*
   Delivery Report: results read like a mail delivery report.
   Depth: white panels sit on a tinted canvas, with one soft elevation scale.
+  The navigation sits a step behind the canvas in both themes, so the content
+  is what comes forward. Light goes darker, dark goes darker still; either way
+  the rail recedes and `paper` advances, which is what keeps the selected item
+  legible against it. The navigation sits outside that scheme and carries its
+  own ink, because the page's would be unreadable on it. It is a deep violet,
+  and it follows the theme: lighter in light, and darker than the page in dark
+  so it recedes like everything else.
   White paper, ink, hairline rules; status classes borrowed from SMTP
-  (5.x listed, 4.x no answer, 2.x clear); the logo's teal is the only accent.
+  (5.x listed, 4.x no answer, 2.x clear); one violet accent and nothing else.
+
+  Why violet. Five hues here already carry meaning: red at 4 (listed), amber
+  at 34 (no answer), green at 151 (clear) and slate blue at 217 (info). A
+  brand colour near any of them stops reading as a brand and starts reading as
+  a status, which rules out most of the wheel — blue worst of all, since it is
+  the info hue exactly. Violet at 272 sits 55 degrees from its nearest
+  neighbour, the widest clearance available short of magenta.
   Colours are RGB channels so Tailwind opacity modifiers work.
 */
 :root {
   --canvas: 241 243 246;       /* page background the panels sit on */
   --paper: 255 255 255;        /* panels and content */
-  --rail: 243 244 246;         /* navigation and side panels */
+  /* The navigation is its own dark surface, not a tint of the page, so it
+     carries its own ink.
+     The rail is held at a saturation that keeps it visibly violet. Solving
+     only for contrast lands on a grey-mauve that hits 10.3 and reads as
+     neither a colour nor a neutral, which leaves the nav and the accent
+     looking like two different brands.
+     `--rail-marker` is the one thing that is not simply `accent`: the accent
+     is near enough to this surface to vanish on it, so the bar down the
+     selected row uses a brighter violet at 4.5. Same hue, enough separation
+     to read. */
+  --rail: 79 35 118;           /* 10.3:1 against the page */
+  --rail-ink: 244 239 247;     /* 10.1:1 on the rail */
+  --rail-ink-2: 202 189 212;   /* 6.4:1, for anything not selected */
+  --rail-rule: 119 45 183;
+  --rail-active: 110 41 171;   /* the selected row, 1.4 against the rail */
+  --rail-marker: 198 134 255;  /* 4.5 against the rail */
   --sunk: 248 249 250;         /* table heads, inset fields */
   --ink: 20 23 28;
   --ink-2: 88 96 108;          /* field names, secondary text (6.3:1 on paper) */
   --ink-3: 140 147 157;        /* disabled, decorative only */
   --rule: 226 229 234;
   --rule-strong: 200 205 212;
-  --accent: 13 117 127;        /* logo teal; 5.4:1 on paper */
-  --accent-hover: 9 95 104;
+  --accent: 148 47 237;        /* 5.4:1 on paper */
+  --accent-hover: 123 35 200;
   --accent-ink: 255 255 255;
-  --accent-soft: 230 244 245;
+  --accent-soft: 248 240 255;
   --s5: 180 35 24;             /* listed / critical */
   --s5-soft: 254 242 241;
   --s4: 154 88 0;              /* no answer / warning */
@@ -46,17 +75,24 @@
 .dark {
   --canvas: 12 14 18;
   --paper: 23 26 32;
-  --rail: 15 17 21;
+  /* Darker than the page here, so the nav recedes in dark the way everything
+     else does, while keeping the violet: green stays lowest. */
+  --rail: 14 6 22;             /* 1.03 against the page, ink-2 at 11.2:1 */
+  --rail-ink: 235 228 241;
+  --rail-ink-2: 215 181 246;
+  --rail-rule: 81 33 122;
+  --rail-active: 66 35 92;     /* 1.54 against the rail */
+  --rail-marker: 210 159 255;  /* 9.6 against the rail */
   --sunk: 28 32 38;
   --ink: 231 234 238;
   --ink-2: 158 166 177;
   --ink-3: 104 112 124;
   --rule: 45 50 58;
   --rule-strong: 66 73 84;
-  --accent: 72 196 204;
-  --accent-hover: 110 214 220;
-  --accent-ink: 6 22 24;
-  --accent-soft: 18 46 49;
+  --accent: 207 160 248;
+  --accent-hover: 220 189 246;
+  --accent-ink: 17 9 23;
+  --accent-soft: 66 25 103;
   --s5: 250 120 110;
   --s5-soft: 60 26 24;
   --s4: 232 172 76;
@@ -144,6 +180,16 @@ kbd {
     border-radius: 0;
     box-shadow: none;
     margin-inline: -1.25rem;
+  }
+  /* The bleed above reaches the panel's own edges, which is only right for a
+     table that spans the panel. One sitting in a column of a nested grid has
+     no padding to bleed into, so it hangs over the gutter or over the page.
+     Such a table asks for `inset` and keeps its own card instead. */
+  .panel .table-wrap.inset {
+    border-width: 1px;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-1);
+    margin-inline: 0;
   }
 }
 

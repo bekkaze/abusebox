@@ -13,6 +13,7 @@ const checkboxClass = "h-4 w-4 rounded border-rule-strong accent-accent";
 const initialForm = {
   cidr: "",
   description: "",
+  owner: "",
   is_alert_enabled: false,
   is_monitor_enabled: false,
   check_blacklist: true,
@@ -104,6 +105,22 @@ export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {
                       Creates <span className="font-semibold text-ink tabular-nums">{hostCount}</span> asset{hostCount !== 1 ? "s" : ""}
                     </p>
                   )}
+                </div>
+
+                <div>
+                  <label htmlFor="cidr-import-owner" className={labelClass}>
+                    Owner <span className="font-normal text-ink-2">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="cidr-import-owner"
+                    name="owner"
+                    value={form.owner}
+                    onChange={handleChange}
+                    maxLength={100}
+                    placeholder="Applied to every imported IP"
+                    className={inputClass}
+                  />
                 </div>
 
                 <div>

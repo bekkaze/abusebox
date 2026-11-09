@@ -1399,3 +1399,83 @@ def test_describe_can_only_ever_return_a_literal_from_its_own_module():
         described = failures.describe_smtp(smtp)
         assert described in allowed, f"SMTP {code} produced {described!r}"
         assert marker not in described and str(code) not in described
+
+
+# --- the risk score -----------------------------------------------------------------
+# A number to rank assets by, not a probability. These pin the properties that
+# make it worth having: it follows the evidence, a worse list counts for more,
+# and more of the same thing stops mattering after a while.
+
+def _health_with(**parts):
+    from app.services.risk import risk_score
+    health = dict(parts)
+    return risk_score(health)
+
+
+def test_an_asset_with_no_findings_scores_zero():
+    assert _health_with()["score"] == 0
+    assert _health_with(blacklist={"listed": [], "listed_severities": {}})["score"] == 0
+
+
+def test_a_critical_listing_outscores_a_low_one():
+    """The whole point. Both are "listed on 1 of 24"; Spamhaus is not
+    UCEPROTECT level 1, and the list's own severity says so."""
+    spamhaus = _health_with(blacklist={"listed": ["zen.spamhaus.org"], "listed_severities": {"critical": 1}})
+    minor = _health_with(blacklist={"listed": ["dnsbl-1.uceprotect.net"], "listed_severities": {"low": 1}})
+    assert spamhaus["score"] > minor["score"] * 3
+    assert spamhaus["factors"][0]["factor"] == "blacklist"
+    assert "critical" in spamhaus["factors"][0]["detail"]
+
+
+def test_listings_saturate_rather_than_adding_up_forever():
+    one = _health_with(blacklist={"listed": ["a"], "listed_severities": {"critical": 1}})["score"]
+    two = _health_with(blacklist={"listed": ["a", "b"], "listed_severities": {"critical": 2}})["score"]
+    six = _health_with(blacklist={"listed": list("abcdef"), "listed_severities": {"critical": 6}})["score"]
+    assert one < two < six
+    # The second listing adds more than the fifth and sixth together.
+    assert (two - one) > (six - two)
+
+
+def test_the_score_is_capped_at_100_with_everything_wrong():
+    worst = _health_with(
+        blacklist={"listed": list("abcde"), "listed_severities": {"critical": 5}},
+        server={"up": False, "reason": "Connection refused"},
+        ssl={"valid": False, "days_remaining": -1},
+        domain_expiry_days=-3,
+        email_grade="F",
+        abuse_score=100,
+    )
+    assert 90 <= worst["score"] <= 100
+
+
+def test_every_contributing_factor_is_named_with_its_points():
+    scored = _health_with(
+        server={"up": False, "reason": "Connection refused"},
+        ssl={"valid": True, "days_remaining": 2},
+        email_grade="D",
+    )
+    named = {f["factor"]: f for f in scored["factors"]}
+    assert set(named) == {"reachability", "certificate", "email_auth"}
+    assert named["reachability"]["points"] == 20 and named["reachability"]["of"] == 20
+    assert scored["factors"][0]["factor"] == "reachability"   # worst first
+    assert sum(f["points"] for f in scored["factors"]) == pytest.approx(scored["score"], abs=0.5)
+
+
+def test_an_overdue_check_is_not_risk():
+    """Missing evidence is not a finding. Scoring it would send someone to an
+    asset because the scheduler stalled."""
+    from app.services.risk import risk_score
+    health = {"issues": [{"kind": "monitoring", "severity": "warning", "message": "Scheduled check overdue"}]}
+    assert risk_score(health)["score"] == 0
+
+
+def test_a_result_without_severities_still_scores_from_the_count():
+    """Checks stored before severities were kept must not read as clean."""
+    old = _health_with(blacklist={"listed": ["a", "b"]})
+    assert old["score"] > 0
+    assert "listed on 2" in old["factors"][0]["detail"]
+
+
+def test_abuseipdb_below_the_noise_floor_adds_nothing():
+    assert _health_with(abuse_score=20)["score"] == 0
+    assert _health_with(abuse_score=90)["score"] > 0

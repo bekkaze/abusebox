@@ -38,16 +38,13 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 				path: '/dashboard/activity',
 				icon: <HiOutlineClock />
 			},
-			{
-				key: 'settings',
-				label: 'Settings',
-				path: '/dashboard/settings',
-				icon: <HiOutlineCog6Tooth />
-			},
 		],
 	},
 	{
-		label: 'Check & lookup',
+		// Ten entries, folded behind a disclosure so the nav keeps a readable
+		// height. Cmd+K reaches any of them without opening it.
+		label: 'Tools',
+		collapsible: true,
 		links: [
 			{
 				key: 'blacklist-check',
@@ -114,6 +111,12 @@ export const DASHBOARD_SIDEBAR_SECTIONS = [
 ]
 
 export const DASHBOARD_SIDEBAR_BOTTOM_LINKS = [
+	{
+		key: 'settings',
+		label: 'Settings',
+		path: '/dashboard/settings',
+		icon: <HiOutlineCog6Tooth />
+	},
 	{
 		key: 'support',
 		label: 'API docs',

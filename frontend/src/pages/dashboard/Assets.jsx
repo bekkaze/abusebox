@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   HiChevronDown, HiOutlineArrowDownTray, HiOutlineArrowPath, HiOutlineBell, HiOutlineMagnifyingGlass, HiOutlinePlus,
   HiOutlineRectangleStack, HiOutlineServerStack, HiOutlineSquares2X2, HiOutlineSquaresPlus, HiOutlineTableCells,
-  HiOutlineTrash, HiXMark,
+  HiOutlineTrash, HiOutlineUserCircle, HiChevronLeft, HiChevronRight, HiXMark,
 } from "react-icons/hi2";
 import { toast } from "react-toastify";
 import HostnameService from "../../services/hostname";
@@ -15,11 +15,11 @@ import { SkeletonLine } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
 import { SeverityBadge, SeverityCode } from "../../components/shared/activity";
-import { SEVERITY_RANK } from "../../components/shared/severity";
 import {
   Alert, EmptyState, PageHeader, linkClass, primaryButtonClass, secondaryButtonClass, selectClass, inputClass,
 } from "../../components/shared/ui";
 import { downloadCsv } from "../../services/tools";
+import { RiskBadge } from "../../components/shared/RiskScore";
 
 const CHECK_BADGE_MAP = {
   check_blacklist: 'BL',
@@ -35,6 +35,7 @@ const initialFormData = {
   hostname_type: "",
   hostname: "",
   description: "",
+  owner: "",
   is_alert_enabled: false,
   is_monitor_enabled: true,
   check_blacklist: true,
@@ -54,14 +55,17 @@ const FILTERS = [
   { key: 'clean', label: 'Clean' },
 ];
 
+// Keys are the server's, so the select's value goes straight into the query
+// rather than being translated on the way.
 const SORTS = [
-  { key: 'status', label: 'Most urgent first' },
+  { key: 'urgency', label: 'Most urgent first' },
   { key: 'name', label: 'Name (A–Z)' },
   { key: 'checked', label: 'Recently checked' },
   { key: 'created', label: 'Recently added' },
 ];
 
-const PAGE_SIZE = 60;
+const PAGE_SIZES = [25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 const FINDINGS_SHOWN = 3;
 
 // Local control styles: a segmented group of standard h-9 buttons.
@@ -81,6 +85,16 @@ const clearButtonClass = 'inline-flex h-9 w-9 items-center justify-center rounde
 const thBase = 'py-2 font-mono text-xs font-normal text-ink-2 border-b border-rule text-left whitespace-nowrap';
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/** A value that settles before it is used, so typing is not a request each. */
+function useDebounced(value, delay) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return settled;
+}
 
 function readPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
@@ -138,18 +152,19 @@ function healthOf(item) {
   return { severity: 'ok', label: 'Healthy' };
 }
 
-function urgency(item) {
-  if (item.is_blacklisted) return -1;
-  return SEVERITY_RANK[item.health?.status] ?? 4;
-}
+// Ordering by urgency lives on the server now (see _sort_key in the hostname
+// router), so page one is the top of the whole set rather than of one page.
+// Keeping a second comparator here would only let the two drift apart.
 
 function exportAssetsCsv(assets) {
   const rows = [
-    ['Hostname', 'Type', 'Description', 'Listed', 'Listed on', 'Status', 'Issues', 'Monitored', 'Alerts', 'Interval (min)', 'Last checked'],
+    ['Hostname', 'Type', 'Owner', 'Description', 'Risk', 'Listed', 'Listed on', 'Status', 'Issues', 'Monitored', 'Alerts', 'Interval (min)', 'Last checked'],
     ...assets.map((item) => [
       item.hostname,
       item.hostname_type,
+      item.owner || '',
       item.description || '',
+      item.health?.risk?.score ?? '',
       item.is_blacklisted ? 'Yes' : 'No',
       item.health?.blacklist?.listed?.join('; ') || '',
       item.health?.status || 'unchecked',
@@ -223,6 +238,91 @@ function SelectBox({ checked, onChange, label, indeterminate = false }) {
   );
 }
 
+/** Page numbers around the current one, with the ends always reachable. */
+function pageWindow(page, pageCount) {
+  if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+  const pages = new Set([1, pageCount, page, page - 1, page + 1]);
+  // Keep the row a steady width near the ends, where the window is one-sided.
+  if (page <= 3) { pages.add(2); pages.add(3); pages.add(4); }
+  if (page >= pageCount - 2) { pages.add(pageCount - 3); pages.add(pageCount - 2); pages.add(pageCount - 1); }
+  const sorted = [...pages].filter((n) => n >= 1 && n <= pageCount).sort((a, b) => a - b);
+  const out = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) out.push('gap');
+    out.push(n);
+  });
+  return out;
+}
+
+const pageButtonClass = (on) =>
+  `inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-sm tabular-nums transition-colors ` +
+  (on ? 'bg-accent-soft text-accent font-semibold ring-1 ring-inset ring-accent/40'
+      : 'text-ink-2 hover:bg-sunk hover:text-ink');
+
+function Pager({ page, pageCount, pageSize, total, firstIndex, shownCount, onPage, onPageSize }) {
+  // Nothing to page through and nothing to choose: say the count and stop.
+  if (total === 0) return null;
+  const first = firstIndex + 1;
+  const last = firstIndex + shownCount;
+
+  return (
+    <nav className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3" aria-label="Asset pages">
+      <p className="text-sm text-ink-2" role="status">
+        Showing <span className="text-ink tabular-nums">{first}–{last}</span> of{' '}
+        <span className="text-ink tabular-nums">{total}</span>
+      </p>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {total > PAGE_SIZES[0] && (
+          <label className="flex items-center gap-2 text-sm text-ink-2">
+            Per page
+            <select
+              value={pageSize}
+              onChange={(event) => onPageSize(Number(event.target.value))}
+              className={`${selectClass} h-8 w-auto`}
+            >
+              {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+        )}
+
+        {pageCount > 1 && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button" onClick={() => onPage(page - 1)} disabled={page === 1}
+              className={`${pageButtonClass(false)} disabled:opacity-40 disabled:hover:bg-transparent`}
+              aria-label="Previous page"
+            >
+              <HiChevronLeft className="text-base" aria-hidden="true" />
+            </button>
+            {pageWindow(page, pageCount).map((entry, index) => (
+              entry === 'gap'
+                ? <span key={`gap-${index}`} className="px-1 text-ink-3" aria-hidden="true">&hellip;</span>
+                : (
+                  <button
+                    key={entry} type="button" onClick={() => onPage(entry)}
+                    className={pageButtonClass(entry === page)}
+                    aria-label={`Page ${entry}`}
+                    aria-current={entry === page ? 'page' : undefined}
+                  >
+                    {entry}
+                  </button>
+                )
+            ))}
+            <button
+              type="button" onClick={() => onPage(page + 1)} disabled={page === pageCount}
+              className={`${pageButtonClass(false)} disabled:opacity-40 disabled:hover:bg-transparent`}
+              aria-label="Next page"
+            >
+              <HiChevronRight className="text-base" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}
+
 function LoadingState({ view }) {
   if (view === 'table') {
     return (
@@ -269,19 +369,42 @@ export default function Assets() {
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [view, setView] = useState(() => readPref('abusebox.assets.view', 'table'));
-  const [sort, setSort] = useState(() => readPref('abusebox.assets.sort', 'status'));
+  const [sort, setSort] = useState(() => {
+    // 'status' is what this preference held before the sort moved server-side.
+    const stored = readPref('abusebox.assets.sort', 'urgency');
+    return SORTS.some((option) => option.key === stored) ? stored : 'urgency';
+  });
   const [selected, setSelected] = useState(() => new Set());
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(() => {
+    const stored = Number(readPref('abusebox.assets.pageSize', DEFAULT_PAGE_SIZE));
+    return PAGE_SIZES.includes(stored) ? stored : DEFAULT_PAGE_SIZE;
+  });
   const [bulkBusy, setBulkBusy] = useState(false);
   const { token } = useAuth();
   const [formData, setFormData] = useState({ ...initialFormData });
   const [assets, setAssets] = useState([]);
+  const [pageMeta, setPageMeta] = useState({
+    total: 0, page: 1, pages: 1, page_size: DEFAULT_PAGE_SIZE,
+    counts: { all: 0, attention: 0, listed: 0, clean: 0 },
+  });
+  // Typing should not fire a request per keystroke.
+  const debouncedSearch = useDebounced(search, 300);
   const hostnameService = HostnameService();
 
   const filterStatus = FILTERS.some((f) => f.key === searchParams.get('filter')) ? searchParams.get('filter') : 'all';
   const setFilterStatus = (key) => {
     const next = new URLSearchParams(searchParams);
     if (key === 'all') next.delete('filter'); else next.set('filter', key);
+    next.delete('page');
+    setSearchParams(next, { replace: true });
+  };
+
+  // The page lives in the URL, so a reload, a shared link and the back button
+  // all land on the rows you were looking at.
+  const requestedPage = Math.max(1, Number(searchParams.get('page')) || 1);
+  const goToPage = (page) => {
+    const next = new URLSearchParams(searchParams);
+    if (page <= 1) next.delete('page'); else next.set('page', String(page));
     setSearchParams(next, { replace: true });
   };
 
@@ -291,20 +414,52 @@ export default function Assets() {
     if (quiet) setRefreshing(true); else setIsLoading(true);
     setErrorMessage("");
     try {
-      const list = await HostnameService().listHostname(false);
-      setAssets(list);
-      setSelected((prev) => new Set([...prev].filter((id) => list.some((item) => item.id === id))));
+      const data = await HostnameService().pageHostnames({
+        page: requestedPage, pageSize, sort, search: debouncedSearch, filter: filterStatus,
+      });
+      setAssets(data.items);
+      setPageMeta({
+        total: data.total, page: data.page, pages: data.pages,
+        page_size: data.page_size, counts: data.counts,
+      });
     } catch {
       setErrorMessage("Could not load assets. Check your connection and try again.");
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [requestedPage, pageSize, sort, debouncedSearch, filterStatus]);
 
-  useEffect(() => { if (token) fetchAssets(); }, [token, fetchAssets]);
+  useEffect(() => {
+    if (!token) return;
+    // fetchAssets changes whenever a query input does, which is what drives
+    // the refetch: no separate effect per control.
+    fetchAssets({ quiet: assets.length > 0 });
+  }, [token, fetchAssets]); // eslint-disable-line react-hooks/exhaustive-deps
   const refresh = useCallback(() => fetchAssets({ quiet: true }), [fetchAssets]);
-  useEffect(() => { setVisible(PAGE_SIZE); }, [search, filterStatus, sort]);
+  // A narrower result set can leave you past the end; searching or sorting
+  // should put you back at the top of it either way.
+  useEffect(() => { goToPage(1); }, [debouncedSearch, sort, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * CSV of everything the current filter and search match, not just this page.
+   * "Export" meaning one page of twenty would surprise anyone who clicked it,
+   * so this fetches the unpaged list and applies the same narrowing.
+   */
+  const exportAll = useCallback(async () => {
+    try {
+      const all = await HostnameService().listHostname(false);
+      const needle = search.trim().toLowerCase();
+      const rows = all.filter((item) => {
+        const haystack = [item.hostname, item.hostname_type, item.owner, item.description]
+          .filter(Boolean).join(' ').toLowerCase();
+        return (!needle || haystack.includes(needle)) && matchesFilter(item, filterStatus);
+      });
+      exportAssetsCsv(rows);
+    } catch {
+      toast.error('Could not build the export.');
+    }
+  }, [search, filterStatus]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -314,7 +469,7 @@ export default function Assets() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await hostnameService.createHostname({ ...formData, hostname: formData.hostname.trim(), description: formData.description || null });
+      await hostnameService.createHostname({ ...formData, hostname: formData.hostname.trim(), description: formData.description || null, owner: formData.owner || null });
       toast.success(`Added ${formData.hostname.trim()}`);
       setFormData({ ...initialFormData });
       setAddModalOpen(false);
@@ -371,31 +526,18 @@ export default function Assets() {
     }
   };
 
-  const filterCounts = useMemo(
-    () => Object.fromEntries(FILTERS.map((f) => [f.key, assets.filter((item) => matchesFilter(item, f.key)).length])),
-    [assets],
-  );
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const matches = assets.filter((item) => {
-      const matchSearch = !query
-        || item.hostname.toLowerCase().includes(query)
-        || item.hostname_type.toLowerCase().includes(query)
-        || (item.description || '').toLowerCase().includes(query);
-      return matchSearch && matchesFilter(item, filterStatus);
-    });
-    const sorters = {
-      status: (a, b) => urgency(a) - urgency(b) || a.hostname.localeCompare(b.hostname),
-      name: (a, b) => a.hostname.localeCompare(b.hostname, undefined, { numeric: true }),
-      checked: (a, b) => String(b.last_checked || '').localeCompare(String(a.last_checked || '')),
-      created: (a, b) => String(b.created).localeCompare(String(a.created)),
-    };
-    return [...matches].sort(sorters[sort] || sorters.status);
-  }, [assets, search, filterStatus, sort]);
-
-  const shown = filtered.slice(0, visible);
+  // Filtering, searching, sorting and slicing all happen on the server, so
+  // page one is the top of the whole set rather than the top of whatever was
+  // fetched. These come back with the page.
+  const filterCounts = pageMeta.counts;
+  const shown = assets;
+  const page = pageMeta.page;
+  const pageCount = pageMeta.pages;
+  const firstIndex = (page - 1) * pageMeta.page_size;
   const listedCount = filterCounts.listed || 0;
+  // Bulk actions apply to the whole selection, which can now reach past the
+  // page you are looking at, so the count says how much of it is out of sight.
+  const offPageSelected = selected.size - shown.filter((item) => selected.has(item.id)).length;
   const allShownSelected = shown.length > 0 && shown.every((item) => selected.has(item.id));
   const someShownSelected = !allShownSelected && shown.some((item) => selected.has(item.id));
 
@@ -471,7 +613,7 @@ export default function Assets() {
             <input
               id="asset-search"
               type="search"
-              placeholder="Search hostname, type or description"
+              placeholder="Search hostname, type, owner or description"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={searchInputClass}
@@ -510,7 +652,7 @@ export default function Assets() {
               </button>
             ))}
           </div>
-          <button type="button" className={secondaryButtonClass} onClick={() => exportAssetsCsv(filtered)} title="Export the assets shown as CSV">
+          <button type="button" className={secondaryButtonClass} onClick={exportAll} title="Export the assets shown as CSV">
             <HiOutlineArrowDownTray className="text-base text-ink-2" aria-hidden="true" /> CSV
           </button>
         </div>
@@ -542,7 +684,7 @@ export default function Assets() {
         >
           Add a mail server IP or a domain you own. AbuseBox checks it against 24 blacklists right away, then again on a schedule, and alerts you when something changes.
         </EmptyState>
-      ) : filtered.length === 0 ? (
+      ) : pageMeta.total === 0 ? (
         <EmptyState
           icon={HiOutlineMagnifyingGlass}
           title="No matching assets"
@@ -557,13 +699,18 @@ export default function Assets() {
           >
             {view === 'cards' && (
               <label className="inline-flex items-center gap-2 mr-2 cursor-pointer">
-                <SelectBox checked={allShownSelected} indeterminate={someShownSelected} onChange={toggleAllShown} label="Select all shown assets" />
-                Select all
+                <SelectBox checked={allShownSelected} indeterminate={someShownSelected} onChange={toggleAllShown} label="Select every asset on this page" />
+                Select page
               </label>
             )}
             {selected.size > 0 ? (
               <div role="region" aria-label="Bulk actions" className="flex flex-1 flex-wrap items-center gap-2">
-                <span className="font-semibold text-ink mr-auto" aria-live="polite">{selected.size} selected</span>
+                <span className="font-semibold text-ink mr-auto" aria-live="polite">
+                  {selected.size} selected
+                  {offPageSelected > 0 && (
+                    <span className="ml-1.5 font-normal text-ink-2">({offPageSelected} on other pages)</span>
+                  )}
+                </span>
                 <button type="button" disabled={bulkBusy} onClick={() => runBulk('recheck')} className={secondaryButtonClass}>
                   <HiOutlineArrowPath className="text-base text-ink-2" aria-hidden="true" /> Re-check
                 </button>
@@ -577,7 +724,7 @@ export default function Assets() {
                 </button>
               </div>
             ) : (
-              <span aria-live="polite">Showing {shown.length} of {plural(filtered.length, 'asset')}</span>
+              <span aria-live="polite">Showing {shown.length} of {plural(pageMeta.total, 'asset')}</span>
             )}
           </div>
 
@@ -601,14 +748,16 @@ export default function Assets() {
             </ul>
           )}
 
-          {filtered.length > shown.length && (
-            <div className="flex flex-wrap items-center gap-3">
-              <button type="button" className={secondaryButtonClass} onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                Show {Math.min(PAGE_SIZE, filtered.length - shown.length)} more
-              </button>
-              <span className="text-sm text-ink-2">{filtered.length - shown.length} not shown</span>
-            </div>
-          )}
+          <Pager
+            page={page}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={pageMeta.total}
+            firstIndex={firstIndex}
+            shownCount={shown.length}
+            onPage={goToPage}
+            onPageSize={(size) => { setPageSize(size); writePref('abusebox.assets.pageSize', String(size)); }}
+          />
         </>
       )}
 
@@ -663,6 +812,13 @@ function AssetCard({ item, selected, onToggle, onDelete }) {
         {item.hostname}
       </Link>
       <p className="mt-0.5 text-xs text-ink-2">{meta.join(' · ')}</p>
+      <RiskBadge risk={item.health?.risk} className="relative z-10 mt-1.5 mr-1.5" />
+      {item.owner && (
+        <p className="relative z-10 mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-sunk px-2 py-0.5 text-xs text-ink-2" title={`Owner: ${item.owner}`}>
+          <HiOutlineUserCircle className="flex-shrink-0 text-sm" aria-hidden="true" />
+          <span className="truncate">{item.owner}</span>
+        </p>
+      )}
       {item.description && (
         <p className="mt-1.5 text-sm text-ink-2 truncate" title={item.description}>{item.description}</p>
       )}
@@ -677,8 +833,9 @@ function AssetCard({ item, selected, onToggle, onDelete }) {
   );
 }
 
-const SORTABLE = { name: 'Asset', status: 'Health', checked: 'Last-Checked' };
-const ARIA_SORT = { name: 'ascending', status: 'other', checked: 'descending' };
+// Keys are the server's sort names, so a header's key is what goes in the query.
+const SORTABLE = { name: 'Asset', urgency: 'Risk', checked: 'Last-Checked' };
+const ARIA_SORT = { name: 'ascending', urgency: 'descending', checked: 'descending' };
 
 function SortHeader({ sortKey, sort, onSort, className = '' }) {
   const active = sort === sortKey;
@@ -704,11 +861,12 @@ function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSele
         <thead className="bg-sunk">
           <tr>
             <th scope="col" className={`${thBase} w-9 pl-3 pr-1`}>
-              <SelectBox checked={allSelected} indeterminate={someSelected} onChange={onToggleAll} label="Select all shown assets" />
+              <SelectBox checked={allSelected} indeterminate={someSelected} onChange={onToggleAll} label="Select every asset on this page" />
             </th>
             <SortHeader sortKey="name" sort={sort} onSort={onSort} />
             <th scope="col" className={`${thBase} px-3`}>Type</th>
-            <SortHeader sortKey="status" sort={sort} onSort={onSort} />
+            <th scope="col" className={`${thBase} px-3`}>Health</th>
+            <SortHeader sortKey="urgency" sort={sort} onSort={onSort} />
             <th scope="col" className={`${thBase} px-3 w-full`}>Findings</th>
             <SortHeader sortKey="checked" sort={sort} onSort={onSort} />
             <th scope="col" className={`${thBase} px-3`}>Checks</th>
@@ -728,10 +886,12 @@ function AssetTable({ items, selected, onToggle, onDelete, allSelected, someSele
                   <Link to={`/dashboard/assets/${item.id}`} className="font-mono text-[13px] font-semibold leading-5 text-ink hover:text-accent break-all">
                     {item.hostname}
                   </Link>
+                  {item.owner && <p className="text-xs text-ink-2 mt-0.5 truncate" title={`Owner: ${item.owner}`}>{item.owner}</p>}
                   {item.description && <p className="text-xs text-ink-2 mt-0.5 truncate" title={item.description}>{item.description}</p>}
                 </td>
                 <td className="px-3 py-2 leading-5 text-ink-2 whitespace-nowrap">{typeLabel(item)}</td>
                 <td className="px-3 py-2 whitespace-nowrap"><HealthBadge item={item} /></td>
+                <td className="px-3 py-2 whitespace-nowrap"><RiskBadge risk={item.health?.risk} /></td>
                 <td className="px-3 py-2 min-w-[16rem]"><FindingList item={item} /></td>
                 <td className="px-3 py-2 leading-5 whitespace-nowrap"><LastChecked item={item} /></td>
                 <td className="px-3 py-2.5 min-w-[7rem]"><CheckTags item={item} /></td>

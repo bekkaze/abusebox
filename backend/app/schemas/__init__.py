@@ -19,6 +19,7 @@ from app.schemas.hostname import (
     CidrImportRequest,
     HostnameCreateRequest,
     HostnameListItem,
+    HostnamePage,
     HostnameResponse,
     HostnameUpdateRequest,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "HostnameUpdateRequest",
     "HostnameResponse",
     "HostnameListItem",
+    "HostnamePage",
     "DelistRequest",
     "BulkHostnameCreateRequest",
     "CidrImportRequest",

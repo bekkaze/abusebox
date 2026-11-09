@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.core.timeutil import as_utc
+from app.services.risk import risk_score
 from app.schemas.hostname import MIN_CHECK_INTERVAL_MINUTES
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
@@ -34,8 +35,20 @@ def blacklist_state(result: dict | None) -> dict | None:
     bl = split_result(result).get("blacklist")
     if not isinstance(bl, dict) or bl.get("error"):
         return None
+    detected = [d for d in bl.get("detected_on", []) if d.get("provider")]
+    # How many listings at each severity, not just how many listings. The
+    # severity comes from the list's own documented return codes, so being on
+    # Spamhaus and being on UCEPROTECT level 1 stop counting the same. The risk
+    # score reads this; results stored before it existed have no severities and
+    # fall back to counting.
+    severities: dict[str, int] = {}
+    for entry in detected:
+        severity = entry.get("severity")
+        if severity:
+            severities[severity] = severities.get(severity, 0) + 1
     return {
-        "listed": sorted(d.get("provider") for d in bl.get("detected_on", []) if d.get("provider")),
+        "listed": sorted(d["provider"] for d in detected),
+        "listed_severities": severities,
         "providers": sorted(bl.get("providers", [])),
         "total": len(bl.get("providers", [])),
         "failed": len(bl.get("failed_providers", [])),
@@ -191,4 +204,7 @@ def summarize(
     issues.sort(key=lambda item: SEVERITY_ORDER.get(item["severity"], 9))
     health["issues"] = issues
     health["status"] = issues[0]["severity"] if issues else "ok"
+    # Derived from the findings above, so it cannot drift from them. See risk.py
+    # for the weights, and for what the number is not.
+    health["risk"] = risk_score(health)
     return health

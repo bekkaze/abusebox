@@ -54,7 +54,7 @@ export default function HistoryChart({ hostnameId, hostname, showHostname = true
   return (
     <figure>
       <figcaption className="flex items-baseline justify-between gap-3 mb-2">
-        {showHostname && <Link to={`/dashboard/assets/${hostnameId}`} className="font-mono text-sm font-semibold text-ink hover:text-accent truncate">{hostname}</Link>}
+        {showHostname && <Link to={`/dashboard/assets/${hostnameId}`} title={hostname} className="font-mono text-sm font-semibold text-ink hover:text-accent truncate">{hostname}</Link>}
         {data.length > 1 && <span className="text-xs text-ink-2 whitespace-nowrap">Lists per check, last {data.length}</span>}
       </figcaption>
 
