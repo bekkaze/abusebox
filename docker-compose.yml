@@ -41,8 +41,12 @@ services:
   frontend:
     image: ghcr.io/${GHCR_REPO:-bekkaze/abusebox}-frontend:latest
     build: ./frontend
+    # Wait for the API to answer /health, not merely for its container to be
+    # created: the backend runs migrations at startup, and until those finish
+    # nginx proxies /api to a socket that refuses the connection.
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     # nginx serves the built UI and proxies /api to the backend, so the UI
     # works from any hostname and the API docs are at /api/swagger/.
     environment:

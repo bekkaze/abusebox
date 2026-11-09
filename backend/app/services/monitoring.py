@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -48,7 +48,7 @@ def record_check(db: Session, hostname: Hostname, result: dict[str, Any], *, not
     # Errored or inconclusive DNSBL runs keep the previous status.
     if bl is not None and not bl["inconclusive"]:
         hostname.is_blacklisted = bool(bl["listed"])
-    hostname.last_checked = datetime.now(timezone.utc)
+    hostname.last_checked = datetime.now(UTC)
 
     db.query(CheckHistory).filter(
         CheckHistory.hostname_id == hostname.id,
@@ -100,7 +100,7 @@ def record_check(db: Session, hostname: Hostname, result: dict[str, Any], *, not
 def _safe_notify(**kwargs: Any) -> None:
     try:
         notify_events(**kwargs)
-    except Exception:  # noqa: BLE001 - never let alerting crash a worker thread
+    except Exception:
         logger.exception("Failed to send notifications for %s", kwargs.get("hostname"))
 
 
@@ -138,7 +138,7 @@ def _recheck_one(hostname_id: int) -> None:
         result = run_enabled_checks(hostname.hostname, get_toggles_from_hostname(hostname))
         if result:
             record_check(db, hostname, result)
-    except Exception:  # noqa: BLE001
+    except Exception:
         db.rollback()
         logger.exception("Background re-check failed for hostname id %s", hostname_id)
     finally:
@@ -157,7 +157,7 @@ def prune_history(db: Session, retention_days: int) -> dict[str, int]:
     if not retention_days or retention_days <= 0:
         return {"checks": 0, "events": 0}
     # Stored timestamps are naive UTC (SQLite), so compare against naive UTC.
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).replace(tzinfo=None)
+    cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).replace(tzinfo=None)
     checks = (
         db.query(CheckHistory)
         .filter(CheckHistory.status == "historical", CheckHistory.created < cutoff)

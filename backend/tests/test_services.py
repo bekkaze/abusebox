@@ -30,9 +30,8 @@ def _fake_getaddrinfo(mapping):
 
 @pytest.mark.parametrize("address", ["127.0.0.1", "10.0.0.5", "192.168.1.169", "169.254.169.254", "100.64.0.1"])
 def test_private_destinations_are_rejected(address):
-    with mock.patch("socket.getaddrinfo", _fake_getaddrinfo({"internal.test": address})):
-        with pytest.raises(network_safety.UnsafeDestinationError):
-            network_safety.resolve_public_ipv4("internal.test")
+    with mock.patch("socket.getaddrinfo", _fake_getaddrinfo({"internal.test": address})), pytest.raises(network_safety.UnsafeDestinationError):
+        network_safety.resolve_public_ipv4("internal.test")
 
 
 def test_public_destination_is_allowed():
@@ -553,7 +552,7 @@ def test_whois_failures_are_not_cached(monkeypatch):
     def _flaky(domain, server, timeout=None):
         attempts.append(domain)
         if len(attempts) == 1:
-            raise socket.timeout("timed out")
+            raise TimeoutError("timed out")
         return "Domain name: flaky.nl\n"
 
     monkeypatch.setattr(whois_lookup, "_raw_whois", _flaky)
@@ -647,9 +646,8 @@ def test_resolve_public_addresses_keeps_one_address_per_family():
 
 def test_resolve_public_addresses_rejects_a_private_ipv6_answer():
     pairs = [(socket.AF_INET, "93.184.216.34"), (socket.AF_INET6, "fd00::1")]
-    with mock.patch("socket.getaddrinfo", _fake_dual_stack({"mixed.test": pairs})):
-        with pytest.raises(network_safety.UnsafeDestinationError):
-            network_safety.resolve_public_addresses("mixed.test")
+    with mock.patch("socket.getaddrinfo", _fake_dual_stack({"mixed.test": pairs})), pytest.raises(network_safety.UnsafeDestinationError):
+        network_safety.resolve_public_addresses("mixed.test")
 
 
 def test_whois_falls_back_to_the_other_family_when_one_is_blocked(monkeypatch):
@@ -659,7 +657,7 @@ def test_whois_falls_back_to_the_other_family_when_one_is_blocked(monkeypatch):
     def _connect(address_port, timeout):
         tried.append(address_port[0])
         if ":" not in address_port[0]:          # the blocked IPv4 address
-            raise socket.timeout("timed out")
+            raise TimeoutError("timed out")
         sock = mock.MagicMock()
         sock.__enter__.return_value = sock
         sock.recv.side_effect = [b"Domain name: theyosh.nl\r\n", b""]
@@ -675,7 +673,7 @@ def test_whois_falls_back_to_the_other_family_when_one_is_blocked(monkeypatch):
 
 def test_whois_reports_the_failure_when_every_family_is_blocked(monkeypatch):
     def _connect(address_port, timeout):
-        raise socket.timeout("timed out")
+        raise TimeoutError("timed out")
 
     monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
                         lambda server: ["94.198.154.138", "2a00:d78::1"])
@@ -694,7 +692,7 @@ def test_whois_splits_its_timeout_when_a_family_hangs(monkeypatch):
     def _connect(address_port, timeout):
         timeouts.append(timeout)
         clock[0] += timeout          # this address hangs for its whole share
-        raise socket.timeout("timed out")
+        raise TimeoutError("timed out")
 
     monkeypatch.setattr(whois_lookup, "resolve_public_addresses",
                         lambda server: ["94.198.154.138", "2a00:d78::1"])
@@ -785,7 +783,7 @@ def test_whois_serves_stale_when_the_server_is_unreachable(monkeypatch):
         calls.append(domain)
         if len(calls) == 1:
             return "Domain name: theyosh.nl\r\nRegistrar:\r\n   Quickhost B.V.\r\n"
-        raise socket.timeout("timed out")
+        raise TimeoutError("timed out")
 
     monkeypatch.setattr(whois_lookup, "_raw_whois", _flaky)
     clock = [0.0]
@@ -1181,9 +1179,8 @@ def test_a_certificate_error_is_not_retried_with_relaxed_settings():
         calls.append(context)
         raise ssl.SSLCertVerificationError("certificate has expired")
 
-    with mock.patch.object(ssl_checker, "_handshake", handshake):
-        with pytest.raises(ssl.SSLCertVerificationError):
-            ssl_checker._connect("192.0.2.1", 443, "host.example")
+    with mock.patch.object(ssl_checker, "_handshake", handshake), pytest.raises(ssl.SSLCertVerificationError):
+        ssl_checker._connect("192.0.2.1", 443, "host.example")
     assert len(calls) == 1
 
 
@@ -1259,7 +1256,7 @@ def test_a_failure_is_described_without_quoting_the_exception():
 
 
 @pytest.mark.parametrize("exc, expected", [
-    (socket.timeout(), "timed out"),
+    (TimeoutError(), "timed out"),
     (TimeoutError(), "timed out"),
     (ConnectionRefusedError(), "the connection was refused"),
     (ConnectionResetError(), "the connection was reset"),
@@ -1287,6 +1284,7 @@ def test_an_unknown_ssl_reason_still_says_nothing_specific():
 
 def test_an_smtp_reply_is_named_without_repeating_the_servers_words():
     import smtplib
+
     from app.core.failures import describe_smtp
     exc = smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
     described = describe_smtp(exc)
@@ -1297,6 +1295,7 @@ def test_an_smtp_reply_is_named_without_repeating_the_servers_words():
 
 def test_an_unlisted_smtp_reply_falls_back_to_the_class_of_the_reply():
     import smtplib
+
     from app.core.failures import describe_smtp
     transient = smtplib.SMTPResponseException(451, b"4.3.0 try again later")
     permanent = smtplib.SMTPResponseException(571, b"5.7.1 blocked")
@@ -1362,6 +1361,7 @@ def test_describe_can_only_ever_return_a_literal_from_its_own_module():
     import ast
     import inspect
     import smtplib
+
     from app.core import failures
 
     source = inspect.getsource(failures)

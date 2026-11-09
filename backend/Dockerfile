@@ -19,5 +19,11 @@ RUN mkdir -p /app/data && chown abusebox:abusebox /app/data
 
 EXPOSE 8100
 
+# Compose and orchestrators need a readiness signal: without one the frontend
+# starts proxying to a backend that is still running migrations. Python rather
+# than curl/wget, which this image does not carry.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=4).status == 200 else 1)"
+
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100"]

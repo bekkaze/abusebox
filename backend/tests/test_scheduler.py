@@ -1,6 +1,6 @@
 """Scheduler due-time logic (regression tests for issue #20)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
@@ -37,20 +37,20 @@ def test_never_checked_is_due():
 def test_naive_timestamp_from_sqlite_does_not_crash():
     # SQLite drops tzinfo; comparing it with an aware "now" used to raise
     # "can't subtract offset-naive and offset-aware datetimes" and stop the scheduler.
-    hostname = _stored_hostname(datetime.now(timezone.utc))
+    hostname = _stored_hostname(datetime.now(UTC))
     assert hostname.last_checked.tzinfo is None
     assert _is_asset_due(hostname, 60) is False
 
 
 def test_due_after_global_interval():
-    hostname = _stored_hostname(datetime.now(timezone.utc) - timedelta(minutes=61))
+    hostname = _stored_hostname(datetime.now(UTC) - timedelta(minutes=61))
     assert _is_asset_due(hostname, 60) is True
 
 
 def test_per_asset_interval_overrides_global():
-    hostname = _stored_hostname(datetime.now(timezone.utc) - timedelta(minutes=20), interval=15)
+    hostname = _stored_hostname(datetime.now(UTC) - timedelta(minutes=20), interval=15)
     assert _is_asset_due(hostname, 360) is True
-    hostname = _stored_hostname(datetime.now(timezone.utc) - timedelta(minutes=20), interval=30)
+    hostname = _stored_hostname(datetime.now(UTC) - timedelta(minutes=20), interval=30)
     assert _is_asset_due(hostname, 1) is False
 
 

@@ -1,7 +1,9 @@
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import or_
 
 from app.core.timeutil import as_utc, to_utc_iso
 from app.db.session import SessionLocal
@@ -39,7 +41,7 @@ def _is_asset_due(hostname: Hostname, global_interval_minutes: int) -> bool:
         interval = max(hostname.check_interval_minutes, MIN_CHECK_INTERVAL_MINUTES)
     # SQLite returns naive datetimes even though values are stored in UTC.
     last_checked = as_utc(hostname.last_checked)
-    elapsed = (datetime.now(timezone.utc) - last_checked).total_seconds()
+    elapsed = (datetime.now(UTC) - last_checked).total_seconds()
     return elapsed >= interval * 60
 
 
@@ -53,18 +55,36 @@ def _get_global_interval(db) -> int:
 
 
 def due_hostnames(db, global_interval: int) -> list[Hostname]:
+    """Assets whose next check is owed.
+
+    The staleness test is finished in Python, because the effective interval is
+    per-asset with a fallback to the global one and a floor, which is awkward to
+    express portably in SQL. What SQL does do is discard the rows that cannot
+    possibly be due: an asset is due only once it is at least
+    `min(global_interval, MIN_CHECK_INTERVAL_MINUTES)` old, so anything checked
+    more recently than that is not a candidate whatever its own interval says.
+
+    This matters because the loop runs every 60 seconds. Loading every monitored
+    asset each time to discard almost all of them in Python is the same mistake
+    1.4.0 removed from the asset list, one layer down.
+    """
     queued = queued_recheck_ids()
-    hostnames = (
-        db.query(Hostname)
-        .filter(Hostname.is_monitor_enabled == True, Hostname.status == "active")  # noqa: E712
-        .all()
+    # Stored timestamps are naive UTC (SQLite), so compare against naive UTC.
+    floor_minutes = min(global_interval, MIN_CHECK_INTERVAL_MINUTES)
+    cutoff = (datetime.now(UTC) - timedelta(minutes=floor_minutes)).replace(tzinfo=None)
+    query = db.query(Hostname).filter(
+        Hostname.is_monitor_enabled.is_(True),
+        Hostname.status == "active",
+        or_(Hostname.last_checked.is_(None), Hostname.last_checked <= cutoff),
     )
-    return [h for h in hostnames if h.id not in queued and _is_asset_due(h, global_interval)]
+    if queued:
+        query = query.filter(Hostname.id.notin_(queued))
+    return [h for h in query.all() if _is_asset_due(h, global_interval)]
 
 
 def _maybe_prune(db) -> None:
     last = _prune_state["last"]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if last and (now - last).total_seconds() < _PRUNE_EVERY_SECONDS:
         return
     _prune_state["last"] = now
@@ -95,7 +115,7 @@ def _run_cycle_locked() -> int:
     db = SessionLocal()
     checked = 0
     with _status_lock:
-        _status["last_cycle_started"] = datetime.now(timezone.utc)
+        _status["last_cycle_started"] = datetime.now(UTC)
     try:
         global_interval = _get_global_interval(db)
         due = due_hostnames(db, global_interval)
@@ -139,7 +159,7 @@ def _run_cycle_locked() -> int:
     finally:
         db.close()
         with _status_lock:
-            _status["last_cycle_finished"] = datetime.now(timezone.utc)
+            _status["last_cycle_finished"] = datetime.now(UTC)
             _status["last_cycle_checked"] = checked
     return checked
 

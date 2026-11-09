@@ -6,6 +6,18 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 
 ## [Unreleased]
 
+### Added
+
+- Healthchecks on both images; the frontend waits for the backend to answer `/health`.
+- `LOG_LEVEL` and `LOG_FORMAT` (`text` or `json`). Application logs were previously dropped.
+- `ruff` runs in CI.
+
+### Fixed
+
+- SQLite runs in WAL with a busy timeout, so a check cycle no longer collides with a page load as "database is locked". `foreign_keys` is on, so `ON DELETE CASCADE` works.
+- The scheduler no longer loads every monitored asset every 60 seconds to discard most of them.
+- The version is defined once in Python; a test fails if `pyproject.toml` or `package.json` drifts.
+
 ## [1.4.0] - 2026-11-09
 
 A risk score on every asset, server-side paging, and a rebuilt navigation and identity.

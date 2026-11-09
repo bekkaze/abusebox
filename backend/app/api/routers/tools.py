@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
+from app.core.security import get_current_user
+from app.models import User
 from app.services.abuseipdb import check_abuseipdb
 from app.services.dns_records import lookup_dns_records
 from app.services.dnsbl import check_dnsbl_providers
@@ -15,8 +17,6 @@ from app.services.ssl_checker import check_ssl_certificate
 from app.services.subnet_check import check_subnet
 from app.services.target_file_parser import MAX_TARGET_FILE_SIZE, MAX_TARGETS, parse_target_file
 from app.services.whois_lookup import whois_lookup
-from app.core.security import get_current_user
-from app.models import User
 
 router = APIRouter(prefix="/tools", tags=["tools"], dependencies=[Depends(get_current_user)])
 
@@ -125,7 +125,7 @@ def _bulk_check_items(items: list[str]):
             "detected_on": result.get("detected_on", []),
             "error": result.get("error"),
         }
-        for item, result in zip(items, checked)
+        for item, result in zip(items, checked, strict=True)
     ]
     return {
         "total": len(results),

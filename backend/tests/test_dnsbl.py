@@ -4,8 +4,8 @@ Compares abusebox results against independent dnspython queries to verify
 correctness — the same approach tools like MXToolbox use under the hood.
 """
 
-import dns.resolver
 import dns.exception
+import dns.resolver
 import pytest
 
 from app.services.dnsbl import (

@@ -36,7 +36,7 @@ def _valid_target(value: str) -> str:
         raise ValueError("Only http:// and https:// URLs are supported.")
     try:
         host = parsed.hostname or ""
-        parsed.port  # raises on a malformed port
+        parsed.port  # noqa: B018 - evaluated for its side effect: raises on a malformed port
     except ValueError as exc:
         raise ValueError("Enter a domain, an IPv4 address or a URL.") from exc
     try:

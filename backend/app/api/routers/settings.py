@@ -71,7 +71,7 @@ def get_scheduler_status(db: Session = Depends(get_db), user: User = Depends(get
     row = get_app_settings(db)
     monitored = (
         db.query(Hostname)
-        .filter(Hostname.user_id == user.id, Hostname.is_monitor_enabled == True, Hostname.status == "active")  # noqa: E712
+        .filter(Hostname.user_id == user.id, Hostname.is_monitor_enabled == True, Hostname.status == "active")
         .count()
     )
     due = [h for h in due_hostnames(db, row.scheduler_interval_minutes) if h.user_id == user.id]

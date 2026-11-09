@@ -9,9 +9,9 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
-import dns.resolver
 import dns.name
 import dns.rdatatype
+import dns.resolver
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +205,7 @@ def _resolve_ipv4(value: str) -> str | None:
 
     try:
         return socket.gethostbyname(target)
-    except (socket.gaierror, socket.timeout):
+    except (TimeoutError, socket.gaierror):
         return None
 
 
@@ -377,7 +377,7 @@ def check_dnsbl_providers(hostname_or_ip: str, resolved_ip: str | None = None) -
     answered = [p for p in BASE_PROVIDERS if p not in failed_providers]
     with ThreadPoolExecutor(max_workers=12) as executor:
         healthy = executor.map(lambda provider: _answers_test_points(provider, resolver), answered)
-        for provider, ok in zip(answered, healthy):
+        for provider, ok in zip(answered, healthy, strict=True):
             if not ok:
                 listed.pop(provider, None)
                 failed_providers.add(provider)
