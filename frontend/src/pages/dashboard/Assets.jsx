@@ -682,7 +682,7 @@ export default function Assets() {
             </div>
           )}
         >
-          Add a mail server IP or a domain you own. AbuseBox checks it against 24 blacklists right away, then again on a schedule, and alerts you when something changes.
+          Add a mail server IP or a domain you own, IPv4 or IPv6. AbuseBox checks it against every blacklist that covers it right away, then again on a schedule, and alerts you when something changes.
         </EmptyState>
       ) : pageMeta.total === 0 ? (
         <EmptyState

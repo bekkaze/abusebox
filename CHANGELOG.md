@@ -6,6 +6,20 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-10
+
+IPv6 and domain blacklists, finishing the list coverage.
+
+### Added
+
+- **IPv6 blacklist checks** (#33). Addresses are queried as 32 reversed nibbles (RFC 5782 §2.4) against the five zones that answer IPv6: Spamhaus ZEN, Barracuda, SpamCop, UCEPROTECT level 1 and SpamEatingMonkey's IPv6 zone. IPv4-only zones are not queried, so they are never a false "no answer". IPv6 addresses can now be added as assets, stored in one canonical form.
+- **Domain blacklists** (#34): Spamhaus DBL, SURBL and URIBL, queried by name. DBL codes are decoded individually; SURBL and URIBL answers are bitmasks and every bit is decoded, so SURBL's `127.0.0.80` reads as malware and abuse. A domain asset is now checked both by its address and by its name, and a domain that does not resolve is still checked by name.
+- **Abusix Guardian Mail** as an optional keyed list via `ABUSIX_API_KEY`.
+
+### Fixed
+
+- SURBL and URIBL answer `127.0.0.1` to refuse a query. It sits inside the listing block, so read as a listing it would have marked every domain checked. It is reported as "No answer", as are DBL's `127.0.1.255` and URIBL's `127.0.0.255`.
+
 ## [1.4.0] - 2026-11-09
 
 A risk score on every asset, server-side paging, and a rebuilt navigation and identity.

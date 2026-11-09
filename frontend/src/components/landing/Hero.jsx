@@ -103,7 +103,7 @@ const Hero = () => {
               Find the blacklist listing before your users find the bounce.
             </h1>
             <p className='mt-5 text-base sm:text-lg leading-relaxed text-ink-2 max-w-xl'>
-              AbuseBox is a self-hosted monitor that checks your IPs and domains against 24 blacklists, plus SSL,
+              AbuseBox is a self-hosted monitor that checks your IPs and domains against 27 blacklists, plus SSL,
               domain expiry, SPF/DKIM/DMARC and uptime, and tells you what changed.
             </p>
 

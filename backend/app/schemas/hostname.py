@@ -23,14 +23,25 @@ _DNS_NAME = re.compile(r"(?=.{1,253}$)([a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?\.)*
 
 
 def _valid_target(value: str) -> str:
-    """A domain, an IPv4 address, or an http(s) URL (for server-status checks).
+    """A domain, an IP address, or an http(s) URL (for server-status checks).
 
     Asset names end up in alert emails and Slack/Discord messages, so text that
     isn't a real target (spaces, line breaks, markup) is rejected.
     """
     value = value.strip()
     if not value or _FORBIDDEN.search(value):
-        raise ValueError("Enter a domain, an IPv4 address or a URL, without spaces.")
+        raise ValueError("Enter a domain, an IP address or a URL, without spaces.")
+
+    # A bare IPv6 literal has to be recognised before the URL parsing: its
+    # colons would otherwise be read as a port separator. It is stored in the
+    # compressed form so 2001:0db8::1 and 2001:db8::1 are one asset and not
+    # two. Brackets are accepted because that is how an address is written in
+    # a URL, and dropped because the bare address is what gets looked up.
+    try:
+        return str(ipaddress.IPv6Address(value.strip("[]")))
+    except ValueError:
+        pass
+
     parsed = urlparse(value if "://" in value else f"//{value}")
     if "://" in value and parsed.scheme not in ("http", "https"):
         raise ValueError("Only http:// and https:// URLs are supported.")
@@ -38,14 +49,20 @@ def _valid_target(value: str) -> str:
         host = parsed.hostname or ""
         parsed.port  # raises on a malformed port
     except ValueError as exc:
-        raise ValueError("Enter a domain, an IPv4 address or a URL.") from exc
+        raise ValueError("Enter a domain, an IP address or a URL.") from exc
     try:
         ipaddress.IPv4Address(host)
         return value
     except ValueError:
         pass
+    try:
+        # A URL with a bracketed IPv6 host; urlparse has already unwrapped it.
+        ipaddress.IPv6Address(host)
+        return value
+    except ValueError:
+        pass
     if not _DNS_NAME.fullmatch(host):
-        raise ValueError("Enter a domain, an IPv4 address or a URL.")
+        raise ValueError("Enter a domain, an IP address or a URL.")
     return value
 
 
