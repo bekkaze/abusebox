@@ -18,7 +18,7 @@ Self-hosted monitoring for the IPs and domains you run: 24 DNS blacklists, SSL a
 
 </div>
 
-![AbuseBox in 18 seconds: the dashboard, a blacklist check with every listing explained, an asset's report, and dark mode](files/demo.gif)
+![AbuseBox in 16 seconds: the dashboard ordered by risk, the asset list with each asset's score, one asset's report and the factors behind its score, every blacklist with its verdict explained, the standalone blacklist check, and dark mode](files/demo.gif)
 
 ## Quick start
 
