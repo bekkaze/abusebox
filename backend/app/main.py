@@ -1,14 +1,16 @@
 import logging
 import re
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html
 
+from app import __version__
 from app.api.routers import auth_router, blacklist_router, dmarc_router, events_router, hostname_router, settings_router, tools_router
 from app.core.config import settings
+from app.core.logconfig import configure_logging
 from app.db.init_data import seed_default_admin
 from app.db.migrate import run_migrations
 from app.db.session import SessionLocal, engine
@@ -58,9 +60,11 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
+    configure_logging()
+
     app = FastAPI(
         title=settings.app_name,
-        version="1.5.0",
+        version=__version__,
         debug=settings.app_debug,
         docs_url=None if settings.disable_api_docs else "/swagger/",
         openapi_url=None if settings.disable_api_docs else "/openapi.json",
@@ -96,7 +100,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:
-        return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
+        return {"status": "ok", "time": datetime.now(UTC).isoformat()}
 
     return app
 

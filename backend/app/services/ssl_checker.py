@@ -1,11 +1,12 @@
 import logging
 import socket
 import ssl
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
-from app.core.network_safety import resolve_public_ipv4
+
 from app.core.failures import describe
+from app.core.network_safety import resolve_public_ipv4
 
 logger = logging.getLogger(__name__)
 
@@ -134,11 +135,11 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
         # Strip the timezone suffix and assume UTC to avoid %Z parsing issues.
         def _parse_cert_date(s: str) -> datetime:
             s = s.replace(" GMT", "").replace(" UTC", "").strip()
-            return datetime.strptime(s, "%b %d %H:%M:%S %Y").replace(tzinfo=timezone.utc)
+            return datetime.strptime(s, "%b %d %H:%M:%S %Y").replace(tzinfo=UTC)
 
         not_before = _parse_cert_date(cert["notBefore"])
         not_after = _parse_cert_date(cert["notAfter"])
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         days_remaining = (not_after - now).days
         is_expired = days_remaining < 0
 
@@ -180,7 +181,7 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
         return {"hostname": hostname, "valid": False, "error": f"{describe(exc).capitalize()}."}
     except ssl.SSLError as exc:
         return {"hostname": hostname, "valid": False, "error": f"{describe(exc).capitalize()}."}
-    except socket.timeout:
+    except TimeoutError:
         return {"hostname": hostname, "error": "Connection timed out."}
     except socket.gaierror:
         return {"hostname": hostname, "error": "Could not resolve hostname."}

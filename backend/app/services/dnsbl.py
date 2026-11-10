@@ -224,7 +224,7 @@ def _resolve_ipv4(value: str) -> str | None:
 
     try:
         return socket.gethostbyname(target)
-    except (socket.gaierror, socket.timeout):
+    except (TimeoutError, socket.gaierror):
         return None
 
 

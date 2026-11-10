@@ -1,13 +1,12 @@
 """baseline: schema as of 1.2.2
 
 Revision ID: 0001
-Revises: 
+Revises:
 Create Date: 2026-10-26 00:11:58.129369
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = '0001'
 down_revision = None

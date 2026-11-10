@@ -8,10 +8,9 @@ from urllib.parse import urlparse
 
 from app.core.config import settings
 from app.core.domains import registrable_domain as _registrable_domain
-from app.core.logging_safety import for_log
 from app.core.failures import describe
+from app.core.logging_safety import for_log
 from app.core.network_safety import UnsafeDestinationError, resolve_public_addresses
-
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +174,7 @@ def _raw_whois(domain: str, server: str, timeout: float | None = None) -> str:
         per_attempt = max(remaining / attempts_left, 1.0)
         try:
             return _query_address(domain, address, per_attempt)
-        except (socket.timeout, OSError) as exc:
+        except (TimeoutError, OSError) as exc:
             last_error = exc
             logger.info("WHOIS %s unreachable at %s: %s", for_log(server), address, exc)
     raise last_error if last_error is not None else OSError("No usable address for the WHOIS server.")
@@ -432,7 +431,7 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
         # A safety refusal means the name now resolves somewhere it should not;
         # say so rather than papering over it with an older answer.
         return {"error": f"WHOIS query failed: {describe(exc)}."}
-    except (socket.timeout, socket.error, OSError) as exc:
+    except (TimeoutError, OSError) as exc:
         return _stale_or_error(domain, f"WHOIS query failed: {describe(exc)}.")
 
     if not raw.strip():
@@ -444,7 +443,7 @@ def whois_lookup(hostname: str) -> dict[str, Any]:
     if refer_match:
         try:
             raw = _raw_whois(domain, refer_match.group(1))
-        except (UnsafeDestinationError, socket.timeout, socket.error, OSError):
+        except (TimeoutError, UnsafeDestinationError, OSError):
             pass  # Fall back to original response.
 
     parsed = _parse_whois(raw)

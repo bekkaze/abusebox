@@ -8,7 +8,7 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 
 ## [1.5.0] - 2026-11-10
 
-IPv6 and domain blacklists, finishing the list coverage.
+IPv6 and domain blacklists, plus the fixes that keep a busier check cycle from tripping over itself.
 
 ### Added
 
@@ -16,10 +16,15 @@ IPv6 and domain blacklists, finishing the list coverage.
 - **Domain blacklists** (#34): Spamhaus DBL, SURBL and URIBL, queried by name. DBL codes are decoded individually; SURBL and URIBL answers are bitmasks and every bit is decoded, so SURBL's `127.0.0.80` reads as malware and abuse. A domain asset is now checked both by its address and by its name, and a domain that does not resolve is still checked by name.
 - **Abusix Guardian Mail** as an optional keyed list via `ABUSIX_API_KEY`. The key is part of the query name and never appears in a result.
 - IPv6 addresses work in the public quick check, with the same public-address guard as IPv4.
+- Healthchecks on both images; the frontend waits for the backend to answer `/health`.
+- `LOG_LEVEL` and `LOG_FORMAT` (`text` or `json`). Application logs were previously dropped.
 
 ### Fixed
 
 - SURBL and URIBL answer `127.0.0.1` to refuse a query. It sits inside the listing block, so read as a listing it would have marked every domain checked. It is reported as "No answer", as are DBL's `127.0.1.255` and URIBL's `127.0.0.255`.
+- **SQLite runs in WAL with a busy timeout**, so a check cycle no longer collides with a page load as "database is locked". This matters more now that a domain is checked against its address and its name. `foreign_keys` is on, so `ON DELETE CASCADE` works.
+- The scheduler no longer loads every monitored asset every 60 seconds to discard most of them.
+- The version is defined once; a test fails if the three files that state it drift apart.
 
 ## [1.4.0] - 2026-11-09
 

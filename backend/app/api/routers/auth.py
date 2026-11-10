@@ -205,7 +205,7 @@ def update_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You can't deactivate or demote your own account.")
     removing_admin = target.is_superuser and (payload.is_superuser is False or payload.is_active is False)
     if removing_admin:
-        other_admins = db.query(User).filter(User.is_superuser == True, User.is_active == True, User.id != target.id).count()  # noqa: E712
+        other_admins = db.query(User).filter(User.is_superuser == True, User.is_active == True, User.id != target.id).count()
         if other_admins == 0:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one active admin is required.")
     if payload.email is not None and payload.email != target.email:

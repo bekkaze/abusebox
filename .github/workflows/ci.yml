@@ -22,6 +22,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
+      - run: python -m ruff check app tests
       # Live DNSBL tests depend on third-party DNS and are run manually:
       #   pytest -m network
       - run: python -m pytest -m "not network" -q

@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -32,7 +32,7 @@ class DmarcReport(Base):
     # Raw XML stored for reference
     raw_xml: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     records = relationship("DmarcReportRecord", back_populates="report", cascade="all, delete-orphan")
     user = relationship("User")

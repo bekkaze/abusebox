@@ -18,3 +18,8 @@ ENV BACKEND_URL=http://backend:8100
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 3000
+
+# nginx carries no curl either; this is the one tool the image is guaranteed
+# to have and it checks the same socket a browser would reach.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD nginx -t -q && wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1

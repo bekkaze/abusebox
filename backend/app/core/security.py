@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import User
-
 
 # Use PBKDF2-SHA256 to avoid bcrypt backend/runtime incompatibilities in minimal containers.
 # Hashes made with fewer rounds (releases before 1.3.2 used 29,000) still verify
@@ -53,7 +52,7 @@ def burn_password_check(plain_password: str) -> None:
 
 
 def _build_token(subject: str, token_type: str, expires_delta: timedelta, version: int) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": subject,
         "type": token_type,

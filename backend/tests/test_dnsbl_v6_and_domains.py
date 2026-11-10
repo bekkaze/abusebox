@@ -58,8 +58,8 @@ def test_reverse_ipv4_is_the_octet_reversal():
 
 def test_ipv6_test_points_are_the_documented_addresses():
     # ::FFFF:7F00:2 must be listed, ::FFFF:7F00:1 must not be.
-    assert dnsbl._TEST_POINT_LISTED_V6 == dnsbl.reverse_ipv6("::ffff:7f00:2")
-    assert dnsbl._TEST_POINT_NOT_LISTED_V6 == dnsbl.reverse_ipv6("::ffff:7f00:1")
+    assert dnsbl.reverse_ipv6("::ffff:7f00:2") == dnsbl._TEST_POINT_LISTED_V6
+    assert dnsbl.reverse_ipv6("::ffff:7f00:1") == dnsbl._TEST_POINT_NOT_LISTED_V6
 
 
 def test_ipv6_test_points_are_the_ipv4_ones_mapped():

@@ -1,13 +1,12 @@
 """Health summaries, event detection, notifications and retention."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
 from app.services import notifications
 from app.services.events import detect_events
 from app.services.health import domain_expiry_days, summarize
-
 
 PROVIDERS = ["a", "b", "zen.spamhaus.org"]
 
@@ -100,8 +99,8 @@ def test_ssl_threshold_crossing_and_renewal():
 
 
 def test_domain_expiry_crossing():
-    soon = (datetime.now(timezone.utc) + timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    later = (datetime.now(timezone.utc) + timedelta(days=200)).strftime("%Y-%m-%d")
+    soon = (datetime.now(UTC) + timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    later = (datetime.now(UTC) + timedelta(days=200)).strftime("%Y-%m-%d")
     events = detect_events({"whois": {"expiry_date": later}}, {"whois": {"expiry_date": soon}},
                            was_blacklisted=False, is_blacklisted=False, domain_warning_days=30)
     assert types(events) == ["domain.expiring"]
@@ -142,10 +141,10 @@ def test_summary_clean_asset_is_ok():
 
 
 def test_summary_flags_overdue_monitoring():
-    stale = datetime.now(timezone.utc) - timedelta(hours=30)
+    stale = datetime.now(UTC) - timedelta(hours=30)
     health = summarize(_asset(is_monitor_enabled=True, last_checked=stale), {"blacklist": bl()}, global_interval_minutes=360)
     assert health["issues"][0]["kind"] == "monitoring"
-    fresh = summarize(_asset(is_monitor_enabled=True, last_checked=datetime.now(timezone.utc)), {"blacklist": bl()}, global_interval_minutes=360)
+    fresh = summarize(_asset(is_monitor_enabled=True, last_checked=datetime.now(UTC)), {"blacklist": bl()}, global_interval_minutes=360)
     assert fresh["issues"] == []
 
 
@@ -167,7 +166,7 @@ def test_summary_clamps_a_legacy_negative_check_interval():
     # Releases before 1.3.2 stored any number, and the scheduler clamps it to
     # MIN_CHECK_INTERVAL_MINUTES. Health has to agree or it warns forever.
     from app.services.scheduler import _is_asset_due
-    asset = _asset(is_monitor_enabled=True, last_checked=datetime.now(timezone.utc) - timedelta(minutes=1),
+    asset = _asset(is_monitor_enabled=True, last_checked=datetime.now(UTC) - timedelta(minutes=1),
                    check_interval_minutes=-5)
     health = summarize(asset, {"blacklist": bl()}, global_interval_minutes=360)
     assert [i for i in health["issues"] if i["kind"] == "monitoring"] == []
@@ -175,7 +174,7 @@ def test_summary_clamps_a_legacy_negative_check_interval():
 
 
 def test_summary_still_flags_overdue_with_a_valid_own_interval():
-    stale = datetime.now(timezone.utc) - timedelta(hours=5)
+    stale = datetime.now(UTC) - timedelta(hours=5)
     health = summarize(_asset(is_monitor_enabled=True, last_checked=stale, check_interval_minutes=15),
                        {"blacklist": bl()}, global_interval_minutes=360)
     assert health["issues"][0]["kind"] == "monitoring"

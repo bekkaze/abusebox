@@ -1,6 +1,6 @@
 import copy
 import ipaddress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import Lock
 from time import monotonic
 
@@ -100,14 +100,14 @@ def delist(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This provider is not listed in the selected check.")
 
     item["status"] = "requested"
-    item["requested_at"] = datetime.now(timezone.utc).isoformat()
+    item["requested_at"] = datetime.now(UTC).isoformat()
     note = str(payload.delist_required_data.get("comment") or "").strip()
     if note:
         item["note"] = note[:500]
 
     history.result = result
     flag_modified(history, "result")
-    history.updated = datetime.now(timezone.utc)
+    history.updated = datetime.now(UTC)
     db.commit()
 
     return {"msg": "success", "result": result}
