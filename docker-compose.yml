@@ -30,7 +30,7 @@ services:
     volumes:
       - abusebox-data:/app/data
     # The UI reaches the API through nginx at /api; this port is only for
-    # scripts on this machine (README: "API").
+    # scripts on this machine (see docs/api.md).
     ports:
       - 127.0.0.1:8100:8100
   unbound:

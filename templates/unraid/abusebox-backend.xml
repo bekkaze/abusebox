@@ -16,7 +16,7 @@
 
     On the first start an admin password is generated and saved as 'initial_admin_password' in the data path below. The log names the file but does not print the password, so a log you share does not hand over the account. Read it from this container's Console with: cat /app/data/initial_admin_password
 
-    Note on blacklists: Spamhaus and some other lists refuse queries that come through public resolvers such as Google or Cloudflare, and AbuseBox then shows "No answer" instead of a false "clean". Leave DNSBL_NAMESERVERS empty to use Unraid's own resolver, or set it to a resolver you run. See the README section "Blacklists that show No answer".
+    Note on blacklists: Spamhaus and some other lists refuse queries that come through public resolvers such as Google or Cloudflare, and AbuseBox then shows "No answer" instead of a false "clean". Leave DNSBL_NAMESERVERS empty to use Unraid's own resolver, or set it to a resolver you run. See docs/troubleshooting.md, "Blacklists that show No answer".
   </Overview>
   <Category>Tools: Network: Security:</Category>
   <WebUI>http://[IP]:[PORT:8100]/swagger/</WebUI>
