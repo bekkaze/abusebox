@@ -6,7 +6,7 @@
     "role": "owner",
     "name": "bekkaze",
     "email": "bekkaze7@gmail.com",
-    "description": "Creator and sole maintainer of AbuseBox, a free, self-hosted monitor that tells mail and network operators when their IPs and domains land on DNS blacklists, and why. I build and maintain it in my own time: ten releases between March and October 2026, including the security and correctness fixes that came out of user bug reports.",
+    "description": "Creator and sole maintainer of AbuseBox, a free, self-hosted monitor that tells mail and network operators when their IPs and domains land on DNS blacklists, and why. I build and maintain it in my own time: seventeen releases between March and November 2026, including the security and correctness fixes that came out of user bug reports and from a security review of the project's own code.",
     "webpageUrl": {
       "url": "https://bekkaze.github.io/abusebox/"
     }
@@ -15,7 +15,7 @@
     {
       "guid": "abusebox",
       "name": "AbuseBox",
-      "description": "AbuseBox re-checks the IPs and domains an operator runs against 24 DNS blacklists, AbuseIPDB, SSL and domain expiry, SPF/DKIM/DMARC and uptime, and alerts by email, Slack, Discord or webhook when something changes. It is honest about blacklists: every list is verified against its RFC 5782 test addresses on each check, so a list that refuses to answer (Spamhaus does this for Google and Cloudflare DNS) shows as 'No answer' instead of a false 'clean', and every listing is decoded into its meaning and a severity. Hosted monitoring tools charge per IP for this; AbuseBox is MIT licensed, runs with Docker Compose on amd64 and arm64, and keeps the asset list and results on the operator's own server. Version 2 extends it from single mail servers to the small ISPs, hosting providers and network operators who handle abuse for whole address ranges, so they can find and clean up compromised customers before their space is blacklisted.",
+      "description": "AbuseBox re-checks the IPs and domains an operator runs against 28 DNS blacklists, covering IPv4, IPv6 and domain names, plus AbuseIPDB, SSL and domain expiry, SPF/DKIM/DMARC and uptime, and alerts by email, Slack, Discord or webhook when something changes. It is honest about blacklists: every list is verified against its RFC 5782 test points on each check, so a list that refuses to answer (Spamhaus does this for Google and Cloudflare DNS, and SURBL and URIBL answer 127.0.0.1 from inside their own listing range) shows as 'No answer' instead of a false 'clean'. Every listing is decoded into its meaning and a severity taken from that list's own published return codes. Each asset also carries a 0-100 risk score built only from findings the checks produced, weighted by how directly each one stops mail being delivered, shown with every factor and what it contributed, and stated plainly as a ranking aid rather than a probability. Hosted monitoring tools charge per IP for this; AbuseBox is MIT licensed, runs with Docker Compose on amd64 and arm64, and keeps the asset list and results on the operator's own server with no telemetry. Version 2 extends it from single mail servers to the small ISPs, hosting providers and network operators who handle abuse for whole address ranges, so they can find and clean up compromised customers before their space is blacklisted.",
       "webpageUrl": {
         "url": "https://bekkaze.github.io/abusebox/"
       },
@@ -53,7 +53,7 @@
         "guid": "abusebox-v2",
         "status": "active",
         "name": "AbuseBox 2.0: abuse handling for network operators",
-        "description": "About six months of work in four public milestones: (1) accurate results by default: a bundled resolver, IPv6 and domain blacklists; (2) prefixes, ASNs and customers, with scheduled range scans; (3) import of Shadowserver's free network reports; (4) cases per customer that close only when the evidence clears. Each milestone ships as a tagged release with docs and tests.",
+        "description": "Four public milestones, each shipping as a tagged release with documentation and tests. Milestone 1 is already delivered, unfunded, and can be inspected today: accurate results by default, meaning the bundled recursive resolver (v1.3.2, so the lists see the operator's own address rather than a public resolver they refuse), IPv6 lookups in RFC 5782 nibble format and domain blacklists on Spamhaus DBL, SURBL and URIBL (v1.5.0, 10 November 2026). The three remaining milestones are: (2) telling an operator why each listing happened, whether the cause is fixed, and whether a delisting request is worth spending, since a request made before the cause is fixed is relisted within days; (3) prefixes, ASNs and customers instead of single addresses, with scheduled range scans and PostgreSQL for the row counts that implies; (4) import of Shadowserver's free daily network reports, and cases per customer that close only when the evidence clears.",
         "amount": 10000,
         "currency": "USD",
         "frequency": "one-time",

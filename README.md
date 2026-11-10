@@ -6,7 +6,7 @@
 
 **Know your mail server is blacklisted before your users do.**
 
-Self-hosted monitoring for the IPs and domains you run: 27 DNS blacklists across IPv4, IPv6 and domain names, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.
+Self-hosted monitoring for the IPs and domains you run: 28 DNS blacklists across IPv4, IPv6 and domain names, SSL and domain expiry, SPF/DKIM/DMARC and uptime, with an alert when something changes.
 
 [Website](https://bekkaze.github.io/abusebox/) &nbsp;|&nbsp; [Quick start](#quick-start) &nbsp;|&nbsp; [Changelog](CHANGELOG.md)
 
@@ -33,7 +33,7 @@ Open `http://localhost:3000` and sign in as `admin` with the password from `dock
 
 - **Results you can trust.** Before trusting a blacklist, AbuseBox checks it against its test addresses (RFC 5782). A list that refuses your resolver shows **No answer**, not a false "clean". Try it: through Google DNS, Spamhaus says "not listed" for everything.
 - **Every listing explained.** Spamhaus SBL (a spam source) and PBL (an end-user range) are not the same problem. Each listing comes with its meaning and a severity, so you know what to fix first.
-- **Mail-server health in one place.** 27 blacklists, AbuseIPDB, SSL and domain expiry, SPF/DKIM/DMARC grades, DMARC reports and uptime.
+- **Mail-server health in one place.** 28 blacklists, AbuseIPDB, SSL and domain expiry, SPF/DKIM/DMARC grades, DMARC reports and uptime.
 - **Ranked by what actually matters.** Every asset gets a risk score out of 100, weighted by the severity each blacklist's own return codes decode to, so one critical listing outranks three cosmetic ones. The score shows its working: every factor, what it contributed, and out of what.
 - **Tells you what changed.** Scheduled checks, an activity log, and alerts by email, Slack, Discord or webhook when something is listed, delisted, goes down or is about to expire.
 - **Yours.** Self-hosted, MIT licensed, no telemetry, no paid tier.
@@ -53,7 +53,7 @@ If AbuseBox saves you a bounce, a star helps other mail operators find it.
 - Alerts by email, Slack, Discord or webhook for new listings, removals, outages, recoveries and expiry warnings
 
 **Checks**
-- **Blacklists:** 24 IPv4 lists, 5 of them answering IPv6 as well, plus Spamhaus DBL, SURBL and URIBL for domain names. Every listing is decoded with its meaning and a severity, and every list verified against its own test points
+- **Blacklists:** 28 lists in all: 24 for IPv4, 5 answering IPv6 (one of them IPv6-only), plus Spamhaus DBL, SURBL and URIBL for domain names. Every listing is decoded with its meaning and a severity, and every list verified against its own test points
 - **AbuseIPDB:** abuse confidence score, reports, ISP and country (free API key)
 - **SSL:** validity, issuer, expiry, covered names, and whether the TLS version and cipher are still acceptable
 - **WHOIS:** registrar, dates, name servers and abuse contact, over IPv6 or IPv4

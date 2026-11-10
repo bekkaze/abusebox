@@ -36,7 +36,7 @@ const LandingPage = () => {
 
         <Band id='checks-title' title='What it checks'>
           <Fields className='items-baseline gap-y-2.5 text-[15px]'>
-            <Field name='Blacklists'>27 DNS blacklists across IPv4, IPv6 and domain names, each listing decoded with its meaning and a severity.</Field>
+            <Field name='Blacklists'>28 DNS blacklists across IPv4, IPv6 and domain names, each listing decoded with its meaning and a severity.</Field>
             <Field name='AbuseIPDB'>Abuse confidence score, report count, ISP and country for an IP (with a free API key).</Field>
             <Field name='SSL'>Validity, issuer, expiry date and covered names of the certificate.</Field>
             <Field name='WHOIS'>Registrar, name servers and when the domain expires.</Field>
