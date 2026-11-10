@@ -1,11 +1,14 @@
 import ipaddress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.api.routers.events import serialize_event
+from app.core.config import settings
 from app.core.security import get_current_user
+from app.core.timeutil import to_utc_iso
 from app.db.session import get_db
 from app.models import AssetEvent, CheckHistory, Hostname, User
 from app.schemas import (
@@ -20,13 +23,10 @@ from app.schemas import (
     HostnameResponse,
     HostnameUpdateRequest,
 )
-from app.core.config import settings
-from app.core.timeutil import to_utc_iso
 from app.services.app_settings import get_app_settings
 from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
 from app.services.health import summarize
 from app.services.monitoring import queue_rechecks, record_check
-from app.api.routers.events import serialize_event
 
 router = APIRouter(prefix="/hostname", tags=["hostname"])
 
@@ -116,7 +116,7 @@ def create_hostname(
         status="active",
         # Checks run right below; mark the asset as checked now so the
         # scheduler doesn't pick it up and check it a second time meanwhile.
-        last_checked=datetime.now(timezone.utc),
+        last_checked=datetime.now(UTC),
     )
     db.add(hostname)
     db.commit()
@@ -191,7 +191,7 @@ def import_cidr(
     try:
         network = ipaddress.IPv4Network(payload.cidr, strict=False)
     except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid CIDR: {exc}")
+        raise HTTPException(status_code=400, detail=f"Invalid CIDR: {exc}") from exc
 
     if network.prefixlen < 24:
         raise HTTPException(status_code=400, detail="Maximum /24 (256 addresses) allowed")
@@ -318,7 +318,7 @@ def _sort_key(key: str):
         return lambda item: (_descending_time(item.created), item.hostname.lower())
     return lambda item: (
         -((item.health or {}).get("risk") or {}).get("score", 0),
-        len(((item.health or {}).get("issues") or [])) * -1,
+        len((item.health or {}).get("issues") or []) * -1,
         item.hostname.lower(),
     )
 

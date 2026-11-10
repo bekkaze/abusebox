@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -20,6 +20,6 @@ class AssetEvent(Base):
     severity: Mapped[str] = mapped_column(String(10), nullable=False)  # critical | warning | info | success
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True)
 
     hostname_ref = relationship("Hostname", back_populates="events")

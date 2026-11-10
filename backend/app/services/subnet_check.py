@@ -10,7 +10,6 @@ from app.services.dnsbl import (
     _make_resolver,
 )
 
-
 MAX_SUBNET_SIZE = 256  # /24 max
 
 
@@ -46,8 +45,8 @@ def check_subnet(cidr: str, providers: list[str] | None = None) -> dict[str, Any
     # flag the whole range, and one refusing us would report it all clean.
     with ThreadPoolExecutor(max_workers=max(len(providers), 1)) as executor:
         healthy = list(executor.map(lambda provider: _answers_test_points(provider, resolver), providers))
-    failed_providers = [p for p, ok in zip(providers, healthy) if not ok]
-    providers = [p for p, ok in zip(providers, healthy) if ok]
+    failed_providers = [p for p, ok in zip(providers, healthy, strict=True) if not ok]
+    providers = [p for p, ok in zip(providers, healthy, strict=True) if ok]
 
     def _query(reversed_ip: str, batch: list[str]) -> tuple[list[str], dict[str, str]]:
         listed_on: list[str] = []

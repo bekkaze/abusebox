@@ -6,7 +6,7 @@ import gzip
 import io
 import logging
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from xml.etree import ElementTree
 
@@ -30,7 +30,7 @@ def _int(el: ElementTree.Element | None, path: str, default: int = 0) -> int:
 
 def _ts_to_dt(ts: str) -> datetime | None:
     try:
-        return datetime.fromtimestamp(int(ts), tz=timezone.utc)
+        return datetime.fromtimestamp(int(ts), tz=UTC)
     except (ValueError, TypeError, OSError):
         return None
 

@@ -7,12 +7,12 @@ read from these helpers so they agree on what counts as a problem.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.timeutil import as_utc
-from app.services.risk import risk_score
 from app.schemas.hostname import MIN_CHECK_INTERVAL_MINUTES
+from app.services.risk import risk_score
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 
@@ -93,7 +93,7 @@ def _parse_whois_date(value: Any) -> datetime | None:
     head = re.split(r"[ T(]", text, maxsplit=1)[0]
     for fmt in _WHOIS_DATE_FORMATS:
         try:
-            return datetime.strptime(head, fmt).replace(tzinfo=timezone.utc)
+            return datetime.strptime(head, fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
     return None
@@ -106,7 +106,7 @@ def domain_expiry_days(result: dict | None, now: datetime | None = None) -> int 
     expiry = _parse_whois_date(whois.get("expiry_date"))
     if expiry is None:
         return None
-    return (expiry - (now or datetime.now(timezone.utc))).days
+    return (expiry - (now or datetime.now(UTC))).days
 
 
 def summarize(
@@ -120,7 +120,7 @@ def summarize(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Compact health for one asset: per-check status plus a list of issues."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     parts = split_result(result)
     issues: list[dict[str, str]] = []
     health: dict[str, Any] = {}

@@ -1,6 +1,6 @@
 """v1.2 API: events, health, bulk actions, notifications, users, retention."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest import mock
 
 import pytest
@@ -183,7 +183,7 @@ def test_scheduler_status_and_retention_setting(client, admin_headers):
 
 
 def test_retention_prunes_only_old_history(client, admin_headers, asset):
-    old = datetime.now(timezone.utc) - timedelta(days=100)
+    old = datetime.now(UTC) - timedelta(days=100)
     with SessionLocal() as db:
         db.add(CheckHistory(hostname_id=asset["id"], result={}, status="historical", created=old))
         db.add(CheckHistory(hostname_id=asset["id"], result={}, status="historical"))

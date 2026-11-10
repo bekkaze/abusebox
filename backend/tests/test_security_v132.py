@@ -3,7 +3,7 @@
 import dataclasses
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
@@ -72,11 +72,11 @@ def test_scheduler_ignores_too_short_stored_intervals():
     # Releases before 1.3.2 accepted any interval, so old rows may hold -5 or 1.
     from app.services.scheduler import _is_asset_due
 
-    checked_a_minute_ago = datetime.now(timezone.utc) - timedelta(minutes=1)
+    checked_a_minute_ago = datetime.now(UTC) - timedelta(minutes=1)
     for stored in (-5, 1):
         asset = SimpleNamespace(last_checked=checked_a_minute_ago, check_interval_minutes=stored)
         assert _is_asset_due(asset, 360) is False
-    asset = SimpleNamespace(last_checked=datetime.now(timezone.utc) - timedelta(minutes=16), check_interval_minutes=1)
+    asset = SimpleNamespace(last_checked=datetime.now(UTC) - timedelta(minutes=16), check_interval_minutes=1)
     assert _is_asset_due(asset, 360) is True
 
 

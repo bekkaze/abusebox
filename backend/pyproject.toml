@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "backend"
-version = "1.4.0"
+version = "1.5.0"
 description = "AbuseBox FastAPI backend"
 authors = ["bekkaze <bekkaze7@gmail.com>"]
 readme = "README.md"
@@ -25,6 +25,38 @@ alembic = "^1.20.1"
 pytest = "^9.1.1"
 pytest-timeout = "^2.4.0"
 httpx = "^0.28.1"
+
+[tool.ruff]
+line-length = 160
+target-version = "py311"
+
+[tool.ruff.lint]
+# Defaults plus the bug-finding and modernisation sets. Deliberately not the
+# whole catalogue: a linter nobody can keep green teaches people to ignore it.
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "RUF"]
+ignore = [
+    "E501",    # line length is enforced by the formatter, not by failing CI
+    "B008",    # Depends()/Query() in defaults is how FastAPI is written
+    "RUF012",  # ClassVar annotations add noise to SQLAlchemy models
+    # The remaining few are cases where the rule's rewrite is harder to read
+    # than what is there. A linter should not cost clarity to reach zero.
+    "SIM105",  # try/except/pass next to a comment beats contextlib.suppress here
+    "SIM108",  # the suggested ternaries are longer than the if/else they replace
+    "SIM117",  # the nested `with` in ssl_checker carries a comment between them
+    "B007",    # unused loop variables that document what is being iterated
+    "RUF015",  # `[0]` after a comprehension reads fine in tests
+    "RUF059",  # unpacked-but-unused names document a tuple's shape in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+# `== True` reads as noise but is how SQLAlchemy builds a SQL comparison;
+# `is True` would evaluate in Python and silently filter nothing.
+"app/api/routers/*.py" = ["E712"]
+"app/services/*.py" = ["E712"]
+"tests/*.py" = ["E712", "S101"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Body", "fastapi.Form", "fastapi.Path"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

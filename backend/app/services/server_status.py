@@ -124,7 +124,7 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
     # DNS resolution check
     try:
         socket.getaddrinfo(hostname, None, socket.AF_INET)
-    except (socket.gaierror, socket.timeout, UnicodeError):
+    except (TimeoutError, socket.gaierror, UnicodeError):
         result["resolved_ip"] = None
         result["dns_resolves"] = False
         result["is_up"] = False
@@ -150,7 +150,7 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
         try:
             sock.connect((ip, port))
             result[f"port_{port}_open"] = True
-        except (socket.timeout, socket.error, OSError):
+        except (TimeoutError, OSError):
             result[f"port_{port}_open"] = False
         finally:
             sock.close()

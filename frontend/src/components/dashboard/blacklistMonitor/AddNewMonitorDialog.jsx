@@ -63,7 +63,7 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
-                    <label htmlFor={`${id}-hostname`} className={labelClass}>Domain or IPv4</label>
+                    <label htmlFor={`${id}-hostname`} className={labelClass}>Domain or IP address</label>
                     <input
                       id={`${id}-hostname`}
                       type="text"
@@ -74,7 +74,7 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                       autoComplete="off"
                       autoCapitalize="off"
                       spellCheck="false"
-                      placeholder="mail.example.com or 203.0.113.10"
+                      placeholder="mail.example.com, 203.0.113.10 or 2001:db8::1"
                       className={`${inputClass} font-mono`}
                     />
                   </div>
@@ -84,6 +84,7 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                       <option value="">Select</option>
                       <option value="domain">Domain</option>
                       <option value="ipv4">IPv4</option>
+                      <option value="ipv6">IPv6</option>
                     </select>
                   </div>
                 </div>

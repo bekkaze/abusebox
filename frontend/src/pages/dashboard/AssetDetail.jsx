@@ -13,6 +13,7 @@ import { ResultVerdict } from '../../components/blacklist/ResultTableQuick';
 import { blacklistReportText } from '../../components/blacklist/reportText';
 import { sortProviders } from '../../components/blacklist/providerStatus';
 import AddNewMonitorDialog from '../../components/dashboard/blacklistMonitor/AddNewMonitorDialog';
+import { assetTypeLabel } from '../../components/dashboard/blacklistMonitor/assetForm';
 import { SkeletonLine } from '../../components/shared/Skeleton';
 import CopyButton, { CopyTextButton } from '../../components/shared/CopyButton';
 import TimeAgo from '../../components/shared/TimeAgo';
@@ -294,7 +295,7 @@ export default function AssetDetail() {
               <h1 className="font-mono text-xl font-semibold text-ink break-all">{asset.hostname}</h1>
               <CopyButton text={asset.hostname} label="Copy hostname" />
               <span className="inline-flex rounded bg-sunk px-1.5 py-0.5 text-xs font-medium text-ink-2 ring-1 ring-inset ring-rule">
-                {asset.hostname_type === 'ipv4' ? 'IPv4' : 'Domain'}
+                {assetTypeLabel(asset.hostname_type)}
               </span>
             </div>
             {asset.owner && (

@@ -52,13 +52,13 @@ export default function BlacklistCheck() {
     <div>
       <PageHeader
         title="Blacklist check"
-        description="Checks one IPv4 address or domain against every DNS blacklist and says why each one lists it."
+        description="Checks one IP address or domain against every blacklist that covers it, and says why each one lists it."
       />
 
       <ResolverWarning className="mb-5" />
 
       <LookupForm
-        label="IPv4 address or domain"
+        label="IP address or domain"
         value={hostname}
         onChange={setHostname}
         onSubmit={() => handleCheck()}

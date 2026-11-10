@@ -1,12 +1,12 @@
 """UTC helpers. SQLite returns naive datetimes even though every stored value is UTC."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def as_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def to_utc_iso(value: datetime | None) -> str | None:

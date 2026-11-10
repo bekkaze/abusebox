@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -33,8 +33,8 @@ class Hostname(Base):
     check_server_status: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     check_interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     last_checked: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
-    created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    updated: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
 
     user = relationship("User", back_populates="hostnames")
     checks = relationship("CheckHistory", back_populates="hostname_ref", cascade="all, delete-orphan")

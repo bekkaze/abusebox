@@ -1,6 +1,6 @@
 import copy
 import ipaddress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import Lock
 from time import monotonic
 
@@ -13,7 +13,7 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models import CheckHistory, Hostname, User
 from app.schemas import DelistRequest
-from app.services.dnsbl import _resolve_ipv4, check_dnsbl_providers, resolver_health
+from app.services.dnsbl import check_dnsbl_providers, resolver_health, target_address
 
 router = APIRouter(prefix="/blacklist", tags=["blacklist"])
 
@@ -51,9 +51,9 @@ def quick_check(request: Request, hostname: str | None = None):
     # Anyone can use this endpoint, so it only checks public addresses: an
     # internal name would otherwise reveal whether it resolves, and its private
     # IP would be sent to two dozen outside blacklist operators.
-    resolved = _resolve_ipv4(hostname)
+    resolved, _family = target_address(hostname)
     if not resolved:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve hostname to IPv4 address")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve hostname to an IP address")
     if not ipaddress.ip_address(resolved).is_global:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only public IP addresses and domains can be checked.")
     result = check_dnsbl_providers(hostname, resolved)
@@ -100,14 +100,14 @@ def delist(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This provider is not listed in the selected check.")
 
     item["status"] = "requested"
-    item["requested_at"] = datetime.now(timezone.utc).isoformat()
+    item["requested_at"] = datetime.now(UTC).isoformat()
     note = str(payload.delist_required_data.get("comment") or "").strip()
     if note:
         item["note"] = note[:500]
 
     history.result = result
     flag_modified(history, "result")
-    history.updated = datetime.now(timezone.utc)
+    history.updated = datetime.now(UTC)
     db.commit()
 
     return {"msg": "success", "result": result}

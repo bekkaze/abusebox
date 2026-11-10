@@ -11,6 +11,7 @@ import { useAuth } from "../../services/auth/authProvider";
 import AddNewMonitorDialog from "../../components/dashboard/blacklistMonitor/AddNewMonitorDialog";
 import CidrImportDialog from "../../components/dashboard/blacklistMonitor/CidrImportDialog";
 import BulkMonitorDialog from "../../components/dashboard/blacklistMonitor/BulkMonitorDialog";
+import { assetTypeLabel } from "../../components/dashboard/blacklistMonitor/assetForm";
 import { SkeletonLine } from "../../components/shared/Skeleton";
 import AutoRefresh from "../../components/shared/AutoRefresh";
 import TimeAgo from "../../components/shared/TimeAgo";
@@ -178,7 +179,7 @@ function exportAssetsCsv(assets) {
   downloadCsv(rows, `abusebox-assets-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
-const typeLabel = (item) => (item.hostname_type === 'ipv4' ? 'IPv4' : 'Domain');
+const typeLabel = (item) => assetTypeLabel(item.hostname_type);
 
 function HealthBadge({ item }) {
   const health = healthOf(item);
@@ -682,7 +683,7 @@ export default function Assets() {
             </div>
           )}
         >
-          Add a mail server IP or a domain you own. AbuseBox checks it against 24 blacklists right away, then again on a schedule, and alerts you when something changes.
+          Add a mail server IP or a domain you own, IPv4 or IPv6. AbuseBox checks it against every blacklist that covers it right away, then again on a schedule, and alerts you when something changes.
         </EmptyState>
       ) : pageMeta.total === 0 ? (
         <EmptyState

@@ -1,88 +1,56 @@
+"""Blacklist lookups: build the query, read the answer, decide if it counts.
+
+The catalogue of lists and what their codes mean is in `dnsbl_lists`. Nothing
+here branches on a particular zone; a list describes itself and this module
+follows what it says.
+"""
+
 import ipaddress
 import logging
 import os
+import secrets
 import socket
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
 import dns.resolver
-import dns.name
-import dns.rdatatype
+
+# Re-exported so every existing import of `app.services.dnsbl` keeps working.
+from app.services.dnsbl_lists import (
+    BASE_PROVIDERS,
+    DNSBL_LISTS,
+    DOMAIN_PROVIDERS,
+    LISTS_BY_ZONE,
+    SEVERITIES,
+    DnsblList,
+    _api_key,
+    providers_for,
+)
 
 logger = logging.getLogger(__name__)
 
-SEVERITIES = ("critical", "high", "medium", "low", "info")
-
-
-@dataclass(frozen=True)
-class DnsblList:
-    zone: str
-    name: str
-    severity: str  # of a listing whose code has no entry in `codes`
-    meaning: str
-    # Listing code -> (meaning, severity), for lists that say why they list.
-    codes: dict[str, tuple[str, str]] = field(default_factory=dict)
-    # 127.0.0.x answers that are not listings (e.g. a neutral reputation).
-    ignored: frozenset[str] = frozenset()
-
-
-_ZEN_XBL = ("XBL: compromised host or botnet", "critical")
-
-# Every zone here answers the RFC 5782 test points (127.0.0.2 listed, 127.0.0.1
-# not listed). Severity follows how much weight mail filters give a list
-# (SpamAssassin and Rspamd defaults) and what its codes mean, not how alarming
-# its name sounds. Zones that stopped answering the test points (SORBS, MSRBL,
-# abuse.ch, NiX Spam, WPBL, AUPADS, ...) were removed in 1.2.1, and lists that
-# only added noise (bogons.cymru.com, blackholes.five-ten-sg.com,
-# cbl.abuseat.org, korea.services.net, UCEPROTECT levels 2/3) in 1.2.2.
-DNSBL_LISTS = [
-    DnsblList("zen.spamhaus.org", "Spamhaus ZEN", "critical", "listed by Spamhaus", codes={
-        "127.0.0.2": ("SBL: spam source", "critical"),
-        "127.0.0.3": ("CSS: snowshoe spam source", "critical"),
-        "127.0.0.4": _ZEN_XBL,
-        "127.0.0.5": _ZEN_XBL,
-        "127.0.0.6": _ZEN_XBL,
-        "127.0.0.7": _ZEN_XBL,
-        "127.0.0.9": ("DROP: hijacked or criminal network", "critical"),
-        # PBL is policy, not reputation, but Microsoft 365 and others reject on it.
-        "127.0.0.10": ("PBL: end-user range, listed by its ISP", "high"),
-        "127.0.0.11": ("PBL: end-user range, listed by Spamhaus", "high"),
-    }),
-    DnsblList("b.barracudacentral.org", "Barracuda", "high", "poor sending reputation"),
-    DnsblList("bl.spamcop.net", "SpamCop", "medium", "reported spam source"),
-    DnsblList("bl.mailspike.net", "Mailspike", "medium", "poor sending reputation", codes={
-        "127.0.0.2": ("zero-hour spam source", "medium"),
-        "127.0.0.10": ("worst reputation (L5)", "medium"),
-        "127.0.0.11": ("very bad reputation (L4)", "medium"),
-        "127.0.0.12": ("bad reputation (L3)", "low"),
-    }, ignored=frozenset({"127.0.0.13"})),  # L2 is neutral
-    DnsblList("psbl.surriel.com", "PSBL", "medium", "spamtrap hits"),
-    DnsblList("bl.blocklist.de", "blocklist.de", "medium", "attack source (fail2ban reports)"),
-    DnsblList("bip.virusfree.cz", "VirusFree", "medium", "botnet source"),
-    DnsblList("spam.spamrats.com", "SpamRATS Spam", "medium", "spam source"),
-    DnsblList("bl.spameatingmonkey.net", "SpamEatingMonkey", "low", "spamtrap hits, or end-user range by policy"),
-    DnsblList("dnsbl-1.uceprotect.net", "UCEPROTECT level 1", "low", "spamtrap hits from this IP"),
-    DnsblList("dnsbl.dronebl.org", "DroneBL", "low", "botnet, open proxy or drone"),
-    DnsblList("dyna.spamrats.com", "SpamRATS Dyna", "low", "policy: reverse DNS looks dynamic"),
-    DnsblList("noptr.spamrats.com", "SpamRATS NoPtr", "low", "policy: no reverse DNS"),
-    DnsblList("all.s5h.net", "s5h.net", "low", "spam source"),
-    DnsblList("bl.0spam.org", "0spam", "low", "spam source"),
-    DnsblList("bl.nordspam.com", "NordSpam", "low", "spam source"),
-    DnsblList("rbl.interserver.net", "InterServer", "low", "abuse reports"),
-    DnsblList("singular.ttk.pte.hu", "TTK", "low", "spam source"),
-    DnsblList("spam.dnsbl.anonmails.de", "anonmails.de", "low", "spam source"),
-    DnsblList("spambot.bls.digibase.ca", "Digibase", "low", "spambot"),
-    DnsblList("truncate.gbudb.net", "GBUdb Truncate", "low", "spam source"),
-    DnsblList("ips.backscatterer.org", "Backscatterer", "info", "backscatter: bounces to forged senders"),
-    DnsblList("dnsbl.spfbl.net", "SPFBL", "info", "bad reputation (for scoring only)"),
-    DnsblList("spamsources.fabel.dk", "fabel.dk", "info", "spam source (may list whole networks)"),
+__all__ = [
+    "BASE_PROVIDERS",
+    "DNSBL_LISTS",
+    "DOMAIN_PROVIDERS",
+    "LISTS_BY_ZONE",
+    "REFUSED",
+    "SEVERITIES",
+    "UNREACHABLE",
+    "DnsblList",
+    "check_dnsbl_providers",
+    "describe_listing",
+    "providers_for",
+    "resolver_health",
+    "resolver_source",
+    "reverse_ipv4",
+    "reverse_ipv6",
+    "target_address",
+    "test_points_for",
 ]
-LISTS_BY_ZONE = {item.zone: item for item in DNSBL_LISTS}
-BASE_PROVIDERS = sorted(LISTS_BY_ZONE)
 
 _DNSBL_TIMEOUT = 5.0
 _INCONCLUSIVE_FAILURE_RATIO = 0.20
@@ -94,6 +62,10 @@ _INCONCLUSIVE_FAILURE_RATIO = 0.20
 # (AHBL did this when it shut down in 2015), so its listings mean nothing.
 _TEST_POINT_LISTED = "2.0.0.127"
 _TEST_POINT_NOT_LISTED = "1.0.0.127"
+# RFC 5782 section 5: the IPv6 test points are ::FFFF:7F00:2 and ::FFFF:7F00:1,
+# written as reversed nibbles like any other IPv6 query.
+_TEST_POINT_LISTED_V6 = "2.0.0.0.0.0.f.7.f.f.f.f.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
+_TEST_POINT_NOT_LISTED_V6 = "1.0.0.0.0.0.f.7.f.f.f.f.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
 _TEST_POINT_TTL = 1800.0
 _test_point_ok_until: dict[str, float] = {}
 
@@ -178,6 +150,53 @@ def resolver_source() -> str:
     return _resolver_choice["source"]
 
 
+def reverse_ipv6(address: str) -> str:
+    """An IPv6 address as 32 reversed nibbles (RFC 5782 section 2.4).
+
+    ``2001:db8::1`` becomes
+    ``1.0.0.0.<...>.8.b.d.0.1.0.0.2``, which is what every IPv6 zone expects.
+    """
+    # From the packed bytes, not the text form: a v4-mapped address such as
+    # ::ffff:7f00:2 renders as "::ffff:127.0.0.2", so stripping colons out of
+    # `exploded` would leave the dotted quad embedded in the query. The IPv6
+    # test points are exactly that shape, so this is not a corner case.
+    return ".".join(reversed(ipaddress.IPv6Address(address).packed.hex()))
+
+
+def reverse_ipv4(address: str) -> str:
+    return ".".join(reversed(address.split(".")))
+
+
+def _extract_host(value: str) -> str:
+    """The bare host from a URL, host:port or plain name."""
+    target = (value or "").strip()
+    if not target:
+        return ""
+    if "://" in target:
+        parsed = urlparse(target)
+        target = parsed.hostname or ""
+    elif "/" in target:
+        parsed = urlparse(f"//{target}", scheme="http")
+        target = parsed.hostname or target.split("/", 1)[0]
+    # A bracketed IPv6 literal is already unwrapped by urlparse; a bare
+    # host:port is only a port when there is exactly one colon, since an
+    # unbracketed IPv6 address has several.
+    if ":" in target and target.count(":") == 1:
+        host, port = target.rsplit(":", 1)
+        if port.isdigit():
+            target = host
+    return target.strip().strip("[]")
+
+
+def _parse_address(host: str) -> tuple[str | None, str]:
+    """(normalised address, family) when *host* is a literal IP, else (None, "")."""
+    try:
+        parsed = ipaddress.ip_address(host)
+    except ValueError:
+        return None, ""
+    return str(parsed), ("ipv6" if parsed.version == 6 else "ipv4")
+
+
 def _resolve_ipv4(value: str) -> str | None:
     target = (value or "").strip()
     if not target:
@@ -205,16 +224,43 @@ def _resolve_ipv4(value: str) -> str | None:
 
     try:
         return socket.gethostbyname(target)
-    except (socket.gaierror, socket.timeout):
+    except (TimeoutError, socket.gaierror):
         return None
 
 
+# A DNS name is 253 characters at most. A domain zone appends its own suffix
+# to the name being asked about, so a long name can push the query past the
+# limit; the zone is not at fault and must not be recorded as "no answer".
+_MAX_DNS_NAME = 253
+
+
+def target_address(value: str) -> tuple[str | None, str]:
+    """The address *value* will be checked at, and its family.
+
+    An IP literal is used as given, of either family. A name is resolved to
+    IPv4, which is what the blacklists answer for. Returns ``(None, "")`` when
+    a name does not resolve.
+    """
+    host = _extract_host(value)
+    address, family = _parse_address(host)
+    if address:
+        return address, family
+    resolved = _resolve_ipv4(value)
+    return (resolved, "ipv4") if resolved else (None, "")
+
+
 def _query_zone(provider: str) -> str:
-    # With a Spamhaus Data Query Service key, ask the keyed mirror instead of
-    # the public one (required for commercial use, including ISPs).
-    key = os.environ.get("SPAMHAUS_DQS_KEY", "").strip()
-    if key and provider == "zen.spamhaus.org":
-        return f"{key}.zen.dq.spamhaus.net"
+    """The hostname to actually query, which differs when a key is configured.
+
+    A key is never logged: it is part of the query name, so it reaches the
+    operator's resolver by design, but nothing here writes the query out.
+    """
+    meta = LISTS_BY_ZONE.get(provider)
+    if meta is None:
+        return provider
+    key = _api_key(meta)
+    if key and meta.keyed_zone:
+        return meta.keyed_zone.format(key=key)
     return provider
 
 
@@ -227,8 +273,11 @@ def _lookup(
 
     failure is None when the provider answered, else REFUSED or UNREACHABLE.
     """
+    meta = LISTS_BY_ZONE.get(provider)
+    ignored = meta.ignored if meta else frozenset()
+    prefix = meta.prefix if meta else "127.0.0."
+    refusals = meta.refusals if meta else frozenset()
     query = f"{reversed_ip}.{_query_zone(provider)}"
-    ignored = LISTS_BY_ZONE[provider].ignored if provider in LISTS_BY_ZONE else frozenset()
     try:
         answers = [rdata.to_text() for rdata in resolver.resolve(query, "A")]
     except dns.resolver.NXDOMAIN:
@@ -241,9 +290,15 @@ def _lookup(
         # Actual failures: timeout, servfail, etc.
         return [], UNREACHABLE
 
-    # Only 127.0.0.x responses indicate a real listing.
-    in_range = [answer for answer in answers if answer.startswith("127.0.0.")]
+    # Only answers inside this zone's own block indicate a real listing.
+    # Spamhaus DBL uses 127.0.1.x; everything else 127.0.0.x.
+    in_range = [answer for answer in answers if answer.startswith(prefix)]
     if in_range:
+        # SURBL and URIBL answer 127.0.0.1 to say they are refusing the query,
+        # which sits inside the listing block. Read as a listing it would mark
+        # every domain checked, so it is a failure, not a finding.
+        if any(answer in refusals for answer in in_range):
+            return [], REFUSED
         return sorted((answer for answer in in_range if answer not in ignored), key=ipaddress.IPv4Address), None
     # Anything else is an error, not a clean result: 127.255.255.x are
     # refusal codes (Spamhaus returns .254 via public resolvers and .255
@@ -266,12 +321,34 @@ def _check_provider(
     return provider, bool(codes), failure
 
 
+def _decode_bits(meta: DnsblList, codes: list[str]) -> list[tuple[str, str]]:
+    """Decode a bitmask answer into every sublist it names.
+
+    SURBL and URIBL put each sublist a domain is on in one bit of the final
+    octet, so 127.0.0.80 from SURBL is malware (16) and abuse (64) together,
+    not an unknown code.
+    """
+    decoded: list[tuple[str, str]] = []
+    for code in codes:
+        try:
+            value = int(code.rsplit(".", 1)[1])
+        except (IndexError, ValueError):
+            continue
+        for bit in sorted(meta.bits):
+            if value & bit:
+                decoded.append(meta.bits[bit])
+    return decoded
+
+
 def describe_listing(provider: str, codes: list[str]) -> dict[str, Any]:
     """What a provider's listing codes mean, and how serious they are."""
     meta = LISTS_BY_ZONE.get(provider)
     if meta is None:
         return {"name": provider, "severity": "low", "meanings": ["listed"]}
-    decoded = [meta.codes[code] for code in codes if code in meta.codes]
+    if meta.bits:
+        decoded = _decode_bits(meta, codes)
+    else:
+        decoded = [meta.codes[code] for code in codes if code in meta.codes]
     meanings = [meaning for meaning, _ in decoded] or [meta.meaning]
     severities = [severity for _, severity in decoded] or [meta.severity]
     return {
@@ -281,21 +358,45 @@ def describe_listing(provider: str, codes: list[str]) -> dict[str, Any]:
     }
 
 
-def _answers_test_points(provider: str, resolver: dns.resolver.Resolver) -> bool:
-    if _test_point_ok_until.get(provider, 0.0) > time.monotonic():
+def test_points_for(meta: DnsblList, family: str = "ipv4") -> tuple[str, str]:
+    """The (must be listed, must not be listed) pair for one zone.
+
+    A domain zone publishes a name that is always listed, but nothing that is
+    guaranteed never to be. A random label under `.invalid` serves: RFC 2606
+    reserves the TLD, so it can never be registered and can never legitimately
+    appear on a blocklist. A zone that calls it listed is listing everything,
+    which is exactly what the negative test is for.
+    """
+    if meta.kind == "domain":
+        return meta.test_listed, f"{secrets.token_hex(8)}.invalid"
+    if family == "ipv6":
+        return _TEST_POINT_LISTED_V6, _TEST_POINT_NOT_LISTED_V6
+    return _TEST_POINT_LISTED, _TEST_POINT_NOT_LISTED
+
+
+def _answers_test_points(provider: str, resolver: dns.resolver.Resolver, family: str = "ipv4") -> bool:
+    meta = LISTS_BY_ZONE.get(provider)
+    # Keyed per family: a zone can answer IPv4 correctly and refuse IPv6.
+    cache_key = f"{provider}|{family}"
+    if _test_point_ok_until.get(cache_key, 0.0) > time.monotonic():
+        return True
+    listed_point, clean_point = test_points_for(meta, family) if meta else (_TEST_POINT_LISTED, _TEST_POINT_NOT_LISTED)
+    if not listed_point:
+        # Nothing published to test against. Trusting it is the only option,
+        # and saying so here beats pretending the check happened.
         return True
     try:
-        _, positive_listed, _ = _check_provider(_TEST_POINT_LISTED, provider, resolver)
+        _, positive_listed, _ = _check_provider(listed_point, provider, resolver)
         healthy = positive_listed
         if healthy:
-            _, negative_listed, negative_failed = _check_provider(_TEST_POINT_NOT_LISTED, provider, resolver)
+            _, negative_listed, negative_failed = _check_provider(clean_point, provider, resolver)
             healthy = not negative_listed and not negative_failed
     except Exception:
         return False
     # Only successes are cached, so a provider that is refusing us is re-tested
     # on the next check instead of staying "no answer" for half an hour.
     if healthy:
-        _test_point_ok_until[provider] = time.monotonic() + _TEST_POINT_TTL
+        _test_point_ok_until[cache_key] = time.monotonic() + _TEST_POINT_TTL
     return healthy
 
 
@@ -322,30 +423,67 @@ def resolver_health() -> dict[str, Any]:
 
 
 def check_dnsbl_providers(hostname_or_ip: str, resolved_ip: str | None = None) -> dict[str, Any]:
-    """Check *hostname_or_ip* on every list. Pass *resolved_ip* when the caller
-    already resolved (and vetted) the address, so it isn't resolved again."""
-    resolved_ip = resolved_ip or _resolve_ipv4(hostname_or_ip)
-    if not resolved_ip:
+    """Check *hostname_or_ip* on every list that applies to it.
+
+    What applies depends on the target. An IPv4 address goes to the IPv4
+    zones, an IPv6 address to the far smaller set that answers nibble queries,
+    and a name goes to the domain zones **as well as** the IP zones for the
+    address it resolves to, because a domain can be clean at its address and
+    still be listed by name.
+
+    A zone that does not answer for the family is left unqueried rather than
+    recorded as "no answer": an IPv4-only zone saying nothing about an IPv6
+    address is not a failure on its part.
+
+    Pass *resolved_ip* when the caller already resolved (and vetted) the
+    address, so it is not resolved again.
+    """
+    host = _extract_host(hostname_or_ip)
+    address, family = _parse_address(host)
+    domain = None if address else (host or None)
+
+    if address is None:
+        address = resolved_ip or _resolve_ipv4(hostname_or_ip)
+        if address:
+            _, detected = _parse_address(address)
+            family = detected or "ipv4"
+
+    # (zones, query label, family for the test points)
+    plan: list[tuple[list[str], str, str]] = []
+    if address:
+        label = reverse_ipv6(address) if family == "ipv6" else reverse_ipv4(address)
+        ip_zones = providers_for("ip", family)
+        if ip_zones:
+            plan.append((ip_zones, label, family))
+    if domain:
+        domain_zones = [
+            zone for zone in providers_for("domain")
+            if len(domain) + 1 + len(_query_zone(zone)) <= _MAX_DNS_NAME
+        ]
+        if domain_zones:
+            plan.append((domain_zones, domain, "domain"))
+
+    queried = sorted({zone for zones, _, _ in plan for zone in zones})
+    if not plan:
         return {
             "detected_on": [],
-            "providers": BASE_PROVIDERS,
+            "providers": [],
             "failed_providers": [],
             "is_blacklisted": False,
             "hostname": hostname_or_ip,
             "categories": [],
-            "error": "Unable to resolve hostname to IPv4 address",
+            "error": "Unable to resolve hostname to an IP address",
         }
 
-    reversed_ip = ".".join(reversed(resolved_ip.split(".")))
     listed: dict[str, list[str]] = {}
     failed_providers: set[str] = set()
     refused: set[str] = set()
     resolver = _make_resolver()
 
-    def _run_batch(providers: list[str] | set[str]) -> None:
+    def _run_batch(providers: list[str] | set[str], label: str) -> None:
         with ThreadPoolExecutor(max_workers=12) as executor:
             future_map = {
-                executor.submit(_lookup, reversed_ip, provider, resolver): provider
+                executor.submit(_lookup, label, provider, resolver): provider
                 for provider in providers
             }
             for future in as_completed(future_map):
@@ -362,28 +500,33 @@ def check_dnsbl_providers(hostname_or_ip: str, resolved_ip: str | None = None) -
                 except Exception:
                     failed_providers.add(provider)
 
-    # First pass: query all providers concurrently.
-    _run_batch(BASE_PROVIDERS)
+    for zones, label, _family in plan:
+        # First pass: query every applicable zone concurrently.
+        _run_batch(zones, label)
+        # Retry pass: zones that timed out may succeed on a second attempt
+        # when there is less concurrent load on the resolver. Refusals are
+        # never retried; asking again only makes a rate limit worse.
+        retry = {z for z in zones if z in failed_providers} - refused
+        if retry:
+            failed_providers.difference_update(retry)
+            _run_batch(retry, label)
 
-    # Retry pass: providers that timed out may succeed on a second attempt
-    # when there is less concurrent load on the resolver.
-    retry = failed_providers - refused
-    if retry:
-        failed_providers.difference_update(retry)
-        _run_batch(retry)
-
-    # An answer, listed or clean, only counts if the provider still answers
-    # its test points correctly.
-    answered = [p for p in BASE_PROVIDERS if p not in failed_providers]
-    with ThreadPoolExecutor(max_workers=12) as executor:
-        healthy = executor.map(lambda provider: _answers_test_points(provider, resolver), answered)
-        for provider, ok in zip(answered, healthy):
-            if not ok:
-                listed.pop(provider, None)
-                failed_providers.add(provider)
+    # An answer, listed or clean, only counts if the zone still answers its
+    # own test points for this family.
+    for zones, _label, test_family in plan:
+        answered = [z for z in zones if z not in failed_providers]
+        if not answered:
+            continue
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            # test_family bound now, not when the lambda runs: it changes per plan.
+            healthy = executor.map(lambda z, fam=test_family: _answers_test_points(z, resolver, fam), answered)
+            for provider, ok in zip(answered, healthy, strict=True):
+                if not ok:
+                    listed.pop(provider, None)
+                    failed_providers.add(provider)
 
     detected_on = []
-    for provider in BASE_PROVIDERS:
+    for provider in queried:
         if provider not in listed:
             continue
         listing = describe_listing(provider, listed[provider])
@@ -400,13 +543,16 @@ def check_dnsbl_providers(hostname_or_ip: str, resolved_ip: str | None = None) -
 
     return {
         "detected_on": detected_on,
-        "providers": BASE_PROVIDERS,
+        "providers": queried,
         "failed_providers": sorted(failed_providers),
         # When too many providers fail (resolver blocked, network outage) a
         # "clean" result can't be trusted, so callers keep the previous status.
-        "is_inconclusive": len(failed_providers) >= max(3, int(len(BASE_PROVIDERS) * _INCONCLUSIVE_FAILURE_RATIO)),
+        "is_inconclusive": len(failed_providers) >= max(3, int(len(queried) * _INCONCLUSIVE_FAILURE_RATIO)),
         "is_blacklisted": bool(detected_on),
         "hostname": hostname_or_ip,
+        "checked_address": address,
+        "address_family": family if address else None,
+        "checked_domain": domain,
         "severity": detected_on[0]["severity"] if detected_on else None,
         "categories": list(dict.fromkeys(c for entry in detected_on for c in entry["categories"])),
     }

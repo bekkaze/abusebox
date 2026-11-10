@@ -6,7 +6,7 @@ any other URL receives a JSON payload (see ``build_webhook_payload``).
 
 import logging
 import smtplib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.mime.text import MIMEText
 from typing import Any
 from urllib.parse import urlparse
@@ -55,7 +55,7 @@ def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str | None
             server.sendmail(settings.smtp_from_email, [to_email], msg.as_string())
         logger.info("Email alert sent to %s", to_email)
         return True, None
-    except Exception as exc:  # noqa: BLE001 - report any SMTP failure to the caller
+    except Exception as exc:
         logger.error("Failed to send email alert: %s", exc)
         return False, f"Could not send it: {describe_smtp(exc)}. The backend log has the detail."
 
@@ -105,7 +105,7 @@ def build_webhook_payload(url: str, hostname: str, ip: str, event: dict[str, Any
         "hostname": hostname,
         "ip": ip,
         "details": details,
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "occurred_at": datetime.now(UTC).isoformat(),
     }
     if event["event_type"] == "blacklist.listed":
         # Same keys as the v1.1 "blacklist_detected" payload for existing consumers.
@@ -121,7 +121,7 @@ def post_webhook(url: str, payload: dict[str, Any]) -> tuple[bool, str | None]:
         resp = requests.post(url, json=payload, timeout=10, headers={"Content-Type": "application/json"})
         resp.raise_for_status()
         return True, None
-    except Exception as exc:  # noqa: BLE001 - report any delivery failure to the caller
+    except Exception as exc:
         logger.error("Failed to send webhook alert: %s", exc)
         status = getattr(getattr(exc, "response", None), "status_code", None)
         detail = f"the endpoint replied {status}" if isinstance(status, int) else describe(exc)

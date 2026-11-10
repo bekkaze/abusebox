@@ -4,7 +4,7 @@ import { HiOutlineDocumentArrowUp } from 'react-icons/hi2';
 import { toast } from 'react-toastify';
 import { parseTargetFile } from '../../../services/tools';
 import { inputClass, linkClass, primaryButtonClass, secondaryButtonClass, Spinner } from '../../shared/ui';
-import { CHECK_TOGGLES } from './assetForm';
+import { CHECK_TOGGLES, detectHostnameType, isDomain, isIpv4, isIpv6 } from './assetForm';
 
 // Dialog surface and form vocabulary: flat paper, hairline border, one soft shadow.
 const panelClass =
@@ -35,13 +35,8 @@ function parseTargets(value) {
   return [...new Set(value.split(/[\n,]+/).map((target) => target.trim().toLowerCase()).filter(Boolean))];
 }
 
-function isIpv4(value) {
-  const parts = value.split('.');
-  return parts.length === 4 && parts.every((part) => /^\d+$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
-}
-
-function isDomain(value) {
-  return /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value);
+function isValidTarget(value) {
+  return isIpv4(value) || isIpv6(value) || isDomain(value);
 }
 
 export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
@@ -49,7 +44,7 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const targets = useMemo(() => parseTargets(form.targets), [form.targets]);
-  const invalidTargets = targets.filter((target) => !isIpv4(target) && !isDomain(target));
+  const invalidTargets = targets.filter((target) => !isValidTarget(target));
   const tooMany = targets.length > MAX_TARGETS;
   const canSubmit = targets.length > 0 && !tooMany && invalidTargets.length === 0 && !submitting && !uploading;
 
@@ -76,7 +71,7 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
   const handleSubmit = async () => {
     const hostnames = targets.map((hostname) => ({
       hostname,
-      hostname_type: isIpv4(hostname) ? 'ipv4' : 'domain',
+      hostname_type: detectHostnameType(hostname),
       description: form.description || null,
       is_alert_enabled: form.is_alert_enabled,
       is_monitor_enabled: form.is_monitor_enabled,
@@ -111,7 +106,7 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
             <div className={panelClass}>
               <Dialog.Title as="h3" className="text-base font-semibold text-ink">Add a list of assets</Dialog.Title>
               <p className="mt-1 text-sm text-ink-2">
-                Paste or upload up to {MAX_TARGETS} domains and IPv4 addresses. TXT, CSV and Excel (.xlsx) files work. New assets are checked on the next scheduler run.
+                Paste or upload up to {MAX_TARGETS} domains and IP addresses, IPv4 or IPv6. TXT, CSV and Excel (.xlsx) files work. New assets are checked on the next scheduler run.
               </p>
 
               <div className="mt-5 space-y-4">
@@ -141,7 +136,7 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
                     <span className="tabular-nums">{targets.length}</span> unique target{targets.length !== 1 ? 's' : ''}{tooMany && ` (maximum is ${MAX_TARGETS})`}
                     {invalidTargets.length > 0 && (
                       <>
-                        {'. Not a domain or IPv4: '}
+                        {'. Not a domain or IP address: '}
                         <span className="font-mono">{invalidTargets.slice(0, 3).join(', ')}</span>
                         {invalidTargets.length > 3 && ` and ${invalidTargets.length - 3} more`}
                       </>
