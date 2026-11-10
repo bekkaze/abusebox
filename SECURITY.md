@@ -22,6 +22,8 @@ Please do not open a public issue for security problems.
 
 Include what you found, how to reproduce it, the version you tested, and the impact you expect. You will get a reply within 7 days. Once a fix is released, the advisory credits you unless you prefer otherwise.
 
+AI-generated reports are not accepted. A finding that comes out of a language model or an automated scanner without a working reproduction on a running AbuseBox is closed without a reply. Using an AI tool to find the issue is fine as long as you say so and send the commands and output from your own run.
+
 ## Scope
 
 In scope: the backend API, the web UI, the Docker images and the default `docker-compose.yml`. Examples: authentication or authorization bypass, server-side request forgery through the check tools, injection, secrets exposed in images or logs.
