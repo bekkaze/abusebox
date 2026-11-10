@@ -14,7 +14,7 @@ Thanks for your interest in contributing! Here's how to get started.
    ```bash
    git checkout -b feature/your-feature-name
    ```
-4. Set up the development environment (see [Manual setup](docs/installation.md#manual-setup))
+4. Set up the development environment (see [Manual setup](README.md#manual-setup))
 
 ## Development Workflow
 

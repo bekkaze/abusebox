@@ -19,31 +19,7 @@ Open `http://localhost:3000` and you're ready to go.
 
 ## Manual setup
 
-**Prerequisites:** Python 3.11+, Node.js 20.19+, Yarn
-
-**Backend:**
-
-```bash
-cd backend
-cp .env.example .env
-pip install -r requirements.txt
-uvicorn app.main:app --host 127.0.0.1 --port 8100 --reload
-```
-
-The first start generates an admin password and saves it next to the database, as `initial_admin_password`. This terminal names the exact path.
-
-**Frontend** (new terminal):
-
-```bash
-cd frontend
-cp .env.example .env
-yarn install
-yarn dev
-```
-
-Open `http://localhost:3000`.
-
-`frontend/.env` configures the dev server: `VITE_BASE_URL` is the backend it proxies `/api` to (default `http://localhost:8100`), and `VITE_ALLOWED_HOSTS` is the hostnames it answers to (default `localhost,127.0.0.1`). The Docker image does not use either; it serves the built UI with nginx and proxies `/api` to `BACKEND_URL`.
+Running the backend and frontend directly, without Docker, is in the [README](../README.md#manual-setup).
 
 ## Unraid
 

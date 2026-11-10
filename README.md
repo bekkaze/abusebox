@@ -33,7 +33,33 @@ Open `http://localhost:3000` and sign in as `admin` with the password the first 
 docker compose exec backend cat /app/data/initial_admin_password
 ```
 
-Change it in Settings straight away. Manual, Unraid, Portainer and CasaOS installs are in [Installation](docs/installation.md).
+Change it in Settings straight away. Unraid, Portainer and CasaOS installs are in [Installation](docs/installation.md).
+
+## Manual setup
+
+Without Docker you run the two halves yourself. **Prerequisites:** Python 3.11+, Node.js 20.19+, Yarn.
+
+```bash
+cd backend
+cp .env.example .env
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8100 --reload
+```
+
+The first start generates the admin password and saves it next to the database as `initial_admin_password`; the terminal names the exact path.
+
+Then the frontend, in a second terminal:
+
+```bash
+cd frontend
+cp .env.example .env
+yarn install
+yarn dev
+```
+
+Open `http://localhost:3000`. `frontend/.env` configures the dev server: `VITE_BASE_URL` is the backend it proxies `/api` to (default `http://localhost:8100`), and `VITE_ALLOWED_HOSTS` is the hostnames it answers to (default `localhost,127.0.0.1`). The Docker image uses neither — it serves the built UI with nginx and proxies `/api` to `BACKEND_URL`.
+
+A manual install has no bundled DNS resolver, so blacklist lookups go through whatever the machine uses. If Spamhaus and others come back as **No answer**, point `DNSBL_NAMESERVERS` at a recursive resolver you run: [Blacklists that show "No answer"](docs/troubleshooting.md#blacklists-that-show-no-answer).
 
 ## What it checks
 
