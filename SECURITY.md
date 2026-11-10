@@ -8,10 +8,10 @@ Security fixes go into the latest release. Upgrade with `git pull && docker comp
 
 | Version | Supported |
 |---|---|
-| 1.3.2 and later | Yes |
-| 1.3.1 and earlier | No |
+| 1.5.0 and later | Yes |
+| 1.4.0 and earlier | No |
 
-Reports are only accepted for 1.3.2 or later. Please reproduce the issue on the latest release first: 1.3.1 and earlier have known, already-fixed issues ([GHSA-gccc-7w6h-jvhm](https://github.com/bekkaze/abusebox/security/advisories/GHSA-gccc-7w6h-jvhm)).
+Reports are only accepted for 1.5.0 or later. Please reproduce the issue on the latest release first: earlier versions are missing fixes that have already shipped, and 1.3.1 and earlier carry a known, already-fixed issue ([GHSA-gccc-7w6h-jvhm](https://github.com/bekkaze/abusebox/security/advisories/GHSA-gccc-7w6h-jvhm)).
 
 ## Reporting a vulnerability
 
