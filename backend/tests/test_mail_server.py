@@ -3,6 +3,7 @@
 import socket
 import ssl
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from unittest import mock
 
@@ -19,8 +20,9 @@ class FakeSmtp:
 
     def __init__(self, banner=b"220 mx.example.com ESMTP\r\n",
                  ehlo=b"250-mx.example.com Hello\r\n250-PIPELINING\r\n250 STARTTLS\r\n",
-                 starttls=b"454 TLS not available right now\r\n", greet=True):
+                 starttls=b"454 TLS not available right now\r\n", greet=True, delay=0.0):
         self.banner, self.ehlo, self.starttls, self.greet = banner, ehlo, starttls, greet
+        self.delay = delay
         self.commands: list[str] = []
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind(("127.0.0.1", 0))
@@ -35,6 +37,7 @@ class FakeSmtp:
             if not self.greet:
                 lines.readline()          # wait silently until the client gives up
                 return
+            time.sleep(self.delay)
             conn.sendall(self.banner)
             for raw in lines:
                 command = raw.decode().strip()
@@ -45,6 +48,8 @@ class FakeSmtp:
                     conn.sendall(self.ehlo)
                 elif verb == "STARTTLS":
                     conn.sendall(self.starttls)
+                    if self.starttls.startswith(b"220"):
+                        return            # the client starts TLS; hang up mid-handshake
                 elif verb == "QUIT":
                     conn.sendall(b"221 bye\r\n")
                     return
@@ -85,6 +90,15 @@ def test_it_never_sends_an_envelope_command(fake_smtp):
     assert result["greeting_matches_ptr"] is True
     assert result["starttls"] is True
     assert result["tls"]["ok"] is False
+
+
+def test_starttls_reaches_the_tls_handshake(fake_smtp):
+    # smtplib takes the TLS server name from the constructor, not connect();
+    # without one, every server offering STARTTLS crashed the whole check.
+    server = fake_smtp(starttls=b"220 go ahead\r\n")
+    result = mail_server.probe_smtp("127.0.0.1", [], port=server.port)
+    assert result["state"] == "answered" and result["starttls"] is True
+    assert result["tls"]["ok"] is False and result["tls"]["error"]
 
 
 def test_a_server_without_starttls(fake_smtp):
@@ -143,6 +157,23 @@ def test_a_timeout_is_no_answer_never_down():
     assert result["reason"] == "timed out"
 
 
+def test_connecting_gets_the_short_timeout():
+    # A filtered port 25 costs the connect timeout per asset, not the reply one.
+    with mock.patch("smtplib.socket.create_connection", side_effect=TimeoutError()) as connect:
+        result = mail_server.probe_smtp("192.0.2.25", [])
+    assert result["state"] == "no_answer"
+    assert connect.call_args.args[1] == mail_server._CONNECT_TIMEOUT < mail_server._TIMEOUT
+
+
+def test_a_slow_greeting_gets_the_long_timeout(fake_smtp, monkeypatch):
+    # Some servers wait before greeting on purpose; that is not a dead port.
+    monkeypatch.setattr(mail_server, "_CONNECT_TIMEOUT", 0.2)
+    monkeypatch.setattr(mail_server, "_TIMEOUT", 3)
+    server = fake_smtp(delay=0.6)
+    result = mail_server.probe_smtp("127.0.0.1", [], port=server.port)
+    assert result["state"] == "answered" and result["code"] == 220
+
+
 def test_ipv6_without_a_route_is_not_checked(monkeypatch):
     monkeypatch.setattr(mail_server, "has_ipv6_route", lambda: False)
     with mock.patch.object(mail_server.smtplib.SMTP, "connect") as connect:
@@ -176,7 +207,7 @@ def _cert(days, names=("mx.example.com",)):
 
 def test_a_verified_certificate_is_read():
     session = _stub_session(cert=_cert(40, names=("*.example.com",)))
-    with mock.patch.object(mail_server.smtplib, "SMTP", return_value=session):
+    with mock.patch.object(mail_server, "_Smtp", return_value=session):
         result = mail_server.probe_smtp("192.0.2.25", ["mx.example.com"])
     tls = result["tls"]
     assert tls["ok"] is True and tls["verified"] is True
@@ -191,7 +222,7 @@ def test_a_certificate_that_fails_verification_says_why():
     error = ssl.SSLCertVerificationError(1, "certificate verify failed")
     error.verify_code = 18
     session = _stub_session(starttls_effect=error)
-    with mock.patch.object(mail_server.smtplib, "SMTP", return_value=session):
+    with mock.patch.object(mail_server, "_Smtp", return_value=session):
         result = mail_server.probe_smtp("192.0.2.25", [])
     assert result["tls"] == {"ok": False, "verified": False, "error": "the certificate is self-signed"}
 

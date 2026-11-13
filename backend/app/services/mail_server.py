@@ -44,6 +44,13 @@ from app.core.network_safety import (
 )
 from app.services.dns_records import reverse_lookup
 
+# Two timeouts. Connecting gets a short one: where outbound port 25 is
+# filtered, which is most cloud hosts, every connect attempt waits it out, and
+# 15 s per asset made a scheduler cycle of a thousand IP assets take an hour.
+# A server that is up answers a SYN in well under a second. Replies keep the
+# long one, because some servers pause before the greeting on purpose to
+# catch senders that talk too early.
+_CONNECT_TIMEOUT = 5
 _TIMEOUT = 15
 _MAX_TEXT = 200
 _MAX_PTR_FORWARD = 3
@@ -140,6 +147,24 @@ def _covers(pattern: str, host: str) -> bool:
     return pattern == host
 
 
+class _Smtp(smtplib.SMTP):
+    """smtplib.SMTP with a shorter timeout for the connect than for replies,
+    and a server name for STARTTLS."""
+
+    def connect(self, host="localhost", port=0, source_address=None):
+        # starttls() passes self._host as the TLS server name, and smtplib
+        # sets it only from the constructor's host argument. Calling connect()
+        # separately leaves it empty, and ssl rejects an empty name with a
+        # ValueError. The address is never sent as SNI (see _tls_context).
+        self._host = host
+        return super().connect(host, port, source_address)
+
+    def _get_socket(self, host, port, timeout):
+        sock = super()._get_socket(host, port, min(_CONNECT_TIMEOUT, timeout or _CONNECT_TIMEOUT))
+        sock.settimeout(timeout)
+        return sock
+
+
 def _start_tls(smtp: smtplib.SMTP) -> dict[str, Any]:
     try:
         code, reply = smtp.starttls(context=_tls_context())
@@ -189,7 +214,7 @@ def probe_smtp(address: str, ptr_names: list[str] | None = None, *, port: int = 
         return {"state": "not_checked", "port": port,
                 "reason": describe(NoIpv6RouteError("no IPv6 route"))}
 
-    smtp = smtplib.SMTP(local_hostname=settings.mail_check_helo, timeout=_TIMEOUT)
+    smtp = _Smtp(local_hostname=settings.mail_check_helo, timeout=_TIMEOUT)
     try:
         try:
             code, message = smtp.connect(address, port)
