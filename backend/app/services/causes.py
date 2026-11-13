@@ -217,6 +217,13 @@ _VERIFIERS = {
 }
 
 
+def verify(provider: str, signals: Signals) -> bool | None:
+    """Whether *provider*'s cause is fixed by *signals*; None when it cannot be
+    checked, either for this list at all or from these signals."""
+    verifier = _VERIFIERS.get(provider)
+    return verifier(signals)[0] if verifier else None
+
+
 # --- assessment ------------------------------------------------------------------
 
 def assess_listing(entry: dict, signals: Signals) -> dict[str, Any]:

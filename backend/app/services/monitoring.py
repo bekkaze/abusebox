@@ -21,6 +21,7 @@ from app.services.check_runner import get_toggles_from_hostname, run_enabled_che
 from app.services.events import detect_events
 from app.services.health import blacklist_state
 from app.services.notifications import notify_events
+from app.services.removals import track_requests
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,10 @@ def record_check(db: Session, hostname: Hostname, result: dict[str, Any], *, not
     if bl is not None and not bl["inconclusive"]:
         hostname.is_blacklisted = bool(bl["listed"])
     hostname.last_checked = datetime.now(UTC)
+
+    # Before the result is saved: it marks listings still waiting on a removal
+    # request as "requested", so that status carries into this check.
+    track_requests(db, hostname, result)
 
     db.query(CheckHistory).filter(
         CheckHistory.hostname_id == hostname.id,

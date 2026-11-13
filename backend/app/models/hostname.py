@@ -42,3 +42,4 @@ class Hostname(Base):
     user = relationship("User", back_populates="hostnames")
     checks = relationship("CheckHistory", back_populates="hostname_ref", cascade="all, delete-orphan")
     events = relationship("AssetEvent", back_populates="hostname_ref", cascade="all, delete-orphan")
+    removal_requests = relationship("RemovalRequest", back_populates="hostname_ref", cascade="all, delete-orphan")

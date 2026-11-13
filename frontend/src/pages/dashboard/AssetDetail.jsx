@@ -12,6 +12,7 @@ import ResultTable from '../../components/blacklist/ResultTable';
 import { ResultVerdict } from '../../components/blacklist/ResultTableQuick';
 import { blacklistReportText } from '../../components/blacklist/reportText';
 import { sortProviders } from '../../components/blacklist/providerStatus';
+import { RemovalHistory, WhyListed } from '../../components/blacklist/WhyListed';
 import AddNewMonitorDialog from '../../components/dashboard/blacklistMonitor/AddNewMonitorDialog';
 import { assetTypeLabel } from '../../components/dashboard/blacklistMonitor/assetForm';
 import { SkeletonLine } from '../../components/shared/Skeleton';
@@ -376,7 +377,7 @@ export default function AssetDetail() {
         {/* Tabbed results */}
         {tabs.length > 0 ? (
           <ResultTabs tabs={tabs} current={currentTab} onSelect={setActiveTab}>
-            {currentTab === 'blacklist' && <BlacklistPanel data={results.blacklist} checkId={checkId} hostname={asset.hostname} checked={asset.checked} onChange={() => fetchAsset({ quiet: true })} />}
+            {currentTab === 'blacklist' && <BlacklistPanel assetId={asset.id} data={results.blacklist} checkId={checkId} hostname={asset.hostname} checked={asset.checked} onChange={() => fetchAsset({ quiet: true })} />}
             {currentTab === 'abuseipdb' && <AbuseIPDBPanel data={results.abuseipdb} />}
             {currentTab === 'dns' && <DnsPanel data={results.dns} />}
             {currentTab === 'ssl' && <SslPanel data={results.ssl} />}
@@ -486,17 +487,33 @@ function WithCopy({ text, label, children }) {
   );
 }
 
-function BlacklistPanel({ data, checkId, hostname, checked, onChange }) {
+function BlacklistPanel({ assetId, data, checkId, hostname, checked, onChange }) {
+  const [report, setReport] = useState(null);
+  const loadReport = useCallback(() => {
+    HostnameService().getListings(assetId).then(setReport).catch(() => setReport(null));
+  }, [assetId]);
+  // Again whenever a new check lands: causes and verdicts follow the result.
+  useEffect(() => { loadReport(); }, [loadReport, checkId]);
+
   if (!data || data.error) return <ErrorMsg msg={data?.error} />;
+  const listings = Object.fromEntries((report?.listings || []).map((listing) => [listing.provider, listing]));
+  const recorded = () => {
+    onChange?.();
+    loadReport();
+  };
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <ResultVerdict data={data} providers={sortProviders(data)} detailsOnly />
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <ResultVerdict data={data} providers={sortProviders(data)} detailsOnly />
+          </div>
+          <CopyTextButton text={blacklistReportText(data, { target: hostname, checked })} label="Copy report" />
         </div>
-        <CopyTextButton text={blacklistReportText(data, { target: hostname, checked })} label="Copy report" />
+        <WhyListed listings={report?.listings} />
       </div>
-      <ResultTable data={data} checkId={checkId} onDelistRecorded={onChange} />
+      <ResultTable data={data} checkId={checkId} listings={listings} onDelistRecorded={recorded} />
+      <RemovalHistory requests={report?.requests} />
     </div>
   );
 }

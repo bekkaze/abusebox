@@ -27,6 +27,7 @@ from app.services.app_settings import get_app_settings
 from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
 from app.services.health import summarize
 from app.services.monitoring import queue_rechecks, record_check
+from app.services.removals import listing_report
 
 router = APIRouter(prefix="/hostname", tags=["hostname"])
 
@@ -459,6 +460,16 @@ def get_hostname(pk: int, db: Session = Depends(get_db), user: User = Depends(ge
     if not hostname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
     return _to_list_item(hostname, _latest_checks(db, [hostname.id]).get(hostname.id), _health_options(db))
+
+
+@router.get("/{pk}/listings/")
+def get_listings(pk: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Why each current listing happened, whether a removal request is worth
+    making, the request text, and every removal request this asset has had."""
+    hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
+    if not hostname:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
+    return listing_report(db, hostname)
 
 
 @router.get("/{pk}/checks/{check_id}")

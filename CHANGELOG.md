@@ -12,6 +12,10 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 - Findings are raised only for a host that answers on port 25, so a web server with no reverse DNS is not flagged. No reverse DNS, a greeting that does not match it, no STARTTLS and an expiring mail certificate are.
 - A timeout on port 25 is **No answer**, never down. Most cloud providers block outbound port 25, and from inside that looks the same as a dead server. The dashboard says when no host answers at all. See [Mail servers that show "no answer"](docs/troubleshooting.md#mail-servers-that-show-no-answer).
 - `MAIL_CHECK_HELO` sets the name the check gives in EHLO (default `abusebox.invalid`).
+- **Why it is listed.** Each listing says what the list lists for, in one of six situations: your configuration, a compromised host, mail that was sent, your provider's range, your mail server's behaviour, or the domain's reputation. Spamhaus is read per return code, since SBL, XBL, DROP and PBL each call for something different.
+- **Whether to ask for removal.** Every listing gets a verdict: ready, check the cause first, not ready (clean the host first, or fix what the list names), or not yours to request. For missing or generic reverse DNS, AbuseBox checks the fix itself. Where it cannot see the cause, it says so rather than guessing.
+- **Removal requests are followed.** A request is kept with the verdict it was made against, and every later check moves it on: waiting, cleared, held for 30 days, or relisted. Relisted means the cause was not fixed. Asking against a "not ready" verdict needs a reason, which is kept with it. The API does not require one, so existing scripts keep working.
+- **A drafted removal request** to paste into the list's form: what it lists for, when it was first seen, what AbuseBox can confirm now, and a gap for what you changed, which AbuseBox cannot know.
 
 ### Fixed
 
@@ -21,6 +25,7 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 - Server status refuses a URL whose host has a public A record and an internal AAAA record. Only the A record used to be checked.
 - SSL errors no longer print "IPv6" as "ipv6".
 - A reverse lookup that times out is reported as no answer, not as "no PTR record".
+- A listing marked "requested" went back to "open" at the next check. It now stays requested until the list clears it.
 - The "How to fix it" link on the resolver warning pointed at a README section that moved to `docs/`.
 
 ## [1.5.0] - 2026-11-10
