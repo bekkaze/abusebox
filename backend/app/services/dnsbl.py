@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 
 import dns.resolver
 
+from app.core.hosts import extract_host as _extract_host
+
 # Re-exported so every existing import of `app.services.dnsbl` keeps working.
 from app.services.dnsbl_lists import (
     BASE_PROVIDERS,
@@ -167,27 +169,6 @@ def reverse_ipv4(address: str) -> str:
     return ".".join(reversed(address.split(".")))
 
 
-def _extract_host(value: str) -> str:
-    """The bare host from a URL, host:port or plain name."""
-    target = (value or "").strip()
-    if not target:
-        return ""
-    if "://" in target:
-        parsed = urlparse(target)
-        target = parsed.hostname or ""
-    elif "/" in target:
-        parsed = urlparse(f"//{target}", scheme="http")
-        target = parsed.hostname or target.split("/", 1)[0]
-    # A bracketed IPv6 literal is already unwrapped by urlparse; a bare
-    # host:port is only a port when there is exactly one colon, since an
-    # unbracketed IPv6 address has several.
-    if ":" in target and target.count(":") == 1:
-        host, port = target.rsplit(":", 1)
-        if port.isdigit():
-            target = host
-    return target.strip().strip("[]")
-
-
 def _parse_address(host: str) -> tuple[str | None, str]:
     """(normalised address, family) when *host* is a literal IP, else (None, "")."""
     try:
@@ -321,7 +302,7 @@ def _check_provider(
     return provider, bool(codes), failure
 
 
-def _decode_bits(meta: DnsblList, codes: list[str]) -> list[tuple[str, str]]:
+def _decode_bits(meta: DnsblList, codes: list[str]) -> list[tuple[str, ...]]:
     """Decode a bitmask answer into every sublist it names.
 
     SURBL and URIBL put each sublist a domain is on in one bit of the final
@@ -341,20 +322,27 @@ def _decode_bits(meta: DnsblList, codes: list[str]) -> list[tuple[str, str]]:
 
 
 def describe_listing(provider: str, codes: list[str]) -> dict[str, Any]:
-    """What a provider's listing codes mean, and how serious they are."""
+    """What a provider's listing codes mean, how serious they are, and why.
+
+    ``causes`` is every cause the codes name, falling back to the list's own,
+    and empty for a list no longer in the catalogue: one that is not known is
+    not guessed at.
+    """
     meta = LISTS_BY_ZONE.get(provider)
     if meta is None:
-        return {"name": provider, "severity": "low", "meanings": ["listed"]}
+        return {"name": provider, "severity": "low", "meanings": ["listed"], "causes": []}
     if meta.bits:
         decoded = _decode_bits(meta, codes)
     else:
         decoded = [meta.codes[code] for code in codes if code in meta.codes]
-    meanings = [meaning for meaning, _ in decoded] or [meta.meaning]
-    severities = [severity for _, severity in decoded] or [meta.severity]
+    meanings = [entry[0] for entry in decoded] or [meta.meaning]
+    severities = [entry[1] for entry in decoded] or [meta.severity]
+    causes = [entry[2] if len(entry) > 2 else meta.cause for entry in decoded] or [meta.cause]
     return {
         "name": meta.name,
         "severity": min(severities, key=SEVERITIES.index),
         "meanings": list(dict.fromkeys(meanings)),
+        "causes": list(dict.fromkeys(causes)),
     }
 
 

@@ -23,6 +23,8 @@ const initialForm = {
   check_whois: false,
   check_email_security: false,
   check_server_status: false,
+  // Off: probing port 25 across a whole range every cycle is a scan.
+  check_mail_server: false,
 };
 
 export default function CidrImportDialog({ isOpen, setIsOpen, onImport }) {

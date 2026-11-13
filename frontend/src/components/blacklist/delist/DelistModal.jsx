@@ -5,16 +5,24 @@ import { toast } from 'react-toastify';
 import DelistService from '../../../services/blacklist/delist';
 import { hasOfficialRemovalPage, removalPageFor } from './constant';
 import { Field, Fields, inputClass, linkClass, primaryButtonClass, secondaryButtonClass, Spinner } from '../../shared/ui';
+import { CopyTextButton } from '../../shared/CopyButton';
+import { ReadinessVerdict } from '../WhyListed';
 
-const DelistModal = ({ isOpen, onClose, provider, target, checkId, onRecorded }) => {
+const DelistModal = ({ isOpen, onClose, provider, target, checkId, assessment, onRecorded }) => {
   const id = useId();
   const [note, setNote] = useState('');
+  const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const official = hasOfficialRemovalPage(provider);
+  // A "blocked" verdict asks why, then lets the request through: the operator
+  // may know something AbuseBox cannot see, and the reason is kept with it.
+  const blocked = assessment?.readiness === 'blocked';
+  const canSave = !saving && (!blocked || reason.trim().length > 0);
 
   const close = () => {
     if (saving) return;
     setNote('');
+    setReason('');
     onClose();
   };
 
@@ -28,9 +36,11 @@ const DelistModal = ({ isOpen, onClose, provider, target, checkId, onRecorded })
       await DelistService().delistRequest({
         provider,
         delist_required_data: { id: checkId, comment: note.trim() },
+        override_reason: blocked ? reason.trim() : null,
       });
       toast.success(`Removal request for ${provider} recorded`);
       setNote('');
+      setReason('');
       onRecorded?.();
       onClose();
     } catch (error) {
@@ -58,8 +68,31 @@ const DelistModal = ({ isOpen, onClose, provider, target, checkId, onRecorded })
                 <Field name="Listed-Target"><span className="font-mono text-[13px] break-all">{target}</span></Field>
               </Fields>
 
+              {assessment && (
+                <div className="mt-4 rounded-md border border-rule bg-sunk p-3 space-y-2">
+                  <p className="text-sm text-ink"><span className="font-medium">{assessment.label}.</span> {assessment.means}</p>
+                  <ReadinessVerdict listing={assessment} />
+                </div>
+              )}
+
               <ol className="mt-4 space-y-3 text-sm text-ink list-decimal pl-5 marker:font-mono marker:text-xs marker:text-ink-2">
-                <li>Fix what caused the listing first: a compromised mailbox, an open relay, or missing reverse DNS. Most lists re-add addresses that keep sending spam.</li>
+                <li>
+                  {assessment
+                    ? 'Deal with the cause above first. Most lists re-add an address whose cause is still there, and some slow down repeat requests.'
+                    : 'Fix what caused the listing first: a compromised mailbox, an open relay, or missing reverse DNS. Most lists re-add addresses that keep sending spam.'}
+                </li>
+                {assessment?.request_text && (
+                  <li>
+                    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                      Copy the request text, and fill in what you changed.
+                      <CopyTextButton text={assessment.request_text} label="Copy request text" />
+                    </span>
+                    <details className="mt-2">
+                      <summary className={`cursor-pointer text-xs ${linkClass}`}>Show it</summary>
+                      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-rule bg-sunk p-2 font-mono text-xs text-ink">{assessment.request_text}</pre>
+                    </details>
+                  </li>
+                )}
                 <li>
                   Submit the request on the provider&apos;s site.{' '}
                   <a href={removalPageFor(provider)} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1 ${linkClass}`}>
@@ -84,11 +117,30 @@ const DelistModal = ({ isOpen, onClose, provider, target, checkId, onRecorded })
                 />
               </div>
 
+              {blocked && (
+                <div className="mt-4">
+                  <label htmlFor={`${id}-reason`} className="block text-sm font-medium text-ink mb-1.5">
+                    Why request it anyway?
+                  </label>
+                  <input
+                    id={`${id}-reason`}
+                    type="text"
+                    maxLength={500}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Infected host replaced, ticket 4211"
+                    aria-describedby={`${id}-reason-hint`}
+                    className={inputClass}
+                  />
+                  <p id={`${id}-reason-hint`} className="mt-1 text-xs text-ink-2">Kept with the request, so the history shows it was a judgement call.</p>
+                </div>
+              )}
+
               <div className="mt-6 pt-4 border-t border-rule flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                 <button type="button" onClick={close} disabled={saving} className={secondaryButtonClass}>Cancel</button>
-                <button type="button" onClick={markRequested} disabled={saving} className={primaryButtonClass}>
+                <button type="button" onClick={markRequested} disabled={!canSave} className={primaryButtonClass}>
                   {saving && <Spinner />}
-                  {saving ? 'Saving' : 'Mark as requested'}
+                  {saving ? 'Saving' : blocked ? 'Mark as requested anyway' : 'Mark as requested'}
                 </button>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import secrets
 from dataclasses import dataclass
 
@@ -90,6 +91,14 @@ def load_secret_key(database_url: str) -> str:
         return generated
 
 
+def _helo_name(value: str) -> str:
+    """A hostname safe to put on an SMTP command line, or the default."""
+    value = value.strip().lower()
+    if value and re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?", value):
+        return value
+    return "abusebox.invalid"
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "AbuseBox API")
@@ -138,6 +147,9 @@ class Settings:
     # WHOIS settings. Some registries (SIDN/.nl among them) answer slowly when
     # they are throttling, so the old fixed 10s was easy to trip (issue #36).
     whois_timeout_seconds: int = parse_int("WHOIS_TIMEOUT_SECONDS", 30)
+    # The name the mail-server check gives in EHLO. RFC 2606 .invalid by
+    # default: it says who is knocking, and it can never resolve to anyone.
+    mail_check_helo: str = _helo_name(os.getenv("MAIL_CHECK_HELO", ""))
     # Registries rate limit by the hour; the scheduler re-checks every asset on
     # its own interval, so answers are reused instead of asked for again.
     whois_cache_minutes: int = parse_int("WHOIS_CACHE_MINUTES", 360)

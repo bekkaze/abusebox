@@ -27,6 +27,7 @@ from app.services.app_settings import get_app_settings
 from app.services.check_runner import get_toggles_from_hostname, run_enabled_checks
 from app.services.health import summarize
 from app.services.monitoring import queue_rechecks, record_check
+from app.services.removals import listing_report
 
 router = APIRouter(prefix="/hostname", tags=["hostname"])
 
@@ -38,7 +39,21 @@ CHECK_TOGGLE_FIELDS = [
     "check_whois",
     "check_email_security",
     "check_server_status",
+    "check_mail_server",
 ]
+
+
+def _mail_server_toggle(requested: bool | None, hostname_type: str) -> bool:
+    """Whether a new asset gets the mail-server check.
+
+    An explicit choice always wins. Otherwise on for an address someone added
+    on purpose, which is usually a mail server, and off for a name, whose port
+    25 is as often the web host's. A CIDR import never gets it by default:
+    probing port 25 across a whole range every cycle is a scan, not a check.
+    """
+    if requested is not None:
+        return requested
+    return hostname_type in ("ipv4", "ipv6")
 
 
 def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
@@ -60,6 +75,7 @@ def _to_hostname_response(hostname: Hostname) -> HostnameResponse:
         check_whois=hostname.check_whois,
         check_email_security=hostname.check_email_security,
         check_server_status=hostname.check_server_status,
+        check_mail_server=hostname.check_mail_server,
         check_interval_minutes=hostname.check_interval_minutes,
         last_checked=hostname.last_checked,
         created=hostname.created,
@@ -112,6 +128,7 @@ def create_hostname(
         check_whois=payload.check_whois,
         check_email_security=payload.check_email_security,
         check_server_status=payload.check_server_status,
+        check_mail_server=_mail_server_toggle(payload.check_mail_server, payload.hostname_type),
         check_interval_minutes=payload.check_interval_minutes,
         status="active",
         # Checks run right below; mark the asset as checked now so the
@@ -167,6 +184,7 @@ def create_hostnames_bulk(
                 check_whois=item.check_whois,
                 check_email_security=item.check_email_security,
                 check_server_status=item.check_server_status,
+                check_mail_server=_mail_server_toggle(item.check_mail_server, item.hostname_type),
                 check_interval_minutes=item.check_interval_minutes,
                 status="active",
             )
@@ -227,6 +245,7 @@ def import_cidr(
                 check_whois=payload.check_whois,
                 check_email_security=payload.check_email_security,
                 check_server_status=payload.check_server_status,
+                check_mail_server=payload.check_mail_server,
                 status="active",
             )
             db.add(hostname)
@@ -441,6 +460,16 @@ def get_hostname(pk: int, db: Session = Depends(get_db), user: User = Depends(ge
     if not hostname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
     return _to_list_item(hostname, _latest_checks(db, [hostname.id]).get(hostname.id), _health_options(db))
+
+
+@router.get("/{pk}/listings/")
+def get_listings(pk: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Why each current listing happened, whether a removal request is worth
+    making, the request text, and every removal request this asset has had."""
+    hostname = db.query(Hostname).filter(Hostname.id == pk, Hostname.user_id == user.id).first()
+    if not hostname:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostname not found")
+    return listing_report(db, hostname)
 
 
 @router.get("/{pk}/checks/{check_id}")

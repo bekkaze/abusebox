@@ -1,5 +1,8 @@
+import ipaddress
 import socket
 from typing import Any
+
+from app.core.hosts import extract_host
 
 
 def _resolve_records(domain: str, rdtype: str) -> list[str]:
@@ -21,17 +24,47 @@ def _resolve_records(domain: str, rdtype: str) -> list[str]:
         return []
 
 
+def reverse_lookup(address: str) -> list[str] | None:
+    """PTR names for an IP literal, either family.
+
+    ``[]`` means the address has no PTR record; ``None`` means the lookup got
+    no answer, which says nothing either way. The two must not be confused:
+    "no reverse DNS" is a finding (and a blacklist cause), a timeout is not.
+    """
+    import dns.resolver
+
+    try:
+        answers = dns.resolver.resolve_address(address, lifetime=5)
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+        return []
+    except Exception:
+        return None
+    return [rdata.to_text() for rdata in answers]
+
+
 def lookup_dns_records(domain: str) -> dict[str, Any]:
-    domain = (domain or "").strip().lower()
+    domain = extract_host((domain or "").strip().lower())
     if not domain:
         return {"error": "Please provide a domain name."}
 
-    # Strip protocol/path
-    if "://" in domain:
-        from urllib.parse import urlparse
-
-        domain = urlparse(domain).hostname or domain
-    domain = domain.split("/")[0].split(":")[0]
+    # An address has one record worth having, its PTR, and has to be asked for
+    # by its reverse name. Querying the literal itself for PTR asks about a
+    # name like "8.8.8.8.", which does not exist, and asking it for A only
+    # echoes the address back.
+    try:
+        ipaddress.ip_address(domain)
+    except ValueError:
+        pass
+    else:
+        ptr = reverse_lookup(domain)
+        result = {
+            "domain": domain,
+            "records": {"PTR": ptr} if ptr else {},
+            "record_types_checked": ["PTR"],
+        }
+        if ptr is None:
+            result["error"] = "The reverse lookup got no answer."
+        return result
 
     record_types = ["A", "AAAA", "MX", "TXT", "CNAME", "NS", "SOA", "PTR"]
     records: dict[str, list[str]] = {}

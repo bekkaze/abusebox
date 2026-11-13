@@ -24,6 +24,7 @@ import socket
 import ssl
 
 from app.core.network_safety import (
+    NoIpv6RouteError,
     PrivateDestinationError,
     UnresolvableHostError,
     UnsafeDestinationError,
@@ -99,6 +100,8 @@ def describe(exc: BaseException, fallback: str = "the request failed") -> str:
         return "it does not resolve to a public address"
     if isinstance(exc, UnsupportedUrlError):
         return "only absolute HTTP and HTTPS URLs can be checked"
+    if isinstance(exc, NoIpv6RouteError):
+        return "it has only IPv6 addresses and this AbuseBox has no IPv6 connectivity"
     if isinstance(exc, UnsafeDestinationError):
         return "the destination was refused"
 

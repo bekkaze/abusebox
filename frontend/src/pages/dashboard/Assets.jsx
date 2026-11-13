@@ -30,6 +30,7 @@ const CHECK_BADGE_MAP = {
   check_whois: 'WHOIS',
   check_email_security: 'DMARC',
   check_server_status: 'UP',
+  check_mail_server: 'MAIL',
 };
 
 const initialFormData = {
@@ -46,6 +47,8 @@ const initialFormData = {
   check_whois: false,
   check_email_security: false,
   check_server_status: false,
+  // null: decided by type until the box is touched (see assetForm.js).
+  check_mail_server: null,
   check_interval_minutes: null,
 };
 

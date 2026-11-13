@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.models import CheckHistory, Hostname, User
 from app.schemas import DelistRequest
 from app.services.dnsbl import check_dnsbl_providers, resolver_health, target_address
+from app.services.removals import record_request, serialize
 
 router = APIRouter(prefix="/blacklist", tags=["blacklist"])
 
@@ -108,6 +109,12 @@ def delist(
     history.result = result
     flag_modified(history, "result")
     history.updated = datetime.now(UTC)
+    # The request is also its own record from 1.6, which later checks follow:
+    # cleared, held, or relisted. The verdict it was made against goes with it.
+    request = record_request(
+        db, history.hostname_ref, history, payload.provider,
+        note=note, override_reason=payload.override_reason,
+    )
     db.commit()
 
-    return {"msg": "success", "result": result}
+    return {"msg": "success", "result": result, "request": serialize(request) if request else None}

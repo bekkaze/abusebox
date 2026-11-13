@@ -31,12 +31,12 @@ def _fake_getaddrinfo(mapping):
 @pytest.mark.parametrize("address", ["127.0.0.1", "10.0.0.5", "192.168.1.169", "169.254.169.254", "100.64.0.1"])
 def test_private_destinations_are_rejected(address):
     with mock.patch("socket.getaddrinfo", _fake_getaddrinfo({"internal.test": address})), pytest.raises(network_safety.UnsafeDestinationError):
-        network_safety.resolve_public_ipv4("internal.test")
+        network_safety.resolve_public_address("internal.test")
 
 
 def test_public_destination_is_allowed():
     with mock.patch("socket.getaddrinfo", _fake_getaddrinfo({"public.test": "93.184.216.34"})):
-        assert network_safety.resolve_public_ipv4("public.test") == "93.184.216.34"
+        assert network_safety.resolve_public_address("public.test") == "93.184.216.34"
 
 
 def test_server_status_does_not_follow_redirect_to_metadata_endpoint():
@@ -1327,7 +1327,7 @@ def test_a_rejected_certificate_says_which_way_it_was_rejected(code, expected):
         raise exc
 
     with mock.patch.object(ssl_checker, "_handshake", handshake), \
-         mock.patch.object(ssl_checker, "resolve_public_ipv4", lambda h: "192.0.2.1"):
+         mock.patch.object(ssl_checker, "resolve_public_address", lambda h: "192.0.2.1"):
         result = ssl_checker.check_ssl_certificate("host.example")
     assert result["error"] == expected
     assert result["valid"] is False

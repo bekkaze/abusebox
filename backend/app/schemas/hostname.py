@@ -80,6 +80,7 @@ CHECK_TOGGLE_DEFAULTS = {
     "check_whois": False,
     "check_email_security": False,
     "check_server_status": False,
+    "check_mail_server": False,
 }
 
 
@@ -98,6 +99,8 @@ class HostnameCreateRequest(BaseModel):
     check_whois: bool = False
     check_email_security: bool = False
     check_server_status: bool = False
+    # None: on for an IP address, off for a name. See _mail_server_toggle.
+    check_mail_server: bool | None = None
     check_interval_minutes: IntervalMinutes | None = None
 
 
@@ -117,6 +120,7 @@ class HostnameUpdateRequest(BaseModel):
     check_whois: bool = False
     check_email_security: bool = False
     check_server_status: bool = False
+    check_mail_server: bool = False
     check_interval_minutes: IntervalMinutes | None = None
 
 
@@ -141,6 +145,7 @@ class HostnameResponse(BaseModel):
     check_whois: bool
     check_email_security: bool
     check_server_status: bool
+    check_mail_server: bool = False
     check_interval_minutes: int | None
     last_checked: UTCDateTime | None = None
 
@@ -189,6 +194,7 @@ class CidrImportRequest(BaseModel):
     check_whois: bool = False
     check_email_security: bool = False
     check_server_status: bool = False
+    check_mail_server: bool = False
 
 
 class BulkCreateResult(BaseModel):

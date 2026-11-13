@@ -31,6 +31,9 @@ class Hostname(Base):
     check_whois: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     check_email_security: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     check_server_status: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Reverse DNS and the SMTP handshake (1.6). Off for every asset that
+    # existed before the upgrade; on by default for an address added after.
+    check_mail_server: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     check_interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     last_checked: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
     created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
@@ -39,3 +42,4 @@ class Hostname(Base):
     user = relationship("User", back_populates="hostnames")
     checks = relationship("CheckHistory", back_populates="hostname_ref", cascade="all, delete-orphan")
     events = relationship("AssetEvent", back_populates="hostname_ref", cascade="all, delete-orphan")
+    removal_requests = relationship("RemovalRequest", back_populates="hostname_ref", cascade="all, delete-orphan")

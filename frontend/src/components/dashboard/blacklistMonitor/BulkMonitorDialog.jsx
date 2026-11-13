@@ -29,6 +29,7 @@ const initialForm = {
   check_whois: false,
   check_email_security: false,
   check_server_status: false,
+  check_mail_server: true,
 };
 
 function parseTargets(value) {
@@ -82,6 +83,9 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
       check_whois: form.check_whois,
       check_email_security: form.check_email_security,
       check_server_status: form.check_server_status,
+      // Ticked means "for the addresses in the list": null lets the server
+      // decide per target, on for an IP and off for a name.
+      check_mail_server: form.check_mail_server ? null : false,
     }));
     setSubmitting(true);
     try {
@@ -157,7 +161,9 @@ export default function BulkMonitorDialog({ isOpen, setIsOpen, onImport }) {
                     {CHECK_TOGGLES.map((toggle) => (
                       <label key={toggle.name} className="flex items-center gap-2.5 py-1.5 cursor-pointer">
                         <input type="checkbox" name={toggle.name} checked={form[toggle.name]} onChange={handleChange} className={checkboxClass} />
-                        <span className="text-sm text-ink">{toggle.label}</span>
+                        <span className="text-sm text-ink">
+                          {toggle.name === 'check_mail_server' ? 'Mail server, for IP addresses (reverse DNS, port 25)' : toggle.label}
+                        </span>
                       </label>
                     ))}
                   </div>
