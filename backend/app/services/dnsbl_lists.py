@@ -13,6 +13,17 @@ from dataclasses import dataclass, field
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 
+# Why a list lists, in the six situations that call for different action.
+# The wording, and what each one lets AbuseBox claim, lives in causes.py; this
+# table only says which one applies.
+#   config         your DNS or server setup, which AbuseBox can check
+#   compromise     the host is doing something hostile: clean it first
+#   sending        mail from it hit traps or drew complaints
+#   upstream       the range, by its owner's policy; not yours to fix
+#   server-policy  how your mail server behaves, which DNS cannot show
+#   domain         the name's reputation, not the address's
+CAUSES = ("config", "compromise", "sending", "upstream", "server-policy", "domain")
+
 
 @dataclass(frozen=True)
 class DnsblList:
@@ -20,10 +31,14 @@ class DnsblList:
     name: str
     severity: str  # of a listing whose code has no entry in `codes`
     meaning: str
-    # Listing code -> (meaning, severity), for lists that say why they list.
-    codes: dict[str, tuple[str, str]] = field(default_factory=dict)
+    # Listing code -> (meaning, severity) or (meaning, severity, cause), for
+    # lists that say why they list. A code names its own cause when it differs
+    # from the list's: Spamhaus ZEN's codes call for four different actions.
+    codes: dict[str, tuple[str, ...]] = field(default_factory=dict)
     # 127.0.0.x answers that are not listings (e.g. a neutral reputation).
     ignored: frozenset[str] = frozenset()
+    # Why this list lists, for any code that does not say. One of CAUSES.
+    cause: str = "sending"
 
     # What this list is asked about: an address ("ip") or a name ("domain").
     kind: str = "ip"
@@ -38,7 +53,7 @@ class DnsblList:
     # Bitmask lists (SURBL, URIBL) encode every sublist a name is on in the
     # final octet, so the answer is decoded bit by bit rather than matched
     # against whole codes.
-    bits: dict[int, tuple[str, str]] = field(default_factory=dict)
+    bits: dict[int, tuple[str, ...]] = field(default_factory=dict)
     # Answers inside the listing block that still mean "we will not answer
     # you". SURBL and URIBL both say so with 127.0.0.1, which read as a
     # listing would mark every domain checked.
@@ -58,7 +73,7 @@ class DnsblList:
     requires_key: bool = False
 
 
-_ZEN_XBL = ("XBL: compromised host or botnet", "critical")
+_ZEN_XBL = ("XBL: compromised host or botnet", "critical", "compromise")
 
 # Every zone here answers the RFC 5782 test points (127.0.0.2 listed, 127.0.0.1
 # not listed). Severity follows how much weight mail filters give a list
@@ -70,16 +85,18 @@ _ZEN_XBL = ("XBL: compromised host or botnet", "critical")
 DNSBL_LISTS = [
     DnsblList("zen.spamhaus.org", "Spamhaus ZEN", "critical", "listed by Spamhaus", ipv6=True,
               key_env="SPAMHAUS_DQS_KEY", keyed_zone="{key}.zen.dq.spamhaus.net", codes={
-        "127.0.0.2": ("SBL: spam source", "critical"),
-        "127.0.0.3": ("CSS: snowshoe spam source", "critical"),
+        "127.0.0.2": ("SBL: spam source", "critical", "sending"),
+        "127.0.0.3": ("CSS: snowshoe spam source", "critical", "sending"),
         "127.0.0.4": _ZEN_XBL,
         "127.0.0.5": _ZEN_XBL,
         "127.0.0.6": _ZEN_XBL,
         "127.0.0.7": _ZEN_XBL,
-        "127.0.0.9": ("DROP: hijacked or criminal network", "critical"),
+        # DROP is about the netblock someone else controls, so it is upstream:
+        # nothing done on this server takes it off.
+        "127.0.0.9": ("DROP: hijacked or criminal network", "critical", "upstream"),
         # PBL is policy, not reputation, but Microsoft 365 and others reject on it.
-        "127.0.0.10": ("PBL: end-user range, listed by its ISP", "high"),
-        "127.0.0.11": ("PBL: end-user range, listed by Spamhaus", "high"),
+        "127.0.0.10": ("PBL: end-user range, listed by its ISP", "high", "upstream"),
+        "127.0.0.11": ("PBL: end-user range, listed by Spamhaus", "high", "upstream"),
     }),
     DnsblList("b.barracudacentral.org", "Barracuda", "high", "poor sending reputation", ipv6=True),
     DnsblList("bl.spamcop.net", "SpamCop", "medium", "reported spam source", ipv6=True),
@@ -90,27 +107,33 @@ DNSBL_LISTS = [
         "127.0.0.12": ("bad reputation (L3)", "low"),
     }, ignored=frozenset({"127.0.0.13"})),  # L2 is neutral
     DnsblList("psbl.surriel.com", "PSBL", "medium", "spamtrap hits"),
-    DnsblList("bl.blocklist.de", "blocklist.de", "medium", "attack source (fail2ban reports)"),
-    DnsblList("bip.virusfree.cz", "VirusFree", "medium", "botnet source"),
+    DnsblList("bl.blocklist.de", "blocklist.de", "medium", "attack source (fail2ban reports)",
+              cause="compromise"),
+    DnsblList("bip.virusfree.cz", "VirusFree", "medium", "botnet source", cause="compromise"),
     DnsblList("spam.spamrats.com", "SpamRATS Spam", "medium", "spam source"),
+    # Trap hits and end-user-range policy share one answer here, so it cannot be
+    # split the way ZEN is; it stays "sending", the more cautious advice.
     DnsblList("bl.spameatingmonkey.net", "SpamEatingMonkey", "low", "spamtrap hits, or end-user range by policy"),
     # The same operator keeps IPv6 in its own zone rather than answering
     # nibble queries on the one above.
     DnsblList("bl.ipv6.spameatingmonkey.net", "SpamEatingMonkey IPv6", "low", "spamtrap hits from this address",
               ipv4=False, ipv6=True),
     DnsblList("dnsbl-1.uceprotect.net", "UCEPROTECT level 1", "low", "spamtrap hits from this IP", ipv6=True),
-    DnsblList("dnsbl.dronebl.org", "DroneBL", "low", "botnet, open proxy or drone"),
-    DnsblList("dyna.spamrats.com", "SpamRATS Dyna", "low", "policy: reverse DNS looks dynamic"),
-    DnsblList("noptr.spamrats.com", "SpamRATS NoPtr", "low", "policy: no reverse DNS"),
+    DnsblList("dnsbl.dronebl.org", "DroneBL", "low", "botnet, open proxy or drone", cause="compromise"),
+    # The two lists whose cause AbuseBox can check for itself, against the
+    # address's reverse DNS.
+    DnsblList("dyna.spamrats.com", "SpamRATS Dyna", "low", "policy: reverse DNS looks dynamic", cause="config"),
+    DnsblList("noptr.spamrats.com", "SpamRATS NoPtr", "low", "policy: no reverse DNS", cause="config"),
     DnsblList("all.s5h.net", "s5h.net", "low", "spam source"),
     DnsblList("bl.0spam.org", "0spam", "low", "spam source"),
     DnsblList("bl.nordspam.com", "NordSpam", "low", "spam source"),
     DnsblList("rbl.interserver.net", "InterServer", "low", "abuse reports"),
     DnsblList("singular.ttk.pte.hu", "TTK", "low", "spam source"),
     DnsblList("spam.dnsbl.anonmails.de", "anonmails.de", "low", "spam source"),
-    DnsblList("spambot.bls.digibase.ca", "Digibase", "low", "spambot"),
+    DnsblList("spambot.bls.digibase.ca", "Digibase", "low", "spambot", cause="compromise"),
     DnsblList("truncate.gbudb.net", "GBUdb Truncate", "low", "spam source"),
-    DnsblList("ips.backscatterer.org", "Backscatterer", "info", "backscatter: bounces to forged senders"),
+    DnsblList("ips.backscatterer.org", "Backscatterer", "info", "backscatter: bounces to forged senders",
+              cause="server-policy"),
     DnsblList("dnsbl.spfbl.net", "SPFBL", "info", "bad reputation (for scoring only)"),
     DnsblList("spamsources.fabel.dk", "fabel.dk", "info", "spam source (may list whole networks)"),
 
@@ -123,14 +146,14 @@ DNSBL_LISTS = [
               requires_key=True, ipv6=True, codes={
         "127.0.0.2": ("black: spam source", "high"),
         "127.0.0.3": ("black: composite or heuristic match", "high"),
-        "127.0.0.4": ("exploit: compromised or exploited host", "critical"),
+        "127.0.0.4": ("exploit: compromised or exploited host", "critical", "compromise"),
         "127.0.0.200": ("black: listed by hand", "high"),
     }),
 
     # Domain lists. These are asked about the name itself rather than a
     # reversed address, and they do not share the IP lists' codes.
     DnsblList("dbl.spamhaus.org", "Spamhaus DBL", "critical", "domain listed by Spamhaus",
-              kind="domain", prefix="127.0.1.", test_listed="dbltest.com", codes={
+              kind="domain", cause="domain", prefix="127.0.1.", test_listed="dbltest.com", codes={
         "127.0.1.2": ("spam domain", "critical"),
         "127.0.1.4": ("phishing domain", "critical"),
         "127.0.1.5": ("malware domain", "critical"),
@@ -147,7 +170,7 @@ DNSBL_LISTS = [
     # undecoded bit falls back to the list's own meaning rather than being
     # guessed at, so a listing on bit 2 alone still reports correctly.
     DnsblList("multi.surbl.org", "SURBL", "high", "domain listed by SURBL",
-              kind="domain", test_listed="test.surbl.org",
+              kind="domain", cause="domain", test_listed="test.surbl.org",
               # Free use excludes paid products; see https://surbl.org/usage-policy
               refusals=frozenset({"127.0.0.1"}), bits={
         4: ("disposable email domain", "low"),
@@ -159,7 +182,7 @@ DNSBL_LISTS = [
     }),
 
     DnsblList("multi.uribl.com", "URIBL", "high", "domain listed by URIBL",
-              kind="domain", test_listed="test.uribl.com",
+              kind="domain", cause="domain", test_listed="test.uribl.com",
               # Free for low volume; see https://uribl.com/about.shtml
               refusals=frozenset({"127.0.0.1", "127.0.0.255"}), bits={
         2: ("black: spam domain", "high"),
