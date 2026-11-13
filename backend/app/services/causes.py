@@ -106,8 +106,17 @@ def signals_from(results: dict | None) -> Signals:
     parts = split_result(results)
     blacklist = parts.get("blacklist")
     address = blacklist.get("checked_address") if isinstance(blacklist, dict) else None
-    dns = parts.get("dns")
     ptr = None
+
+    # The mail-server check looks up the address's PTR directly (1.6), and is
+    # on by default for IP assets, so it is the usual source.
+    mail = parts.get("mail_server")
+    if address and isinstance(mail, dict) and not mail.get("error") and _same_address(mail.get("address"), address):
+        found = (mail.get("reverse_dns") or {}).get("ptr")
+        if isinstance(found, list):
+            return Signals(address=address, ptr=[str(name).rstrip(".") for name in found])
+
+    dns = parts.get("dns")
     # Only a reverse lookup of this very address counts. A DNS result saved
     # before 1.6 never held a PTR for an address (it asked for the PTR of the
     # name "8.8.8.8."), so its silence means "not looked up", not "no PTR".

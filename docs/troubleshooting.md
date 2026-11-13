@@ -38,6 +38,22 @@ That is a limit of the machine AbuseBox runs on, not a finding about the host, s
 
 A name with both an A and an AAAA record is checked over IPv4 and is not affected.
 
+## Mail servers that show "no answer"
+
+The mail-server check connects to port 25, reads the greeting, asks for STARTTLS to read the certificate, and says QUIT. It never sends `MAIL FROM` or `RCPT TO`, so no mail is sent or attempted.
+
+Outbound port 25 is blocked by default on AWS, Google Cloud, Azure and DigitalOcean, and on many home and office connections. From inside, a blocked connection looks the same as a server that is down, so AbuseBox reports a timeout as **No answer** and never as down, and leaves it out of the asset's issues. When no host answers at all, the dashboard says so.
+
+Check from the machine AbuseBox runs on. A reply starting `220` means port 25 is open from here:
+
+```bash
+nc -w 10 gmail-smtp-in.l.google.com 25
+```
+
+To fix it, ask the provider to lift the block, which AWS, Azure and some VPS hosts do on request, or run AbuseBox somewhere port 25 is open. Reverse DNS, the other half of the check, is plain DNS and works either way.
+
+A server's own log shows the check as a connection from `abusebox.invalid` (set with `MAIL_CHECK_HELO`) that greets, starts TLS and quits.
+
 ## WHOIS that times out
 
 Registries sometimes block an individual client's IPv4 address while still answering that same client over IPv6. SIDN (`.nl`) is known to do it. AbuseBox tries both address families and falls back to the other when one does not answer, so this fixes itself wherever IPv6 is available.

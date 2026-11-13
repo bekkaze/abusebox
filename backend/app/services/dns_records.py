@@ -24,15 +24,22 @@ def _resolve_records(domain: str, rdtype: str) -> list[str]:
         return []
 
 
-def _reverse_records(address: str) -> list[str]:
-    """PTR names for an IP literal, either family."""
-    try:
-        import dns.resolver
+def reverse_lookup(address: str) -> list[str] | None:
+    """PTR names for an IP literal, either family.
 
+    ``[]`` means the address has no PTR record; ``None`` means the lookup got
+    no answer, which says nothing either way. The two must not be confused:
+    "no reverse DNS" is a finding (and a blacklist cause), a timeout is not.
+    """
+    import dns.resolver
+
+    try:
         answers = dns.resolver.resolve_address(address, lifetime=5)
-        return [rdata.to_text() for rdata in answers]
-    except Exception:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
         return []
+    except Exception:
+        return None
+    return [rdata.to_text() for rdata in answers]
 
 
 def lookup_dns_records(domain: str) -> dict[str, Any]:
@@ -49,12 +56,15 @@ def lookup_dns_records(domain: str) -> dict[str, Any]:
     except ValueError:
         pass
     else:
-        ptr = _reverse_records(domain)
-        return {
+        ptr = reverse_lookup(domain)
+        result = {
             "domain": domain,
             "records": {"PTR": ptr} if ptr else {},
             "record_types_checked": ["PTR"],
         }
+        if ptr is None:
+            result["error"] = "The reverse lookup got no answer."
+        return result
 
     record_types = ["A", "AAAA", "MX", "TXT", "CNAME", "NS", "SOA", "PTR"]
     records: dict[str, list[str]] = {}

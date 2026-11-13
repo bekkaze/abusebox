@@ -6,6 +6,13 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 
 ## [Unreleased]
 
+### Added
+
+- **Mail-server check.** Reverse DNS for the address, and whether it points back (forward-confirmed, which Gmail and Outlook.com require of senders). Then a handshake on port 25: the greeting, whether it matches the reverse DNS, STARTTLS, and the certificate it serves. It never sends `MAIL FROM` or `RCPT TO`. On by default for IP addresses added from now on. Existing assets, names and CIDR imports stay off unless you turn it on.
+- Findings are raised only for a host that answers on port 25, so a web server with no reverse DNS is not flagged. No reverse DNS, a greeting that does not match it, no STARTTLS and an expiring mail certificate are.
+- A timeout on port 25 is **No answer**, never down. Most cloud providers block outbound port 25, and from inside that looks the same as a dead server. The dashboard says when no host answers at all. See [Mail servers that show "no answer"](docs/troubleshooting.md#mail-servers-that-show-no-answer).
+- `MAIL_CHECK_HELO` sets the name the check gives in EHLO (default `abusebox.invalid`).
+
 ### Fixed
 
 - **IPv6 assets work in every check, not only the blacklists.** Server status, the SSL check and AbuseIPDB looked up IPv4 only, so an IPv6 asset with server status on came back as "DNS resolution failed" and was scored as a down server. A name with an A record is still checked over IPv4, exactly as before.
@@ -13,6 +20,8 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 - The DNS check returns an address's **PTR record**, for IPv4 and IPv6. It used to ask for the PTR of a name like `8.8.8.8.`, which does not exist, and turned an IPv6 address into a bogus A record (`2001:…` was read as `2001`, then as `0.0.7.209`).
 - Server status refuses a URL whose host has a public A record and an internal AAAA record. Only the A record used to be checked.
 - SSL errors no longer print "IPv6" as "ipv6".
+- A reverse lookup that times out is reported as no answer, not as "no PTR record".
+- The "How to fix it" link on the resolver warning pointed at a README section that moved to `docs/`.
 
 ## [1.5.0] - 2026-11-10
 

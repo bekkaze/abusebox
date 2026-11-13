@@ -35,6 +35,7 @@ const CHECK_TABS = {
   whois: { label: 'WHOIS' },
   email_security: { label: 'SPF / DKIM / DMARC' },
   server_status: { label: 'Server status' },
+  mail_server: { label: 'Mail server' },
   dmarc_reports: { label: 'DMARC reports' },
   activity: { label: 'Activity' },
   history: { label: 'History' },
@@ -50,6 +51,7 @@ const CHECK_BADGES = [
   ['check_whois', 'WHOIS'],
   ['check_email_security', 'SPF/DKIM/DMARC'],
   ['check_server_status', 'Server status'],
+  ['check_mail_server', 'Mail server'],
 ];
 
 // Text inputs need '' rather than null, or React logs an uncontrolled-input warning.
@@ -381,6 +383,7 @@ export default function AssetDetail() {
             {currentTab === 'whois' && <WhoisPanel data={results.whois} />}
             {currentTab === 'email_security' && <EmailSecurityPanel data={results.email_security} />}
             {currentTab === 'server_status' && <ServerStatusPanel data={results.server_status} />}
+            {currentTab === 'mail_server' && <MailServerPanel data={results.mail_server} />}
             {currentTab === 'dmarc_reports' && <DmarcReportsPanel summary={dmarcSummary} />}
             {currentTab === 'activity' && <ActivityPanel hostnameId={asset.id} refreshKey={historyKey} />}
             {currentTab === 'history' && <HistoryPanel hostnameId={asset.id} refreshKey={historyKey} />}
@@ -682,6 +685,95 @@ function RecordField({ title, data }) {
 
 function YesNo({ ok, yes, no }) {
   return <span className={ok ? 'text-ink' : 'text-s5 font-medium'}>{ok ? yes : no}</span>;
+}
+
+/** Yes, no, or "unknown" when the question could not be answered. */
+function YesNoUnknown({ value, yes, no, unknown = 'Unknown' }) {
+  if (value == null) return <span className="text-ink-2">{unknown}</span>;
+  return <YesNo ok={value} yes={yes} no={no} />;
+}
+
+// Port 25, by what the check could actually tell. A timeout is never "down":
+// from the inside a filtered outbound port looks the same as a dead server.
+function smtpVerdict(smtp) {
+  switch (smtp.state) {
+    case 'answered':
+      return smtp.code === 220
+        ? { code: '2.x', text: 'Accepts connections on port 25' }
+        : { code: '4.x', text: `Answers on port 25 but refuses connections (${smtp.code})`, detail: smtp.reason };
+    case 'closed':
+      return { code: '3.x', text: 'Nothing listens on port 25', detail: 'Normal for a host that does not receive mail.' };
+    case 'no_greeting':
+      return { code: '4.x', text: 'Port 25 is open but sent no greeting', detail: smtp.reason };
+    case 'not_checked':
+      return { code: '3.x', text: 'Port 25 not checked', detail: smtp.reason };
+    default:
+      return {
+        code: '3.x',
+        text: 'No answer on port 25',
+        detail: 'Outbound port 25 is blocked by default on most cloud providers and many home connections, '
+          + 'so this may be the network AbuseBox runs on rather than the server.',
+      };
+  }
+}
+
+function MailServerPanel({ data }) {
+  if (!data || data.error) return <ErrorMsg msg={data?.error} />;
+  const smtp = data.smtp || {};
+  const rdns = data.reverse_dns || {};
+  const tls = smtp.tls;
+  const verdict = smtpVerdict(smtp);
+  const answered = smtp.state === 'answered' && smtp.code === 220;
+  return (
+    <div className="space-y-5">
+      <CheckVerdict code={verdict.code} detail={verdict.detail}>{verdict.text}</CheckVerdict>
+      <Fields>
+        <Field name="Address"><Mono>{data.address}</Mono></Field>
+        <Field name="Reverse-DNS">
+          {rdns.ptr == null
+            ? <span className="text-ink-2">No answer</span>
+            : rdns.ptr.length === 0
+              ? <span className="text-s5 font-medium">None</span>
+              : <ul className="space-y-0.5">{rdns.ptr.map((name) => <li key={name}><Mono>{name}</Mono></li>)}</ul>}
+        </Field>
+        {rdns.ptr?.length > 0 && (
+          <Field name="Points-Back">
+            <YesNoUnknown value={rdns.forward_confirmed} yes="Yes, forward-confirmed" no="No, the name resolves elsewhere" />
+          </Field>
+        )}
+        {answered && (
+          <>
+            {smtp.banner && <Field name="Greeting"><Mono>{smtp.banner}</Mono></Field>}
+            <Field name="Greets-As-PTR">
+              <YesNoUnknown value={smtp.greeting_matches_ptr} yes="Yes" no={`No, it greets as ${smtp.banner_host || smtp.ehlo_host}`} />
+            </Field>
+            <Field name="STARTTLS"><YesNo ok={smtp.starttls} yes="Offered" no="Not offered" /></Field>
+          </>
+        )}
+        {tls && !tls.ok && <Field name="TLS"><span className="text-s5 font-medium">Failed: {tls.error}</span></Field>}
+        {tls?.ok && (
+          <>
+            <Field name="TLS"><Mono>{[tls.protocol, tls.cipher].filter(Boolean).join(' · ')}</Mono></Field>
+            {tls.days_remaining != null && (
+              <Field name="Certificate">
+                <span className={tls.days_remaining < 30 ? 'text-s4 font-medium' : 'text-ink'}>
+                  Valid, {plural(tls.days_remaining, 'day')} remaining
+                </span>
+              </Field>
+            )}
+            {tls.names?.length > 0 && (
+              <Field name="Cert-Names">
+                <ul className="flex flex-wrap gap-x-3 gap-y-0.5">{tls.names.map((name) => <li key={name}><Mono>{name}</Mono></li>)}</ul>
+              </Field>
+            )}
+            {tls.matches_name != null && (
+              <Field name="Cert-Matches"><YesNo ok={tls.matches_name} yes="Covers the server's name" no="Does not cover the server's name" /></Field>
+            )}
+          </>
+        )}
+      </Fields>
+    </div>
+  );
 }
 
 function ServerStatusPanel({ data }) {
