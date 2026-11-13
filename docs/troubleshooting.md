@@ -28,6 +28,16 @@ A refusal is not a listing. Spamhaus answers a refused query with `127.255.255.2
 
 <a id="whois-that-times-out"></a>
 
+## IPv6 assets that say "not checked"
+
+Blacklist and DNS lookups for an IPv6 address work everywhere, because they are DNS queries. Server status and the SSL check have to connect to the host, and Docker gives containers IPv4 only by default. When a host has only IPv6 addresses and AbuseBox has no IPv6 route, those two checks say:
+
+> Not checked: it has only IPv6 addresses and this AbuseBox has no IPv6 connectivity.
+
+That is a limit of the machine AbuseBox runs on, not a finding about the host, so it is left out of the risk score rather than counted as down. To check these hosts, give the containers IPv6 with the `enable_ipv6` block described in [WHOIS that times out](#whois-that-times-out) below, on a host that has IPv6 itself.
+
+A name with both an A and an AAAA record is checked over IPv4 and is not affected.
+
 ## WHOIS that times out
 
 Registries sometimes block an individual client's IPv4 address while still answering that same client over IPv6. SIDN (`.nl`) is known to do it. AbuseBox tries both address families and falls back to the other when one does not answer, so this fixes itself wherever IPv6 is available.

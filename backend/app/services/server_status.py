@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import socket
 import time
@@ -9,13 +10,31 @@ from requests.adapters import HTTPAdapter
 
 from app.core.failures import describe
 from app.core.logging_safety import for_log
-from app.core.network_safety import UnsafeDestinationError, resolve_public_ipv4, validate_public_url
+from app.core.network_safety import (
+    NoIpv6RouteError,
+    UnresolvableHostError,
+    UnsafeDestinationError,
+    resolve_public_address,
+    validate_public_url,
+)
 
 logger = logging.getLogger(__name__)
 
 _MAX_REDIRECTS = 5
 _MAX_BODY_BYTES = 1024 * 1024
 _HEADERS = {"User-Agent": "AbuseBox-Monitor/1.0"}
+
+
+def _is_ipv6(value: str) -> bool:
+    try:
+        return ipaddress.ip_address(value).version == 6
+    except ValueError:
+        return False
+
+
+def _netloc_host(host: str) -> str:
+    """*host* as it has to appear in a URL or a Host header: IPv6 bracketed."""
+    return f"[{host}]" if _is_ipv6(host) else host
 
 
 def _normalize_url(value: str) -> tuple[str, str]:
@@ -25,6 +44,10 @@ def _normalize_url(value: str) -> tuple[str, str]:
         return "", ""
 
     if not target.startswith(("http://", "https://")):
+        # A bare IPv6 literal has to be bracketed before it can be a URL, or
+        # its first group is read as the host and the rest as a port.
+        if _is_ipv6(target.strip("[]")):
+            target = f"[{target.strip('[]')}]"
         target = "https://" + target
 
     parsed = urlparse(target)
@@ -57,15 +80,15 @@ def _pinned_get(url: str) -> tuple[requests.Session, requests.Response]:
     hostname = parsed.hostname or ""
     if parsed.scheme not in ("http", "https") or not hostname:
         raise UnsafeDestinationError("Only absolute HTTP(S) URLs are allowed.")
-    ip = resolve_public_ipv4(hostname)
+    ip = resolve_public_address(hostname)
     port = f":{parsed.port}" if parsed.port else ""
-    pinned = urlunparse(parsed._replace(netloc=f"{ip}{port}"))
+    pinned = urlunparse(parsed._replace(netloc=f"{_netloc_host(ip)}{port}"))
     session = requests.Session()
     session.mount("https://", _PinnedAdapter(hostname))
     try:
         resp = session.get(
             pinned, timeout=10, allow_redirects=False, stream=True,
-            headers={**_HEADERS, "Host": f"{hostname}{port}"},
+            headers={**_HEADERS, "Host": f"{_netloc_host(hostname)}{port}"},
         )
     except Exception:
         session.close()
@@ -121,19 +144,22 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
         "url": url,
     }
 
-    # DNS resolution check
     try:
-        socket.getaddrinfo(hostname, None, socket.AF_INET)
-    except (TimeoutError, socket.gaierror, UnicodeError):
+        validate_public_url(url)
+        ip = resolve_public_address(hostname)
+    except UnresolvableHostError:
         result["resolved_ip"] = None
         result["dns_resolves"] = False
         result["is_up"] = False
         result["reason"] = "DNS resolution failed"
         return result
-
-    try:
-        validate_public_url(url)
-        ip = resolve_public_ipv4(hostname)
+    except NoIpv6RouteError as exc:
+        # Reported as an error, not as down: the host may be fine, this
+        # machine just cannot reach it. An error is left out of health and
+        # the risk score, where "down" would cost the asset 20 points.
+        result["dns_resolves"] = True
+        result["error"] = f"Not checked: {describe(exc)}."
+        return result
     except UnsafeDestinationError as exc:
         result["resolved_ip"] = None
         result["dns_resolves"] = True
@@ -144,8 +170,9 @@ def check_server_status(hostname_or_url: str) -> dict[str, Any]:
     result["dns_resolves"] = True
 
     # TCP port check (80 and 443)
+    family = socket.AF_INET6 if _is_ipv6(ip) else socket.AF_INET
     for port in (443, 80):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = socket.socket(family, socket.SOCK_STREAM)
         sock.settimeout(5)
         try:
             sock.connect((ip, port))

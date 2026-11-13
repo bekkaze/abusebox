@@ -6,6 +6,14 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 
 ## [Unreleased]
 
+### Fixed
+
+- **IPv6 assets work in every check, not only the blacklists.** Server status, the SSL check and AbuseIPDB looked up IPv4 only, so an IPv6 asset with server status on came back as "DNS resolution failed" and was scored as a down server. A name with an A record is still checked over IPv4, exactly as before.
+- Where AbuseBox itself has no IPv6 route, which is Docker's default, an IPv6-only host is reported as **not checked** rather than down, and is left out of the risk score. See [IPv6 assets that say "not checked"](docs/troubleshooting.md#ipv6-assets-that-say-not-checked).
+- The DNS check returns an address's **PTR record**, for IPv4 and IPv6. It used to ask for the PTR of a name like `8.8.8.8.`, which does not exist, and turned an IPv6 address into a bogus A record (`2001:…` was read as `2001`, then as `0.0.7.209`).
+- Server status refuses a URL whose host has a public A record and an internal AAAA record. Only the A record used to be checked.
+- SSL errors no longer print "IPv6" as "ipv6".
+
 ## [1.5.0] - 2026-11-10
 
 IPv6 and domain blacklists, plus the fixes that keep a busier check cycle from tripping over itself.

@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 
 import dns.resolver
 
+from app.core.hosts import extract_host as _extract_host
+
 # Re-exported so every existing import of `app.services.dnsbl` keeps working.
 from app.services.dnsbl_lists import (
     BASE_PROVIDERS,
@@ -165,27 +167,6 @@ def reverse_ipv6(address: str) -> str:
 
 def reverse_ipv4(address: str) -> str:
     return ".".join(reversed(address.split(".")))
-
-
-def _extract_host(value: str) -> str:
-    """The bare host from a URL, host:port or plain name."""
-    target = (value or "").strip()
-    if not target:
-        return ""
-    if "://" in target:
-        parsed = urlparse(target)
-        target = parsed.hostname or ""
-    elif "/" in target:
-        parsed = urlparse(f"//{target}", scheme="http")
-        target = parsed.hostname or target.split("/", 1)[0]
-    # A bracketed IPv6 literal is already unwrapped by urlparse; a bare
-    # host:port is only a port when there is exactly one colon, since an
-    # unbracketed IPv6 address has several.
-    if ":" in target and target.count(":") == 1:
-        host, port = target.rsplit(":", 1)
-        if port.isdigit():
-            target = host
-    return target.strip().strip("[]")
 
 
 def _parse_address(host: str) -> tuple[str | None, str]:

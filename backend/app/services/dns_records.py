@@ -1,5 +1,8 @@
+import ipaddress
 import socket
 from typing import Any
+
+from app.core.hosts import extract_host
 
 
 def _resolve_records(domain: str, rdtype: str) -> list[str]:
@@ -21,17 +24,37 @@ def _resolve_records(domain: str, rdtype: str) -> list[str]:
         return []
 
 
+def _reverse_records(address: str) -> list[str]:
+    """PTR names for an IP literal, either family."""
+    try:
+        import dns.resolver
+
+        answers = dns.resolver.resolve_address(address, lifetime=5)
+        return [rdata.to_text() for rdata in answers]
+    except Exception:
+        return []
+
+
 def lookup_dns_records(domain: str) -> dict[str, Any]:
-    domain = (domain or "").strip().lower()
+    domain = extract_host((domain or "").strip().lower())
     if not domain:
         return {"error": "Please provide a domain name."}
 
-    # Strip protocol/path
-    if "://" in domain:
-        from urllib.parse import urlparse
-
-        domain = urlparse(domain).hostname or domain
-    domain = domain.split("/")[0].split(":")[0]
+    # An address has one record worth having, its PTR, and has to be asked for
+    # by its reverse name. Querying the literal itself for PTR asks about a
+    # name like "8.8.8.8.", which does not exist, and asking it for A only
+    # echoes the address back.
+    try:
+        ipaddress.ip_address(domain)
+    except ValueError:
+        pass
+    else:
+        ptr = _reverse_records(domain)
+        return {
+            "domain": domain,
+            "records": {"PTR": ptr} if ptr else {},
+            "record_types_checked": ["PTR"],
+        }
 
     record_types = ["A", "AAAA", "MX", "TXT", "CNAME", "NS", "SOA", "PTR"]
     records: dict[str, list[str]] = {}
