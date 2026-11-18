@@ -53,12 +53,16 @@ def run_enabled_checks(hostname: str, toggles: dict[str, bool]) -> dict[str, Any
         from app.services.server_status import check_server_status
         tasks["server_status"] = (check_server_status, (hostname,))
 
+    if toggles.get("check_mail_server"):
+        from app.services.mail_server import check_mail_server
+        tasks["mail_server"] = (check_mail_server, (hostname,))
+
     if not tasks:
         return {}
 
     results: dict[str, Any] = {}
 
-    with ThreadPoolExecutor(max_workers=min(len(tasks), 7)) as executor:
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
         future_to_key = {
             executor.submit(fn, *args): key
             for key, (fn, args) in tasks.items()
@@ -88,4 +92,5 @@ def get_toggles_from_hostname(hostname_obj) -> dict[str, bool]:
         "check_whois": hostname_obj.check_whois,
         "check_email_security": hostname_obj.check_email_security,
         "check_server_status": hostname_obj.check_server_status,
+        "check_mail_server": hostname_obj.check_mail_server,
     }

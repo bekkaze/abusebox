@@ -1,42 +1,31 @@
 import ipaddress
 from typing import Any
-from urllib.parse import urlparse
 
 import requests
 
 from app.core.config import settings
-from app.core.network_safety import resolve_public_ipv4
+from app.core.hosts import extract_host
+from app.core.network_safety import resolve_public_address
 
 
 def _extract_ip(value: str) -> str | None:
-    """Resolve a hostname/URL/IP to an IPv4 address."""
-    target = (value or "").strip()
-    if not target:
-        return None
+    """The public address AbuseIPDB should be asked about, of either family.
 
-    if "://" in target:
-        parsed = urlparse(target)
-        target = parsed.hostname or ""
-    elif "/" in target:
-        parsed = urlparse(f"//{target}", scheme="http")
-        target = parsed.hostname or target.split("/", 1)[0]
-
-    if ":" in target and target.count(":") == 1:
-        host, port = target.rsplit(":", 1)
-        if port.isdigit():
-            target = host
-    target = target.strip()
+    AbuseIPDB is asked *about* the address and never connects to it, so an
+    IPv6-only host is looked up even where this machine has no IPv6 route.
+    """
+    target = extract_host(value)
     if not target:
         return None
 
     try:
-        ip = ipaddress.IPv4Address(target)
+        ip = ipaddress.ip_address(target)
         return str(ip) if ip.is_global else None
-    except ipaddress.AddressValueError:
+    except ValueError:
         pass
 
     try:
-        return resolve_public_ipv4(target)
+        return resolve_public_address(target, connect=False)
     except ValueError:
         return None
 
@@ -48,7 +37,7 @@ def check_abuseipdb(hostname_or_ip: str, max_age_in_days: int = 90) -> dict[str,
 
     ip = _extract_ip(hostname_or_ip)
     if not ip:
-        return {"error": "Unable to resolve hostname to IPv4 address."}
+        return {"error": "Unable to resolve hostname to a public IP address."}
 
     try:
         resp = requests.get(

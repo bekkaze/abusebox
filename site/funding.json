@@ -6,7 +6,7 @@
     "role": "owner",
     "name": "bekkaze",
     "email": "bekkaze7@gmail.com",
-    "description": "Creator and sole maintainer of AbuseBox, a free, self-hosted monitor that tells mail and network operators when their IPs and domains land on DNS blacklists, and why. I build and maintain it in my own time: seventeen releases between March and November 2026, including the security and correctness fixes that came out of user bug reports and from a security review of the project's own code.",
+    "description": "Creator and sole maintainer of AbuseBox, a free, self-hosted monitor that tells mail and network operators when their IPs and domains land on DNS blacklists, and why. I build and maintain it in my own time: eighteen releases between March and November 2026, including the security and correctness fixes that came out of user bug reports and from a security review of the project's own code.",
     "webpageUrl": {
       "url": "https://bekkaze.github.io/abusebox/"
     }
@@ -53,7 +53,7 @@
         "guid": "abusebox-v2",
         "status": "active",
         "name": "AbuseBox 2.0: abuse handling for network operators",
-        "description": "Four public milestones, each a tagged release with docs and tests. (1) Accurate results by default, already delivered unfunded: a bundled resolver (v1.3.2), IPv6 and domain blacklists (v1.5.0). (2) Why each listing happened, whether the cause is fixed, and whether to request delisting. (3) Prefixes, ASNs and customers, with scheduled range scans and PostgreSQL. (4) Import of Shadowserver's free daily reports, and per-customer cases that close only when the evidence clears.",
+        "description": "Four public milestones, each a tagged release with docs and tests. Two are delivered, unfunded: (1) accurate results by default: a bundled resolver (v1.3.2), IPv6 and domain blacklists (v1.5.0); (2) why each listing happened, whether the cause is fixed, and whether to request delisting (v1.6.0). Two remain: (3) prefixes, ASNs and customers, with scheduled range scans and PostgreSQL; (4) import of Shadowserver's free daily reports, and per-customer cases that close when the evidence clears.",
         "amount": 10000,
         "currency": "USD",
         "frequency": "one-time",

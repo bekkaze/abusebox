@@ -1,7 +1,7 @@
 import { Fragment, useId } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { inputClass, primaryButtonClass, secondaryButtonClass, selectClass, Spinner } from "../../shared/ui";
-import { CHECK_TOGGLES, detectHostnameType } from "./assetForm";
+import { CHECK_TOGGLES, detectHostnameType, toggleValue } from "./assetForm";
 
 // Dialog surface and form vocabulary: flat paper, hairline border, one soft shadow.
 const panelClass =
@@ -109,7 +109,7 @@ export default function AddNewMonitorDialog({ formData, handleInputChange, handl
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                     {CHECK_TOGGLES.map((toggle) => (
                       <label key={toggle.name} className="flex items-center gap-2.5 py-1.5 cursor-pointer">
-                        <input type="checkbox" name={toggle.name} checked={formData[toggle.name] || false} onChange={handleInputChange} className={checkboxClass} />
+                        <input type="checkbox" name={toggle.name} checked={toggleValue(formData, toggle.name)} onChange={handleInputChange} className={checkboxClass} />
                         <span className="text-sm text-ink">{toggle.label}</span>
                       </label>
                     ))}

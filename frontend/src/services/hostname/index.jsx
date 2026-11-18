@@ -126,6 +126,12 @@ const HostnameService = () => {
     return response.data;
   };
 
+  // Why each listing happened, the removal verdict, and every removal request.
+  const getListings = async (id) => {
+    const response = await axios.get(`/api/hostname/${id}/listings/`);
+    return response.data;
+  };
+
   const getHistory = async (id, limit = 100) => {
     const response = await axios.get(`/api/hostname/${id}/history/?limit=${limit}`);
     return response.data;
@@ -135,6 +141,7 @@ const HostnameService = () => {
     bulkAction,
     getCheck,
     getHistory,
+    getListings,
     createHostname,
     getHostname,
     updateHostname,

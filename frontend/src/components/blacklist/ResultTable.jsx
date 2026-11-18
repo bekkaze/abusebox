@@ -4,7 +4,7 @@ import { ProviderRows } from './ResultTableQuick';
 import { sortProviders } from './providerStatus';
 import { linkClass } from '../shared/ui';
 
-const ResultTable = ({ data, checkId, onDelistRecorded }) => {
+const ResultTable = ({ data, checkId, listings, onDelistRecorded }) => {
   const [selectedProvider, setSelectedProvider] = useState(null);
   const providers = sortProviders(data);
 
@@ -31,6 +31,7 @@ const ResultTable = ({ data, checkId, onDelistRecorded }) => {
         provider={selectedProvider}
         target={data?.hostname}
         checkId={checkId}
+        assessment={selectedProvider ? listings?.[selectedProvider] : null}
         onRecorded={onDelistRecorded}
       />
     </>

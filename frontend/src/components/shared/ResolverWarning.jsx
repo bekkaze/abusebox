@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getResolverHealth } from '../../services/blacklist/checkService';
 import { Alert, linkClass } from './ui';
 
-const HELP_URL = 'https://github.com/bekkaze/abusebox#blacklists-that-show-no-answer';
+const HELP_URL = 'https://github.com/bekkaze/abusebox/blob/main/docs/troubleshooting.md#blacklists-that-show-no-answer';
 
 /** Says so when blacklist lookups can't be trusted because the DNS resolver is refused. */
 export default function ResolverWarning({ className = '' }) {

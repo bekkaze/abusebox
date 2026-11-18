@@ -24,6 +24,8 @@ GET  /hostname/list/?include_result=false
 GET  /hostname/page/?page=1&page_size=25&sort=urgency&filter=attention&search=mail
 GET  /hostname/{id}/checks/{check_id}
 GET  /hostname/{id}/events/
+GET  /hostname/{id}/listings/               # why each listing happened, the removal verdict, request history
+POST /blacklist/delist/                     # {"provider": ..., "delist_required_data": {"id": <check id>}, "override_reason": null}
 GET  /events/?severity=critical
 GET  /settings/scheduler/status/
 POST /settings/scheduler/run/            # admin only: check due assets now

@@ -3,10 +3,10 @@ import socket
 import ssl
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlparse
 
 from app.core.failures import describe
-from app.core.network_safety import resolve_public_ipv4
+from app.core.hosts import extract_host
+from app.core.network_safety import resolve_public_address
 
 logger = logging.getLogger(__name__)
 
@@ -108,20 +108,25 @@ def _tls_warnings(cipher, strict_error: ssl.SSLError | None) -> list[str]:
     return warnings
 
 
+def _sentence(phrase: str) -> str:
+    """*phrase* as a sentence. Not str.capitalize(), which would also lowercase
+    every later letter and print "IPv6" as "ipv6"."""
+    return f"{phrase[:1].upper()}{phrase[1:]}."
+
+
 def check_ssl_certificate(hostname: str) -> dict[str, Any]:
     hostname = (hostname or "").strip()
     if not hostname:
         return {"error": "Please provide a hostname."}
 
-    # Strip protocol/path/port
-    if "://" in hostname:
-        parsed = urlparse(hostname)
-        hostname = parsed.hostname or hostname
-    hostname = hostname.split("/")[0].split(":")[0]
+    # Protocol, path and port go; an IPv6 literal keeps its colons.
+    hostname = extract_host(hostname)
+    if not hostname:
+        return {"error": "Please provide a hostname."}
     try:
-        ip = resolve_public_ipv4(hostname)
+        ip = resolve_public_address(hostname)
     except ValueError as exc:
-        return {"hostname": hostname, "error": f"{describe(exc).capitalize()}."}
+        return {"hostname": hostname, "error": _sentence(describe(exc))}
 
     port = 443
 
@@ -178,9 +183,9 @@ def check_ssl_certificate(hostname: str) -> dict[str, Any]:
     except ssl.SSLCertVerificationError as exc:
         # describe() returns a whole clause, so it reads as the sentence it is
         # rather than as a prefix with the same thing said twice after it.
-        return {"hostname": hostname, "valid": False, "error": f"{describe(exc).capitalize()}."}
+        return {"hostname": hostname, "valid": False, "error": _sentence(describe(exc))}
     except ssl.SSLError as exc:
-        return {"hostname": hostname, "valid": False, "error": f"{describe(exc).capitalize()}."}
+        return {"hostname": hostname, "valid": False, "error": _sentence(describe(exc))}
     except TimeoutError:
         return {"hostname": hostname, "error": "Connection timed out."}
     except socket.gaierror:

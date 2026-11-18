@@ -7,4 +7,4 @@ with `pyproject.toml` still reading 1.3.5 because three files had to be edited
 by hand and one was missed.
 """
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"

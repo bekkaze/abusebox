@@ -36,6 +36,7 @@ Everything available:
 | `SCHEDULER_INTERVAL_MINUTES` | How often the scheduler checks due assets | `360` |
 | `WHOIS_TIMEOUT_SECONDS` | Total seconds for one WHOIS lookup, split evenly across IPv6 and IPv4. Some registries block a client on one family and answer it on the other | `30` |
 | `WHOIS_CACHE_MINUTES` | How long a successful WHOIS answer is reused before asking again. `0` disables caching | `360` |
+| `MAIL_CHECK_HELO` | The name the mail-server check gives in `EHLO`. The default, under the reserved `.invalid` domain, tells a server's operator who connected and can never resolve to anyone | `abusebox.invalid` |
 | `SMTP_HOST` | SMTP server for email alerts. Alerts go to the email address of the asset's owner; each user sets theirs in **Settings → Notifications** | unset |
 | `SMTP_PORT` | `587` uses STARTTLS, `465` uses TLS from the start | `587` |
 | `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_TLS` | The rest of the SMTP settings | unset |

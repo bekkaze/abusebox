@@ -28,6 +28,32 @@ A refusal is not a listing. Spamhaus answers a refused query with `127.255.255.2
 
 <a id="whois-that-times-out"></a>
 
+## IPv6 assets that say "not checked"
+
+Blacklist and DNS lookups for an IPv6 address work everywhere, because they are DNS queries. Server status and the SSL check have to connect to the host, and Docker gives containers IPv4 only by default. When a host has only IPv6 addresses and AbuseBox has no IPv6 route, those two checks say:
+
+> Not checked: it has only IPv6 addresses and this AbuseBox has no IPv6 connectivity.
+
+That is a limit of the machine AbuseBox runs on, not a finding about the host, so it is left out of the risk score rather than counted as down. To check these hosts, give the containers IPv6 with the `enable_ipv6` block described in [WHOIS that times out](#whois-that-times-out) below, on a host that has IPv6 itself.
+
+A name with both an A and an AAAA record is checked over IPv4 and is not affected.
+
+## Mail servers that show "no answer"
+
+The mail-server check connects to port 25, reads the greeting, asks for STARTTLS to read the certificate, and says QUIT. It never sends `MAIL FROM` or `RCPT TO`, so no mail is sent or attempted.
+
+Outbound port 25 is blocked by default on AWS, Google Cloud, Azure and DigitalOcean, and on many home and office connections. From inside, a blocked connection looks the same as a server that is down, so AbuseBox reports a timeout as **No answer** and never as down, and leaves it out of the asset's issues. When no host answers at all, the dashboard says so.
+
+Check from the machine AbuseBox runs on. A reply starting `220` means port 25 is open from here:
+
+```bash
+nc -w 10 gmail-smtp-in.l.google.com 25
+```
+
+To fix it, ask the provider to lift the block, which AWS, Azure and some VPS hosts do on request, or run AbuseBox somewhere port 25 is open. Reverse DNS, the other half of the check, is plain DNS and works either way.
+
+A server's own log shows the check as a connection from `abusebox.invalid` (set with `MAIL_CHECK_HELO`) that greets, starts TLS and quits.
+
 ## WHOIS that times out
 
 Registries sometimes block an individual client's IPv4 address while still answering that same client over IPv6. SIDN (`.nl`) is known to do it. AbuseBox tries both address families and falls back to the other when one does not answer, so this fixes itself wherever IPv6 is available.

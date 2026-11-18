@@ -35,7 +35,10 @@ class _SyncThread:
 @pytest.fixture()
 def asset(client, admin_headers):
     response = client.post("/hostname/", json={
-        "hostname_type": "ipv4", "hostname": "203.0.113.10", "check_blacklist": False, "is_alert_enabled": True,
+        # No checks at all, so the history holds only what each test records.
+        # The mail-server check is on by default for a new address (1.6).
+        "hostname_type": "ipv4", "hostname": "203.0.113.10", "check_blacklist": False,
+        "check_mail_server": False, "is_alert_enabled": True,
     }, headers=admin_headers)
     assert response.status_code == 200, response.text
     return response.json()

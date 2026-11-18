@@ -16,7 +16,7 @@ from app.services.risk import risk_score
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 
-CHECK_KEYS = ("blacklist", "abuseipdb", "dns", "ssl", "whois", "email_security", "server_status")
+CHECK_KEYS = ("blacklist", "abuseipdb", "dns", "ssl", "whois", "email_security", "server_status", "mail_server")
 
 
 def split_result(result: dict | None) -> dict[str, Any]:
@@ -109,6 +109,46 @@ def domain_expiry_days(result: dict | None, now: datetime | None = None) -> int 
     return (expiry - (now or datetime.now(UTC))).days
 
 
+def mail_issues(mail: Any, health: dict, issue, ssl_warning_days: int) -> None:
+    """Mail-server findings, raised only for a host that answered on port 25.
+
+    The check is on by default for every new IP address, most of which are
+    not mail servers. A web server with no PTR and nothing on port 25 is
+    normal, so none of this is an issue until the host has shown it handles
+    mail. A port that did not answer is never one either: from here that may
+    be a filter on this side (see mail_server.py).
+    """
+    if not isinstance(mail, dict) or mail.get("error"):
+        return
+    smtp = mail.get("smtp") or {}
+    rdns = mail.get("reverse_dns") or {}
+    health["mail"] = {
+        "smtp": smtp.get("state"),
+        "starttls": smtp.get("starttls"),
+        "fcrdns": rdns.get("forward_confirmed"),
+        "ptr": (rdns.get("ptr") or [None])[0],
+    }
+    if smtp.get("state") != "answered" or smtp.get("code") != 220:
+        return
+
+    if rdns.get("ptr") == []:
+        issue("mail", "warning", "Mail server has no reverse DNS")
+    elif rdns.get("forward_confirmed") is False:
+        issue("mail", "warning", "Mail server's reverse DNS does not point back to its address")
+    if smtp.get("greeting_matches_ptr") is False:
+        greets_as = smtp.get("banner_host") or smtp.get("ehlo_host")
+        issue("mail", "warning", f"Mail server greets as {greets_as}, not as its reverse DNS name")
+    if smtp.get("starttls") is False:
+        issue("mail", "warning", "Mail server does not offer STARTTLS")
+    tls = smtp.get("tls") or {}
+    days = tls.get("days_remaining")
+    if tls.get("ok") is False and tls.get("error"):
+        issue("mail", "warning", f"Mail server TLS failed: {tls['error']}")
+    elif tls.get("ok") and isinstance(days, int) and ssl_warning_days and days <= ssl_warning_days:
+        issue("mail", "critical" if days <= 3 else "warning",
+              f"Mail server certificate expires in {days} day{'s' if days != 1 else ''}")
+
+
 def summarize(
     hostname,
     result: dict | None,
@@ -173,6 +213,8 @@ def summarize(
             issue("server", "critical", f"Server is down{': ' + server['reason'] if server.get('reason') else ''}")
         elif isinstance(server.get("status_code"), int) and server["status_code"] >= 500:
             issue("server", "warning", f"Server responds with HTTP {server['status_code']}")
+
+    mail_issues(parts.get("mail_server"), health, issue, ssl_warning_days)
 
     email = parts.get("email_security")
     if isinstance(email, dict) and not email.get("error") and email.get("grade"):

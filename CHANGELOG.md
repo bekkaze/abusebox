@@ -6,6 +6,35 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-18
+
+Why each listing happened, whether to ask for removal, and whether the removal held. Plus a check of the mail server itself, and IPv6 in every check.
+
+### Added
+
+- **Mail-server check.** Reverse DNS for the address, and whether it points back (forward-confirmed, which Gmail and Outlook.com require of senders). Then a handshake on port 25: the greeting, whether it matches the reverse DNS, STARTTLS, and the certificate it serves. It never sends `MAIL FROM` or `RCPT TO`. On by default for IP addresses added from now on. Existing assets, names and CIDR imports stay off unless you turn it on.
+- Findings are raised only for a host that answers on port 25, so a web server with no reverse DNS is not flagged. No reverse DNS, a greeting that does not match it, no STARTTLS and an expiring mail certificate are.
+- A timeout on port 25 is **No answer**, never down. Most cloud providers block outbound port 25, and from inside that looks the same as a dead server. The dashboard says when no host answers at all. See [Mail servers that show "no answer"](docs/troubleshooting.md#mail-servers-that-show-no-answer).
+- `MAIL_CHECK_HELO` sets the name the check gives in EHLO (default `abusebox.invalid`).
+- **Why it is listed.** Each listing says what the list lists for, in one of six situations: your configuration, a compromised host, mail that was sent, your provider's range, your mail server's behaviour, or the domain's reputation. Spamhaus is read per return code, since SBL, XBL, DROP and PBL each call for something different.
+- **Whether to ask for removal.** Every listing gets a verdict: ready, check the cause first, not ready (clean the host first, or fix what the list names), or not yours to request. For missing or generic reverse DNS, AbuseBox checks the fix itself. Where it cannot see the cause, it says so rather than guessing.
+- **Removal requests are followed.** A request is kept with the verdict it was made against, and every later check moves it on: waiting, cleared, held for 30 days, or relisted. Relisted means the cause was not fixed. Asking against a "not ready" verdict needs a reason, which is kept with it. The API does not require one, so existing scripts keep working.
+- **A drafted removal request** to paste into the list's form: what it lists for, when it was first seen, what AbuseBox can confirm now, and a gap for what you changed, which AbuseBox cannot know.
+
+### Fixed
+
+- **IPv6 assets work in every check, not only the blacklists.** Server status, the SSL check and AbuseIPDB looked up IPv4 only, so an IPv6 asset with server status on came back as "DNS resolution failed" and was scored as a down server. A name with an A record is still checked over IPv4, exactly as before.
+- Where AbuseBox itself has no IPv6 route, which is Docker's default, an IPv6-only host is reported as **not checked** rather than down, and is left out of the risk score. See [IPv6 assets that say "not checked"](docs/troubleshooting.md#ipv6-assets-that-say-not-checked).
+- The DNS check returns an address's **PTR record**, for IPv4 and IPv6. It used to ask for the PTR of a name like `8.8.8.8.`, which does not exist, and turned an IPv6 address into a bogus A record (`2001:…` was read as `2001`, then as `0.0.7.209`).
+- Server status refuses a URL whose host has a public A record and an internal AAAA record. Only the A record used to be checked.
+- SSL errors no longer print "IPv6" as "ipv6".
+- A reverse lookup that times out is reported as no answer, not as "no PTR record".
+- A listing marked "requested" went back to "open" at the next check. It now stays requested until the list clears it.
+- The "How to fix it" link on the resolver warning pointed at a README section that moved to `docs/`.
+- **STARTTLS failed on every mail server that offered it**, so the mail check could never report a certificate. Fixed, with a test that completes a real handshake.
+- dnspython 2.9.2 ([GHSA-vvf4-9x63-8xvv](https://github.com/advisories/GHSA-vvf4-9x63-8xvv)). The flaw is in parsing zone-file text, which AbuseBox never does, so it was not reachable, but image scanners report it.
+- The mail check gives up connecting after 5 seconds instead of 15. Where outbound port 25 is blocked, a cycle of 1,000 IP addresses took about an hour. The greeting and replies still get 15 seconds.
+
 ## [1.5.0] - 2026-11-10
 
 IPv6 and domain blacklists, plus the fixes that keep a busier check cycle from tripping over itself.

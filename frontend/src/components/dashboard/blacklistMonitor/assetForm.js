@@ -8,7 +8,21 @@ export const CHECK_TOGGLES = [
   { name: "check_whois", label: "WHOIS lookup" },
   { name: "check_email_security", label: "SPF / DKIM / DMARC" },
   { name: "check_server_status", label: "Server status" },
+  { name: "check_mail_server", label: "Mail server (reverse DNS, port 25)" },
 ];
+
+// Left unset, the server decides: on for an IP address, off for a name, whose
+// port 25 is as often the web host's. The form mirrors that until someone
+// ticks or clears the box.
+export function mailServerDefault(hostnameType) {
+  return hostnameType === "ipv4" || hostnameType === "ipv6";
+}
+
+/** A check toggle's checked state, including the mail check's default. */
+export function toggleValue(form, name) {
+  if (name === "check_mail_server" && form[name] == null) return mailServerDefault(form.hostname_type);
+  return Boolean(form[name]);
+}
 
 const IPV4_RE = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 const DOMAIN_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
