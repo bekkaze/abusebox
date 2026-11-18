@@ -42,3 +42,12 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: yarn lint
       - run: yarn build
+
+  # FLOSS/Fund's crawler enforces limits the funding.json schema leaves out
+  # (a plan description over 500 bytes fails the crawl and the listing is
+  # removed), so check the manifest against the portal's own rules.
+  funding-json:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 .github/scripts/check_funding_json.py site/funding.json
