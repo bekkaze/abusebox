@@ -6,6 +6,10 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-18
+
+Why each listing happened, whether to ask for removal, and whether the removal held. Plus a check of the mail server itself, and IPv6 in every check.
+
 ### Added
 
 - **Mail-server check.** Reverse DNS for the address, and whether it points back (forward-confirmed, which Gmail and Outlook.com require of senders). Then a handshake on port 25: the greeting, whether it matches the reverse DNS, STARTTLS, and the certificate it serves. It never sends `MAIL FROM` or `RCPT TO`. On by default for IP addresses added from now on. Existing assets, names and CIDR imports stay off unless you turn it on.
@@ -27,6 +31,8 @@ Upgrading is `docker compose pull && docker compose up -d` unless a release says
 - A reverse lookup that times out is reported as no answer, not as "no PTR record".
 - A listing marked "requested" went back to "open" at the next check. It now stays requested until the list clears it.
 - The "How to fix it" link on the resolver warning pointed at a README section that moved to `docs/`.
+- **STARTTLS failed on every mail server that offered it**, so the mail check could never report a certificate. Fixed, with a test that completes a real handshake.
+- The mail check gives up connecting after 5 seconds instead of 15. Where outbound port 25 is blocked, a cycle of 1,000 IP addresses took about an hour. The greeting and replies still get 15 seconds.
 
 ## [1.5.0] - 2026-11-10
 
