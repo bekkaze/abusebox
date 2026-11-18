@@ -7,6 +7,7 @@ on:
       - "site/**"
       - "files/*.png"
       - ".github/workflows/pages.yml"
+      - ".github/scripts/check_funding_json.py"
   workflow_dispatch:
 
 permissions:
@@ -31,6 +32,10 @@ jobs:
       # keeping a second set in the repository.
       - name: Add screenshots
         run: mkdir -p site/screens && cp files/dashboard.png files/dashboard_dark.png files/asset_details.png site/screens/
+
+      # Don't publish a funding.json that FLOSS/Fund's crawler would reject.
+      - name: Check funding.json
+        run: python3 .github/scripts/check_funding_json.py site/funding.json
 
       - uses: actions/configure-pages@v6
 

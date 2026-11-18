@@ -53,7 +53,7 @@
         "guid": "abusebox-v2",
         "status": "active",
         "name": "AbuseBox 2.0: abuse handling for network operators",
-        "description": "Four public milestones, each shipping as a tagged release with documentation and tests. Milestone 1 is already delivered, unfunded, and can be inspected today: accurate results by default, meaning the bundled recursive resolver (v1.3.2, so the lists see the operator's own address rather than a public resolver they refuse), IPv6 lookups in RFC 5782 nibble format and domain blacklists on Spamhaus DBL, SURBL and URIBL (v1.5.0, 10 November 2026). The three remaining milestones are: (2) telling an operator why each listing happened, whether the cause is fixed, and whether a delisting request is worth spending, since a request made before the cause is fixed is relisted within days; (3) prefixes, ASNs and customers instead of single addresses, with scheduled range scans and PostgreSQL for the row counts that implies; (4) import of Shadowserver's free daily network reports, and cases per customer that close only when the evidence clears.",
+        "description": "Four public milestones, each a tagged release with docs and tests. (1) Accurate results by default, already delivered unfunded: a bundled resolver (v1.3.2), IPv6 and domain blacklists (v1.5.0). (2) Why each listing happened, whether the cause is fixed, and whether to request delisting. (3) Prefixes, ASNs and customers, with scheduled range scans and PostgreSQL. (4) Import of Shadowserver's free daily reports, and per-customer cases that close only when the evidence clears.",
         "amount": 10000,
         "currency": "USD",
         "frequency": "one-time",
