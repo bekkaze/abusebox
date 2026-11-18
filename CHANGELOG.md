@@ -32,6 +32,7 @@ Why each listing happened, whether to ask for removal, and whether the removal h
 - A listing marked "requested" went back to "open" at the next check. It now stays requested until the list clears it.
 - The "How to fix it" link on the resolver warning pointed at a README section that moved to `docs/`.
 - **STARTTLS failed on every mail server that offered it**, so the mail check could never report a certificate. Fixed, with a test that completes a real handshake.
+- dnspython 2.9.2 ([GHSA-vvf4-9x63-8xvv](https://github.com/advisories/GHSA-vvf4-9x63-8xvv)). The flaw is in parsing zone-file text, which AbuseBox never does, so it was not reachable, but image scanners report it.
 - The mail check gives up connecting after 5 seconds instead of 15. Where outbound port 25 is blocked, a cycle of 1,000 IP addresses took about an hour. The greeting and replies still get 15 seconds.
 
 ## [1.5.0] - 2026-11-10

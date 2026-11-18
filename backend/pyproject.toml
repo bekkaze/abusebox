@@ -17,7 +17,7 @@ passlib = "^1.7.4"
 pyjwt = "^2.15.1"
 requests = "^2.34.2"
 certifi = ">=2026.10.19"
-dnspython = "^2.9.0"
+dnspython = "^2.9.2"
 python-multipart = "^0.0.32"
 alembic = "^1.20.1"
 
